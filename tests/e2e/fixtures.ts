@@ -1,5 +1,17 @@
 import { Page, Request, expect, test as base } from "@playwright/test"
 
+export type ApiResponse<T = unknown> = {
+    status: number
+    ok: boolean
+    body: T | string | null
+}
+
+export type CommonResponse<T = unknown> = {
+    success: boolean
+    error?: string
+    data?: T
+}
+
 export type LoginContext = {
     username: string
     password: string
@@ -20,6 +32,48 @@ export async function loginAs(page: Page, creds: LoginContext) {
 
 export async function logout(page: Page) {
     await page.context().clearCookies()
+}
+
+export async function browserApi<T = unknown>(
+    page: Page,
+    method: "POST" | "PUT" | "PATCH" | "DELETE",
+    path: string,
+    data?: unknown,
+): Promise<ApiResponse<T>> {
+    const result = await page.evaluate(
+        async ({ method, path, data }) => {
+            const init: RequestInit = { method }
+            if (data !== undefined) {
+                init.headers = { "Content-Type": "application/json" }
+                init.body = data === null ? null : JSON.stringify(data)
+            }
+            const response = await fetch(path, init)
+            const text = await response.text()
+            let body: unknown = null
+            if (text) {
+                try {
+                    body = JSON.parse(text)
+                } catch {
+                    body = text
+                }
+            }
+            return {
+                status: response.status,
+                ok: response.ok,
+                body,
+            }
+        },
+        { method, path, data },
+    )
+    return result as ApiResponse<T>
+}
+
+export async function browserApiPost<T = unknown>(page: Page, path: string, data?: unknown): Promise<ApiResponse<T>> {
+    return await browserApi<T>(page, "POST", path, data)
+}
+
+export function responseSummary(resp: ApiResponse) {
+    return `status=${resp.status} body=${typeof resp.body === "string" ? resp.body : JSON.stringify(resp.body)}`
 }
 
 export async function expectAuthenticated(page: Page) {
@@ -49,8 +103,8 @@ export async function findRequest(
 }
 
 export const test = base.extend<{ adminPage: Page }>({
-    adminPage: async ({ page }, use) => {
+    adminPage: async ({ page }, runFixture) => {
         await loginAs(page, defaultAdmin)
-        await use(page)
+        await runFixture(page)
     },
 })

@@ -1,6 +1,6 @@
 import { expect } from "@playwright/test"
 
-import { test } from "./fixtures"
+import { CommonResponse, browserApiPost, responseSummary, test } from "./fixtures"
 
 test("server-group hides guest-empty groups from anonymous callers", async ({ adminPage: page, browser }) => {
     const tag = Date.now().toString(36)
@@ -17,17 +17,13 @@ test("server-group hides guest-empty groups from anonymous callers", async ({ ad
 
     const createdGroupIDs: number[] = []
     if (publicServer) {
-        const visibleResp = await page.request.post("/api/v1/server-group", {
-            data: { name: visibleName, servers: [publicServer.id] },
-        })
-        expect(visibleResp.ok()).toBeTruthy()
-        createdGroupIDs.push(((await visibleResp.json()) as { data: number }).data)
+        const visibleResp = await browserApiPost<CommonResponse<number>>(page, "/api/v1/server-group", { name: visibleName, servers: [publicServer.id] })
+        expect(visibleResp.ok && (visibleResp.body as CommonResponse<number>).success, responseSummary(visibleResp)).toBeTruthy()
+        createdGroupIDs.push((visibleResp.body as CommonResponse<number>).data as number)
     }
-    const hiddenResp = await page.request.post("/api/v1/server-group", {
-        data: { name: hiddenName, servers: [] },
-    })
-    expect(hiddenResp.ok()).toBeTruthy()
-    createdGroupIDs.push(((await hiddenResp.json()) as { data: number }).data)
+    const hiddenResp = await browserApiPost<CommonResponse<number>>(page, "/api/v1/server-group", { name: hiddenName, servers: [] })
+    expect(hiddenResp.ok && (hiddenResp.body as CommonResponse<number>).success, responseSummary(hiddenResp)).toBeTruthy()
+    createdGroupIDs.push((hiddenResp.body as CommonResponse<number>).data as number)
 
     try {
         const guestCtx = await browser.newContext()
@@ -47,7 +43,7 @@ test("server-group hides guest-empty groups from anonymous callers", async ({ ad
         }
     } finally {
         if (createdGroupIDs.length > 0) {
-            await page.request.post("/api/v1/batch-delete/server-group", { data: createdGroupIDs })
+            await browserApiPost(page, "/api/v1/batch-delete/server-group", createdGroupIDs)
         }
     }
 })

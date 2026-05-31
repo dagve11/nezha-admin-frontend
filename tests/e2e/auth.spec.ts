@@ -1,6 +1,15 @@
 import { expect } from "@playwright/test"
 
-import { defaultAdmin, expectAuthenticated, expectUnauthenticated, loginAs, test } from "./fixtures"
+import {
+    CommonResponse,
+    browserApiPost,
+    defaultAdmin,
+    expectAuthenticated,
+    expectUnauthenticated,
+    loginAs,
+    responseSummary,
+    test,
+} from "./fixtures"
 
 test("login persists session via cookie and getProfile succeeds", async ({ page }) => {
     await loginAs(page, defaultAdmin)
@@ -17,15 +26,13 @@ test("password change rotates TokenVersion and revokes existing session", async 
     const newPassword = `e2e-${Date.now().toString(36)}`
     let isOnNewPassword = false
     try {
-        const resp = await page.request.post("/api/v1/profile", {
-            data: {
-                original_password: defaultAdmin.password,
-                new_password: newPassword,
-                new_username: defaultAdmin.username,
-                reject_password: false,
-            },
+        const resp = await browserApiPost<CommonResponse>(page, "/api/v1/profile", {
+            original_password: defaultAdmin.password,
+            new_password: newPassword,
+            new_username: defaultAdmin.username,
+            reject_password: false,
         })
-        expect(resp.ok(), "profile update must succeed").toBeTruthy()
+        expect(resp.ok && (resp.body as CommonResponse).success, `profile update must succeed: ${responseSummary(resp)}`).toBeTruthy()
         isOnNewPassword = true
 
         await page.context().clearCookies()
@@ -43,15 +50,16 @@ test("password change rotates TokenVersion and revokes existing session", async 
         if (isOnNewPassword) {
             await page.context().clearCookies()
             await loginAs(page, { username: defaultAdmin.username, password: newPassword })
-            const restoreResp = await page.request.post("/api/v1/profile", {
-                data: {
-                    original_password: newPassword,
-                    new_password: defaultAdmin.password,
-                    new_username: defaultAdmin.username,
-                    reject_password: false,
-                },
+            const restoreResp = await browserApiPost<CommonResponse>(page, "/api/v1/profile", {
+                original_password: newPassword,
+                new_password: defaultAdmin.password,
+                new_username: defaultAdmin.username,
+                reject_password: false,
             })
-            expect(restoreResp.ok(), "password restore must succeed so other suites can still log in").toBeTruthy()
+            expect(
+                restoreResp.ok && (restoreResp.body as CommonResponse).success,
+                `password restore must succeed so other suites can still log in: ${responseSummary(restoreResp)}`,
+            ).toBeTruthy()
         }
     }
 })

@@ -1,22 +1,20 @@
 import { expect } from "@playwright/test"
 
-import { test } from "./fixtures"
+import { CommonResponse, browserApiPost, responseSummary, test } from "./fixtures"
 
 test("manual cron trigger goes through POST, not GET", async ({ adminPage: page }) => {
-    const created = await page.request.post("/api/v1/cron", {
-        data: {
-            name: "e2e-cron-csrf",
-            task_type: 0,
-            scheduler: "@every 1h",
-            command: "true",
-            servers: [],
-            cover: 0,
-            push_successful: false,
-            notification_group_id: 0,
-        },
+    const created = await browserApiPost<CommonResponse<number>>(page, "/api/v1/cron", {
+        name: "e2e-cron-csrf",
+        task_type: 0,
+        scheduler: "@every 1h",
+        command: "true",
+        servers: [],
+        cover: 0,
+        push_successful: false,
+        notification_group_id: 0,
     })
-    expect(created.ok(), "create cron via POST must succeed").toBeTruthy()
-    const { data: cronID } = (await created.json()) as { data: number }
+    expect(created.ok && (created.body as CommonResponse<number>).success, `create cron via POST must succeed: ${responseSummary(created)}`).toBeTruthy()
+    const cronID = (created.body as CommonResponse<number>).data
     expect(typeof cronID).toBe("number")
 
     try {
@@ -28,11 +26,11 @@ test("manual cron trigger goes through POST, not GET", async ({ adminPage: page 
             `GET must no longer be routable (got ${getResp.status()})`,
         ).toBeTruthy()
 
-        const postResp = await page.request.post(`/api/v1/cron/${cronID}/manual`)
-        expect(postResp.ok(), `POST must succeed (got ${postResp.status()})`).toBeTruthy()
-        const body = await postResp.json()
+        const postResp = await browserApiPost<CommonResponse>(page, `/api/v1/cron/${cronID}/manual`)
+        expect(postResp.ok, `POST must succeed: ${responseSummary(postResp)}`).toBeTruthy()
+        const body = postResp.body as CommonResponse
         expect(body.success).toBe(true)
     } finally {
-        await page.request.post("/api/v1/batch-delete/cron", { data: [cronID] })
+        await browserApiPost(page, "/api/v1/batch-delete/cron", [cronID])
     }
 })
