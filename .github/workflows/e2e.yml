@@ -21,8 +21,8 @@ jobs:
     timeout-minutes: 25
 
     env:
-      NEZHA_REPO: dagve11/nezha
-      NEZHA_REF: main
+      NEZHA_REPO: nezhahq/nezha
+      NEZHA_REF: master
       NZ_LISTENHOST: 127.0.0.1
       NZ_LISTENPORT: "8008"
       NZ_AGENTSECRETKEY: e2e-agent-secret-32-bytes-long-ok

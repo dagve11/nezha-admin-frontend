@@ -10,7 +10,7 @@ npx swagger-typescript-api -p http://localhost:8008/swagger/doc.json -o ./src/ty
 
 Playwright suite lives in `tests/e2e/` and runs in CI via
 `.github/workflows/e2e.yml`. The workflow checks out the backend
-(`dagve11/nezha` main), starts it on `127.0.0.1:8008`, then runs
+(`nezhahq/nezha` master), starts it on `127.0.0.1:8008`, then runs
 `npm run e2e` here.
 
 ### Run locally
@@ -24,7 +24,7 @@ npm run e2e:install
 Then start the backend separately. The shape the CI workflow uses is:
 
 ```bash
-# in a checkout of dagve11/nezha
+# in a checkout of nezhahq/nezha
 mkdir -p cmd/dashboard/admin-dist cmd/dashboard/user-dist
 printf '<!doctype html><title>admin e2e</title>\n' > cmd/dashboard/admin-dist/index.html
 printf '<!doctype html><title>user e2e</title>\n' > cmd/dashboard/user-dist/index.html
