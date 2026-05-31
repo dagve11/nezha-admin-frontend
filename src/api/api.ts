@@ -13,6 +13,28 @@ function buildUrl(path: string, data?: any): string {
     return url.toString()
 }
 
+const csrfCookieName = "nz-csrf"
+const csrfHeaderName = "X-CSRF-Token"
+
+function getCookie(name: string): string {
+    if (typeof document === "undefined" || !document.cookie) return ""
+    const prefix = `${encodeURIComponent(name)}=`
+    const cookie = document.cookie.split("; ").find((item) => item.startsWith(prefix))
+    return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : ""
+}
+
+function buildUnsafeHeaders(includeJson: boolean): HeadersInit {
+    const headers: Record<string, string> = {}
+    if (includeJson) {
+        headers["Content-Type"] = "application/json"
+    }
+    const csrfToken = getCookie(csrfCookieName)
+    if (csrfToken) {
+        headers[csrfHeaderName] = csrfToken
+    }
+    return headers
+}
+
 export enum FetcherMethod {
     GET = "GET",
     POST = "POST",
@@ -32,9 +54,7 @@ export async function fetcher<T>(method: FetcherMethod, path: string, data?: any
     } else {
         response = await fetch(path, {
             method: method,
-            headers: {
-                "Content-Type": "application/json",
-            },
+            headers: buildUnsafeHeaders(true),
             body: data ? JSON.stringify(data) : null,
         })
     }
@@ -52,7 +72,10 @@ export async function fetcher<T>(method: FetcherMethod, path: string, data?: any
         (!lastestRefreshTokenAt || Date.now() - lastestRefreshTokenAt > 1000 * 60 * 60)
     ) {
         lastestRefreshTokenAt = Date.now()
-        fetch("/api/v1/refresh-token")
+        fetch("/api/v1/refresh-token", {
+            method: "POST",
+            headers: buildUnsafeHeaders(false),
+        })
     }
 
     return responseData.data

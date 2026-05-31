@@ -43,9 +43,18 @@ export async function browserApi<T = unknown>(
     const result = await page.evaluate(
         async ({ method, path, data }) => {
             const init: RequestInit = { method }
+            const headers: Record<string, string> = {}
             if (data !== undefined) {
-                init.headers = { "Content-Type": "application/json" }
+                headers["Content-Type"] = "application/json"
                 init.body = data === null ? null : JSON.stringify(data)
+            }
+            const csrfPrefix = "nz-csrf="
+            const csrfCookie = document.cookie.split("; ").find((item) => item.startsWith(csrfPrefix))
+            if (csrfCookie) {
+                headers["X-CSRF-Token"] = decodeURIComponent(csrfCookie.slice(csrfPrefix.length))
+            }
+            if (Object.keys(headers).length > 0) {
+                init.headers = headers
             }
             const response = await fetch(path, init)
             const text = await response.text()
