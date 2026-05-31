@@ -13,6 +13,7 @@ import {
 import {
     Form,
     FormControl,
+    FormDescription,
     FormField,
     FormItem,
     FormLabel,
@@ -41,8 +42,8 @@ interface NATCardProps {
 const natFormSchema = z.object({
     name: z.string().min(1),
     enabled: z.boolean(),
-    server_id: z.coerce.number().int(),
-    host: z.string(),
+    server_id: z.coerce.number().int().min(1),
+    host: z.string().trim().min(1),
     port: z.coerce.number().int().min(1).max(65535),
 })
 
@@ -84,8 +85,10 @@ export const NATCard: React.FC<NATCardProps> = ({ data, mutate }) => {
             }
         } catch (e) {
             console.error(e)
+            const description =
+                e instanceof Error && e.message ? e.message : t("Results.UnExpectedError")
             toast(t("Error"), {
-                description: t("Results.UnExpectedError"),
+                description,
             })
             return
         }
@@ -104,7 +107,7 @@ export const NATCard: React.FC<NATCardProps> = ({ data, mutate }) => {
                     <div className="items-center mx-1">
                         <DialogHeader>
                             <DialogTitle>{data ? t("EditNAT") : t("CreateNAT")}</DialogTitle>
-                            <DialogDescription />
+                            <DialogDescription>{t("NATDialogHint")}</DialogDescription>
                         </DialogHeader>
                         <Form {...form}>
                             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2 my-2">
@@ -154,6 +157,9 @@ export const NATCard: React.FC<NATCardProps> = ({ data, mutate }) => {
                                                     {...field}
                                                 />
                                             </FormControl>
+                                            <FormDescription>
+                                                {t("NATLocalServiceHint")}
+                                            </FormDescription>
                                             <FormMessage />
                                         </FormItem>
                                     )}
@@ -176,6 +182,9 @@ export const NATCard: React.FC<NATCardProps> = ({ data, mutate }) => {
                                                         {...fieldProps}
                                                     />
                                                 </FormControl>
+                                                <FormDescription>
+                                                    {t("NATBindPortHint")}
+                                                </FormDescription>
                                                 <FormMessage />
                                             </FormItem>
                                         )
