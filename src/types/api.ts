@@ -746,6 +746,7 @@ export interface ModelSettingForm {
     /** @minLength 1 */
     site_name: string
     tls?: boolean
+    tsdb_enabled?: boolean
     user_template?: string
     /** 前端真实IP */
     web_real_ip_header?: string
@@ -754,6 +755,7 @@ export interface ModelSettingForm {
 export interface ModelSettingResponse {
     config: ModelSetting
     frontend_templates: ModelFrontendTemplate[]
+    tsdb_enabled: boolean
     version: string
 }
 

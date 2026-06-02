@@ -43,6 +43,7 @@
     "Error": "Error",
     "Name": "Name",
     "Version": "Version",
+    "TSDBStatus": "TSDB",
     "Unknown": "unknown",
     "Enable": "Enable",
     "HideForGuest": "Hidden from Visitors",

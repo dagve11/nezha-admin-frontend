@@ -43,6 +43,7 @@
     "Error": "Помилка",
     "Name": "Назва",
     "Version": "Версія",
+    "TSDBStatus": "TSDB",
     "Unknown": "невідомо",
     "Enable": "Увімкнути",
     "HideForGuest": "Приховано для гостей",

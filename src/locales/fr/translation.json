@@ -35,6 +35,7 @@
     "Error": "Erreur",
     "Name": "Nom",
     "Version": "Version",
+    "TSDBStatus": "TSDB",
     "Unknown": "inconnu",
     "Enable": "Activer",
     "HideForGuest": "Caché des visiteurs",

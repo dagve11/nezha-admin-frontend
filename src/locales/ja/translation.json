@@ -1,3 +1,4 @@
 {
-    "BindPort": "バインドポート"
+    "BindPort": "バインドポート",
+    "TSDBStatus": "TSDB"
 }

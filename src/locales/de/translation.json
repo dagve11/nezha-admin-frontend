@@ -33,6 +33,7 @@
     "Error": "Fehler",
     "Name": "Name",
     "Version": "Version",
+    "TSDBStatus": "TSDB",
     "Unknown": "Unbekannt",
     "Enable": "Aktivieren",
     "HideForGuest": "Versteckt von Besuchern",

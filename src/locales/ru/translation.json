@@ -165,6 +165,7 @@
     "Notification": "Уведомление",
     "SelectAPageToNavigateTo": "Выберите страницу для перехода",
     "Version": "Версия",
+    "TSDBStatus": "TSDB",
     "InstallCommands": "Команда установки",
     "Loading": "Загрузка",
     "EditServer": "Редактировать сервер",

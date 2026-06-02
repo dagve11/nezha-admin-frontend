@@ -78,6 +78,7 @@
     "Group": "Grupo",
     "MinimumLatency": "Retraso mínimo (milisegundos)",
     "Version": "Versión",
+    "TSDBStatus": "TSDB",
     "Note": "Nota",
     "Profile": "Perfil",
     "Logout": "Cerrar sesión",

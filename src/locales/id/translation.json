@@ -43,6 +43,7 @@
     "Error": "Galat",
     "Name": "Nama",
     "Version": "Versi",
+    "TSDBStatus": "TSDB",
     "Unknown": "tidak diketahui",
     "Enable": "Aktifkan",
     "HideForGuest": "Tersembunyi dari Pengunjung",

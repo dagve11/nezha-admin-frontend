@@ -43,6 +43,7 @@
     "Error": "错误",
     "Name": "名称",
     "Version": "版本",
+    "TSDBStatus": "TSDB 状态",
     "Unknown": "未知",
     "Enable": "启用",
     "HideForGuest": "对游客隐藏",

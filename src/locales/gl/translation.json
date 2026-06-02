@@ -22,5 +22,6 @@
         "ThisOperationIsUnrecoverable": "A operación non se pode desfacer!",
         "TaskTriggeredSuccessfully": "A tarefa desencadeouse correctamente"
     },
-    "BindPort": "Vincular porto"
+    "BindPort": "Vincular porto",
+    "TSDBStatus": "TSDB"
 }

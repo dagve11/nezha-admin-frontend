@@ -41,6 +41,7 @@
     "Error": "錯誤",
     "Name": "名稱",
     "Version": "版本",
+    "TSDBStatus": "TSDB 狀態",
     "Unknown": "未知",
     "Enable": "啟用",
     "HideForGuest": "對遊客隱藏",

@@ -52,6 +52,7 @@ const settingFormSchema = z.object({
     tls: asOptionalField(z.boolean()),
     enable_ip_change_notification: asOptionalField(z.boolean()),
     enable_plain_ip_in_notification: asOptionalField(z.boolean()),
+    tsdb_enabled: asOptionalField(z.boolean()),
 })
 
 export default function SettingsPage() {
@@ -77,6 +78,7 @@ export default function SettingsPage() {
         defaultValues: config
             ? {
                 ...config.config,
+                tsdb_enabled: config.tsdb_enabled,
                 user_template:
                       config.config?.user_template ||
                       Object.keys(config.frontend_templates?.filter((t) => !t.is_admin) || {})[0] ||
@@ -88,6 +90,7 @@ export default function SettingsPage() {
                 site_name: "",
                 language: "",
                 user_template: "user-dist",
+                tsdb_enabled: false,
             },
         resetOptions: {
             keepDefaultValues: false,
@@ -96,9 +99,12 @@ export default function SettingsPage() {
 
     useEffect(() => {
         if (config?.config) {
-            form.reset(config?.config)
+            form.reset({
+                ...config.config,
+                tsdb_enabled: config.tsdb_enabled,
+            })
         }
-    }, [config?.config, form])
+    }, [config?.config, config?.tsdb_enabled, form])
 
     const onSubmit = async (values: any) => {
         try {
@@ -160,6 +166,24 @@ export default function SettingsPage() {
                                                 ))}
                                             </SelectContent>
                                         </Select>
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="tsdb_enabled"
+                            render={({ field }) => (
+                                <FormItem className="flex items-center space-x-2">
+                                    <FormControl>
+                                        <div className="flex items-center gap-2">
+                                            <Checkbox
+                                                checked={field.value}
+                                                onCheckedChange={field.onChange}
+                                            />
+                                            <Label className="text-sm">{t("TSDBStatus")}</Label>
+                                        </div>
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
