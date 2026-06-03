@@ -9,6 +9,8 @@ import { AuthProvider } from "./hooks/useAuth"
 import { NotificationProvider } from "./hooks/useNotfication"
 import { ServerProvider } from "./hooks/useServer"
 
+import { ThemeProvider } from "./components/theme-provider"
+import { Toaster } from "./components/ui/sonner"
 import Root from "./routes/root"
 import ErrorPage from "./error-page"
 
@@ -32,6 +34,20 @@ import UserPage from "./routes/user"
 import WAFPage from "./routes/waf"
 
 const router = createBrowserRouter([
+    {
+        path: "/dashboard/terminal/:id",
+        element: (
+            <AuthProvider>
+                <ProtectedRoute>
+                    <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
+                        <TerminalPage />
+                        <Toaster />
+                    </ThemeProvider>
+                </ProtectedRoute>
+            </AuthProvider>
+        ),
+        errorElement: <ErrorPage />,
+    },
     {
         path: "/dashboard",
         element: (
@@ -106,10 +122,6 @@ const router = createBrowserRouter([
                         <NotificationGroupPage />
                     </NotificationProvider>
                 ),
-            },
-            {
-                path: "/dashboard/terminal/:id",
-                element: <TerminalPage />,
             },
             {
                 path: "/dashboard/notification",

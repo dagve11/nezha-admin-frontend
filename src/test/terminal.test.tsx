@@ -1,7 +1,19 @@
-import { render } from "@testing-library/react"
+import { fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
 
 vi.mock("sonner", () => ({ toast: () => undefined }))
+
+vi.mock("react-router-dom", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("react-router-dom")>()
+    return {
+        ...actual,
+        useParams: () => ({ id: "2" }),
+    }
+})
+
+vi.mock("@/hooks/useTerminal", () => ({
+    default: () => ({ session_id: "session-1" }),
+}))
 
 vi.mock("@/lib/utils", () => ({
     sleep: () => Promise.resolve(),
@@ -9,6 +21,7 @@ vi.mock("@/lib/utils", () => ({
 }))
 
 const attachAddonInstances: { ws: WebSocket }[] = []
+const terminalInstances: { options: { fontSize?: number } }[] = []
 vi.mock("@xterm/addon-attach", () => ({
     AttachAddon: class {
         ws: WebSocket
@@ -34,6 +47,11 @@ vi.mock("@xterm/addon-fit", () => ({
 
 vi.mock("@xterm/xterm", () => ({
     Terminal: class {
+        options: { fontSize?: number }
+        constructor(options: { fontSize?: number } = {}) {
+            this.options = { ...options }
+            terminalInstances.push(this)
+        }
         loadAddon() {}
         open() {}
         dispose() {}
@@ -72,8 +90,22 @@ class FakeWebSocket {
 beforeEach(() => {
     FakeWebSocket.instances = []
     attachAddonInstances.length = 0
+    terminalInstances.length = 0
     ;(globalThis as { WebSocket: typeof WebSocket }).WebSocket =
         FakeWebSocket as unknown as typeof WebSocket
+    Object.defineProperty(window, "matchMedia", {
+        writable: true,
+        value: vi.fn().mockImplementation((query: string) => ({
+            matches: true,
+            media: query,
+            onchange: null,
+            addEventListener: vi.fn(),
+            removeEventListener: vi.fn(),
+            addListener: vi.fn(),
+            removeListener: vi.fn(),
+            dispatchEvent: vi.fn(),
+        })),
+    })
 })
 
 afterEach(() => {
@@ -100,4 +132,47 @@ test("XtermComponent closes the previous WebSocket and re-attaches xterm when ws
     expect(firstSocket.closeCalls).toBeGreaterThanOrEqual(1)
     expect(attachAddonInstances).toHaveLength(2)
     expect(attachAddonInstances[1].ws).toBe(secondSocket as unknown as WebSocket)
+})
+
+test("TerminalPage renders as a standalone mac style terminal window", async () => {
+    const { TerminalPage } = await import("../components/terminal")
+
+    render(<TerminalPage />)
+
+    expect(screen.getByTestId("mac-terminal-page")).toBeTruthy()
+    expect(screen.getByTestId("mac-terminal-window")).toBeTruthy()
+    expect(screen.getByText("Terminal (2)")).toBeTruthy()
+    expect(screen.getByLabelText("Close window")).toBeTruthy()
+    expect(screen.getByLabelText("Minimize window")).toBeTruthy()
+    expect(screen.getByLabelText("Zoom window")).toBeTruthy()
+})
+
+test("TerminalPage bounds the terminal window to the first viewport", async () => {
+    const { TerminalPage } = await import("../components/terminal")
+
+    render(<TerminalPage />)
+
+    expect(screen.getByTestId("mac-terminal-page").className).toContain("h-[100dvh]")
+    expect(screen.getByTestId("mac-terminal-window").className).toContain("h-full")
+    expect(screen.getByTestId("terminal-viewport").className).toContain("min-h-0")
+    expect(screen.getByTestId("terminal-viewport").className).toContain("h-full")
+})
+
+test("TerminalPage lets users change xterm font size from the title bar", async () => {
+    const { TerminalPage } = await import("../components/terminal")
+
+    render(<TerminalPage />)
+
+    expect(screen.getByTestId("terminal-font-size").textContent).toBe("16")
+    expect(terminalInstances[0].options.fontSize).toBe(16)
+
+    fireEvent.click(screen.getByLabelText("Increase terminal font size"))
+
+    expect(screen.getByTestId("terminal-font-size").textContent).toBe("17")
+    expect(terminalInstances[0].options.fontSize).toBe(17)
+
+    fireEvent.click(screen.getByLabelText("Decrease terminal font size"))
+
+    expect(screen.getByTestId("terminal-font-size").textContent).toBe("16")
+    expect(terminalInstances[0].options.fontSize).toBe(16)
 })
