@@ -4,13 +4,14 @@ import { Toaster } from "@/components/ui/sonner"
 import useSetting from "@/hooks/useSetting"
 import i18n from "@/lib/i18n"
 import { InjectContext } from "@/lib/inject"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { Outlet } from "react-router-dom"
 
 export default function Root() {
     const { t } = useTranslation()
     const { data: settingData, error } = useSetting()
+    const [injectedCustomCode, setInjectedCustomCode] = useState<string | null>(null)
 
     useEffect(() => {
         document.title = settingData?.config?.site_name || "哪吒监控 Nezha Monitoring"
@@ -19,6 +20,13 @@ export default function Root() {
     useEffect(() => {
         if (settingData?.config?.custom_code_dashboard) {
             InjectContext(settingData?.config?.custom_code_dashboard)
+            queueMicrotask(() => {
+                setInjectedCustomCode(settingData.config.custom_code_dashboard)
+            })
+        } else {
+            queueMicrotask(() => {
+                setInjectedCustomCode(null)
+            })
         }
     }, [settingData?.config?.custom_code_dashboard])
 
@@ -33,6 +41,13 @@ export default function Root() {
     }
 
     if (!settingData) {
+        return null
+    }
+
+    if (
+        settingData?.config?.custom_code_dashboard &&
+        injectedCustomCode !== settingData.config.custom_code_dashboard
+    ) {
         return null
     }
 

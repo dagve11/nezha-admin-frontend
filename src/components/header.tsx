@@ -18,6 +18,7 @@ import {
 import { useAuth } from "@/hooks/useAuth"
 import { useMainStore } from "@/hooks/useMainStore"
 import { useMediaQuery } from "@/hooks/useMediaQuery"
+import useSetting from "@/hooks/useSetting"
 import { cn } from "@/lib/utils"
 import i18next from "i18next"
 import { LogOut, Settings, User2 } from "lucide-react"
@@ -38,6 +39,8 @@ import {
     DropdownMenuShortcut,
     DropdownMenuTrigger,
 } from "./ui/dropdown-menu"
+import { Separator } from "./ui/separator"
+import { Skeleton } from "./ui/skeleton"
 import { IconButton } from "./xui/icon-button"
 import { NzNavigationMenuLink } from "./xui/navigation-menu"
 
@@ -57,6 +60,7 @@ export default function Header() {
     const { logout } = useAuth()
     const profile = useMainStore((store) => store.profile)
     const isAdmin = profile?.role === 0
+    const { data: settingData, isLoading: isSettingLoading } = useSetting()
 
     const location = useLocation()
     const isDesktop = useMediaQuery("(min-width: 890px)")
@@ -68,6 +72,10 @@ export default function Header() {
 
     // @ts-expect-error DisableAnimatedMan is a global variable
     const disableAnimatedMan = window.DisableAnimatedMan as boolean
+
+    // @ts-expect-error CustomLogo is a global variable
+    const customLogo = window.CustomLogo || "/apple-touch-icon.png"
+    const siteName = settingData?.config?.site_name
 
     return isDesktop ? (
         <header className={cn("flex px-4 dark:bg-black/40 bg-muted border-b-[1px] overflow-visible", location.pathname === "/dashboard/login" ? "pt-4" : "pt-8")}>
@@ -97,10 +105,11 @@ export default function Header() {
                                 {location.pathname === "/dashboard/login" ? (
                                     <span className="text-sm font-semibold">{t("LoginFirst")}</span>
                                 ) : (
-                                    <>
-                                        <img className="h-7 mr-1" src="/dashboard/logo.svg" />
-                                        {t("nezha")}
-                                    </>
+                                    <BrandLinkContent
+                                        customLogo={customLogo}
+                                        isLoading={isSettingLoading}
+                                        siteName={siteName}
+                                    />
                                 )}
                             </Link>
                         </NavigationMenuLink>
@@ -316,10 +325,11 @@ export default function Header() {
                 {location.pathname === "/dashboard/login" ? (
                     <span className="text-sm font-semibold">{t("LoginFirst")}</span>
                 ) : (
-                    <>
-                        <img className="h-7 mr-1" src="/dashboard/logo.svg" />
-                        {t("nezha")}
-                    </>
+                    <BrandLinkContent
+                        customLogo={customLogo}
+                        isLoading={isSettingLoading}
+                        siteName={siteName}
+                    />
                 )}
             </Link>
             <div className="ml-auto flex items-center gap-1">
@@ -389,6 +399,37 @@ export default function Header() {
                 )}
             </div>
         </header>
+    )
+}
+
+function BrandLinkContent({
+    customLogo,
+    isLoading,
+    siteName,
+}: {
+    customLogo: string
+    isLoading: boolean
+    siteName?: string
+}) {
+    return (
+        <>
+            <div className="mr-1 flex flex-row items-center justify-start header-logo">
+                <img
+                    width={40}
+                    height={40}
+                    alt="apple-touch-icon"
+                    src={customLogo}
+                    className="relative m-0 border-2 border-transparent h-6 w-6 object-cover object-top p-0"
+                />
+            </div>
+            {isLoading ? (
+                <Skeleton className="h-6 w-20 rounded-[5px] bg-muted-foreground/10 animate-none" />
+            ) : (
+                siteName || "NEZHA"
+            )}
+            <Separator orientation="vertical" className="mx-2 hidden h-4 w-px md:block" />
+            <p className="hidden text-sm font-medium opacity-40 md:block">Monitor</p>
+        </>
     )
 }
 
