@@ -21,7 +21,15 @@ vi.mock("@/lib/utils", () => ({
 }))
 
 const attachAddonInstances: { ws: WebSocket }[] = []
-const terminalInstances: { options: { fontSize?: number }; focusCalls: number }[] = []
+const terminalInstances: {
+    options: { fontSize?: number }
+    focusCalls: number
+    textarea?: HTMLTextAreaElement
+    screen?: HTMLElement
+    buffer: { active: { cursorX: number; cursorY: number } }
+    cols: number
+    rows: number
+}[] = []
 vi.mock("@xterm/addon-attach", () => ({
     AttachAddon: class {
         ws: WebSocket
@@ -49,12 +57,37 @@ vi.mock("@xterm/xterm", () => ({
     Terminal: class {
         options: { fontSize?: number }
         focusCalls = 0
+        cols = 80
+        rows = 24
+        buffer = { active: { cursorX: 7, cursorY: 3 } }
+        textarea?: HTMLTextAreaElement
+        screen?: HTMLElement
         constructor(options: { fontSize?: number } = {}) {
             this.options = { ...options }
             terminalInstances.push(this)
         }
         loadAddon() {}
-        open() {}
+        open(container: HTMLElement) {
+            const xterm = document.createElement("div")
+            xterm.className = "xterm"
+            const screen = document.createElement("div")
+            screen.className = "xterm-screen"
+            Object.defineProperty(screen, "clientWidth", { configurable: true, value: 800 })
+            Object.defineProperty(screen, "clientHeight", { configurable: true, value: 480 })
+            const helpers = document.createElement("div")
+            helpers.className = "xterm-helpers"
+            const textarea = document.createElement("textarea")
+            textarea.className = "xterm-helper-textarea"
+            const compositionView = document.createElement("div")
+            compositionView.className = "composition-view"
+
+            helpers.append(textarea, compositionView)
+            screen.append(helpers)
+            xterm.append(screen)
+            container.append(xterm)
+            this.textarea = textarea
+            this.screen = screen
+        }
         focus() {
             this.focusCalls += 1
         }
@@ -173,7 +206,13 @@ test("XtermComponent sends resize frames after WebSocket opens", async () => {
     const { XtermComponent } = await import("../components/terminal")
     const noop = () => undefined
 
-    render(<XtermComponent wsUrl="/api/v1/ws/terminal/session-1" setClose={noop} />)
+    render(
+        <XtermComponent
+            data-testid="terminal-viewport"
+            wsUrl="/api/v1/ws/terminal/session-1"
+            setClose={noop}
+        />,
+    )
 
     const socket = FakeWebSocket.instances[0]
     socket.open()
@@ -187,9 +226,38 @@ test("XtermComponent focuses xterm after opening so IME follows cursor position"
     const { XtermComponent } = await import("../components/terminal")
     const noop = () => undefined
 
-    render(<XtermComponent wsUrl="/api/v1/ws/terminal/session-1" setClose={noop} />)
+    render(
+        <XtermComponent
+            data-testid="terminal-viewport"
+            wsUrl="/api/v1/ws/terminal/session-1"
+            setClose={noop}
+        />,
+    )
 
     expect(terminalInstances[0].focusCalls).toBe(1)
+})
+
+test("XtermComponent anchors the IME textarea to the xterm cursor before composition", async () => {
+    const { XtermComponent } = await import("../components/terminal")
+    const noop = () => undefined
+
+    render(
+        <XtermComponent
+            data-testid="terminal-viewport"
+            wsUrl="/api/v1/ws/terminal/session-1"
+            setClose={noop}
+        />,
+    )
+
+    fireEvent.compositionStart(screen.getByTestId("terminal-viewport"))
+
+    const textarea = terminalInstances[0].textarea
+    expect(textarea?.style.left).toBe("70px")
+    expect(textarea?.style.top).toBe("60px")
+    expect(textarea?.style.width).toBe("10px")
+    expect(textarea?.style.height).toBe("20px")
+    expect(textarea?.style.lineHeight).toBe("20px")
+    expect(textarea?.style.zIndex).toBe("1000")
 })
 
 test("TerminalPage renders as a standalone mac style terminal window", async () => {
@@ -214,6 +282,10 @@ test("TerminalPage bounds the terminal window to the first viewport", async () =
     expect(screen.getByTestId("mac-terminal-window").className).toContain("h-full")
     expect(screen.getByTestId("terminal-viewport").className).toContain("min-h-0")
     expect(screen.getByTestId("terminal-viewport").className).toContain("h-full")
+    expect(screen.getByTestId("terminal-viewport").className).toContain("xterm-ime-stable")
+    expect(screen.getByTestId("terminal-viewport").className).toContain(
+        "[&_.composition-view]:!opacity-0",
+    )
 })
 
 test("TerminalPage lets users change xterm font size from the title bar", async () => {

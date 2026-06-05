@@ -8,7 +8,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import useTerminal from "@/hooks/useTerminal"
-import { sleep } from "@/lib/utils"
+import { cn, sleep } from "@/lib/utils"
 import { AttachAddon } from "@xterm/addon-attach"
 import { FitAddon } from "@xterm/addon-fit"
 import { Terminal } from "@xterm/xterm"
@@ -42,7 +42,7 @@ const TERMINAL_FONT_SIZE_MIN = 12
 const TERMINAL_FONT_SIZE_MAX = 24
 
 export const XtermComponent = forwardRef<HTMLDivElement, XtermProps & JSX.IntrinsicElements["div"]>(
-    ({ wsUrl, setClose, fontSize = TERMINAL_FONT_SIZE_DEFAULT, ...props }, ref) => {
+    ({ wsUrl, setClose, fontSize = TERMINAL_FONT_SIZE_DEFAULT, className, ...props }, ref) => {
         const terminalIdRef = useRef<HTMLDivElement>(null)
         const terminalRef = useRef<Terminal | null>(null)
         const wsRef = useRef<WebSocket | null>(null)
@@ -59,10 +59,46 @@ export const XtermComponent = forwardRef<HTMLDivElement, XtermProps & JSX.Intrin
         const [fitAddon] = useState(() => new FitAddon())
         const sendResize = useRef(false)
 
+        const syncImeAnchor = useCallback(() => {
+            const terminal = terminalRef.current
+            const container = terminalIdRef.current
+            if (!terminal || !container || terminal.cols <= 0 || terminal.rows <= 0) return
+
+            const textarea = container.querySelector<HTMLTextAreaElement>(
+                ".xterm-helper-textarea",
+            )
+            const screenElement = container.querySelector<HTMLElement>(".xterm-screen")
+            if (!textarea || !screenElement) return
+
+            const screenBounds = screenElement.getBoundingClientRect()
+            const screenWidth = screenBounds.width || screenElement.clientWidth
+            const screenHeight = screenBounds.height || screenElement.clientHeight
+            if (!screenWidth || !screenHeight) return
+
+            const cellWidth = screenWidth / terminal.cols
+            const cellHeight = screenHeight / terminal.rows
+            const cursorX = Math.min(
+                Math.max(terminal.buffer.active.cursorX, 0),
+                Math.max(terminal.cols - 1, 0),
+            )
+            const cursorY = Math.min(
+                Math.max(terminal.buffer.active.cursorY, 0),
+                Math.max(terminal.rows - 1, 0),
+            )
+
+            textarea.style.left = `${cursorX * cellWidth}px`
+            textarea.style.top = `${cursorY * cellHeight}px`
+            textarea.style.width = `${Math.max(cellWidth, 1)}px`
+            textarea.style.height = `${Math.max(cellHeight, 1)}px`
+            textarea.style.lineHeight = `${Math.max(cellHeight, 1)}px`
+            textarea.style.zIndex = "1000"
+        }, [])
+
         const doResize = useCallback(() => {
             if (!terminalIdRef.current) return
 
             fitAddon.fit()
+            syncImeAnchor()
 
             const dimensions = fitAddon.proposeDimensions()
 
@@ -84,7 +120,7 @@ export const XtermComponent = forwardRef<HTMLDivElement, XtermProps & JSX.Intrin
 
                 ws.send(msg)
             }
-        }, [fitAddon])
+        }, [fitAddon, syncImeAnchor])
 
         const onResize = useCallback(async () => {
             if (sendResize.current) return
@@ -120,8 +156,13 @@ export const XtermComponent = forwardRef<HTMLDivElement, XtermProps & JSX.Intrin
             terminal.loadAddon(attachAddon)
             terminal.loadAddon(fitAddon)
             terminal.open(container)
+            fitAddon.fit()
+            syncImeAnchor()
             terminal.focus()
             window.addEventListener("resize", onResize)
+            container.addEventListener("compositionstart", syncImeAnchor, true)
+            container.addEventListener("keydown", syncImeAnchor, true)
+            container.addEventListener("focusin", syncImeAnchor, true)
 
             ws.onopen = () => {
                 onResize()
@@ -139,6 +180,9 @@ export const XtermComponent = forwardRef<HTMLDivElement, XtermProps & JSX.Intrin
 
             return () => {
                 window.removeEventListener("resize", onResize)
+                container.removeEventListener("compositionstart", syncImeAnchor, true)
+                container.removeEventListener("keydown", syncImeAnchor, true)
+                container.removeEventListener("focusin", syncImeAnchor, true)
                 ws.onopen = null
                 ws.onclose = null
                 ws.onerror = null
@@ -147,7 +191,7 @@ export const XtermComponent = forwardRef<HTMLDivElement, XtermProps & JSX.Intrin
                 if (wsRef.current === ws) wsRef.current = null
                 if (terminalRef.current === terminal) terminalRef.current = null
             }
-        }, [fitAddon, onResize, setClose, wsUrl])
+        }, [fitAddon, onResize, setClose, syncImeAnchor, wsUrl])
 
         useEffect(() => {
             const terminal = terminalRef.current
@@ -157,7 +201,16 @@ export const XtermComponent = forwardRef<HTMLDivElement, XtermProps & JSX.Intrin
             doResize()
         }, [doResize, fontSize])
 
-        return <div ref={terminalIdRef} {...props} />
+        return (
+            <div
+                ref={terminalIdRef}
+                className={cn(
+                    "xterm-ime-stable [&_.composition-view]:!opacity-0 [&_.composition-view]:pointer-events-none [&_.xterm-helper-textarea]:!z-[1000]",
+                    className,
+                )}
+                {...props}
+            />
+        )
     },
 )
 
