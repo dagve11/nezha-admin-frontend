@@ -260,6 +260,78 @@ test("XtermComponent anchors the IME textarea to the xterm cursor before composi
     expect(textarea?.style.zIndex).toBe("1000")
 })
 
+test("XtermComponent keeps IME composition keystrokes away from xterm input handlers", async () => {
+    const { XtermComponent } = await import("../components/terminal")
+    const noop = () => undefined
+
+    render(
+        <XtermComponent
+            data-testid="terminal-viewport"
+            wsUrl="/api/v1/ws/terminal/session-1"
+            setClose={noop}
+        />,
+    )
+
+    const textarea = terminalInstances[0].textarea!
+    const targetHandlers = {
+        compositionstart: vi.fn(),
+        compositionend: vi.fn(),
+        keydown: vi.fn(),
+        input: vi.fn(),
+    }
+    textarea.addEventListener("compositionstart", targetHandlers.compositionstart)
+    textarea.addEventListener("compositionend", targetHandlers.compositionend)
+    textarea.addEventListener("keydown", targetHandlers.keydown)
+    textarea.addEventListener("input", targetHandlers.input)
+
+    textarea.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }))
+
+    const composingKeyDown = new KeyboardEvent("keydown", {
+        bubbles: true,
+        cancelable: true,
+        key: "x",
+    })
+    Object.defineProperty(composingKeyDown, "isComposing", { value: true })
+    textarea.dispatchEvent(composingKeyDown)
+
+    textarea.dispatchEvent(
+        new InputEvent("input", {
+            bubbles: true,
+            data: "x",
+            inputType: "insertCompositionText",
+            isComposing: true,
+        }),
+    )
+
+    textarea.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true, data: "小" }))
+    textarea.dispatchEvent(
+        new InputEvent("input", {
+            bubbles: true,
+            data: "小",
+            inputType: "insertText",
+        }),
+    )
+
+    expect(targetHandlers.compositionstart).toHaveBeenCalledTimes(1)
+    expect(targetHandlers.compositionend).toHaveBeenCalledTimes(1)
+    expect(targetHandlers.keydown).not.toHaveBeenCalled()
+    expect(targetHandlers.input).not.toHaveBeenCalled()
+
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    textarea.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "a" }))
+    textarea.dispatchEvent(
+        new InputEvent("input", {
+            bubbles: true,
+            data: "a",
+            inputType: "insertText",
+        }),
+    )
+
+    expect(targetHandlers.keydown).toHaveBeenCalledTimes(1)
+    expect(targetHandlers.input).toHaveBeenCalledTimes(1)
+})
+
 test("TerminalPage renders as a standalone mac style terminal window", async () => {
     const { TerminalPage } = await import("../components/terminal")
 

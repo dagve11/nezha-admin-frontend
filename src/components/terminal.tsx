@@ -40,12 +40,26 @@ interface XtermProps {
 const TERMINAL_FONT_SIZE_DEFAULT = 16
 const TERMINAL_FONT_SIZE_MIN = 12
 const TERMINAL_FONT_SIZE_MAX = 24
+type ImeState = {
+    isComposing: boolean
+    blockNextInput: boolean
+    clearBlockTimer?: number
+}
+
+const stopXtermInputPropagation = (event: Event) => {
+    event.stopPropagation()
+    event.stopImmediatePropagation()
+}
 
 export const XtermComponent = forwardRef<HTMLDivElement, XtermProps & JSX.IntrinsicElements["div"]>(
     ({ wsUrl, setClose, fontSize = TERMINAL_FONT_SIZE_DEFAULT, className, ...props }, ref) => {
         const terminalIdRef = useRef<HTMLDivElement>(null)
         const terminalRef = useRef<Terminal | null>(null)
         const wsRef = useRef<WebSocket | null>(null)
+        const imeStateRef = useRef<ImeState>({
+            isComposing: false,
+            blockNextInput: false,
+        })
 
         useImperativeHandle(ref, () => {
             return {
@@ -58,6 +72,14 @@ export const XtermComponent = forwardRef<HTMLDivElement, XtermProps & JSX.Intrin
 
         const [fitAddon] = useState(() => new FitAddon())
         const sendResize = useRef(false)
+
+        const clearPendingImeInputBlock = useCallback(() => {
+            const clearBlockTimer = imeStateRef.current.clearBlockTimer
+            if (clearBlockTimer === undefined) return
+
+            window.clearTimeout(clearBlockTimer)
+            imeStateRef.current.clearBlockTimer = undefined
+        }, [])
 
         const syncImeAnchor = useCallback(() => {
             const terminal = terminalRef.current
@@ -92,6 +114,50 @@ export const XtermComponent = forwardRef<HTMLDivElement, XtermProps & JSX.Intrin
             textarea.style.height = `${Math.max(cellHeight, 1)}px`
             textarea.style.lineHeight = `${Math.max(cellHeight, 1)}px`
             textarea.style.zIndex = "1000"
+        }, [])
+
+        const handleImeCompositionStart = useCallback(() => {
+            clearPendingImeInputBlock()
+            imeStateRef.current.isComposing = true
+            imeStateRef.current.blockNextInput = false
+            syncImeAnchor()
+        }, [clearPendingImeInputBlock, syncImeAnchor])
+
+        const handleImeCompositionEnd = useCallback(() => {
+            clearPendingImeInputBlock()
+            imeStateRef.current.isComposing = false
+            imeStateRef.current.blockNextInput = true
+            syncImeAnchor()
+            imeStateRef.current.clearBlockTimer = window.setTimeout(() => {
+                imeStateRef.current.blockNextInput = false
+                imeStateRef.current.clearBlockTimer = undefined
+            }, 0)
+        }, [clearPendingImeInputBlock, syncImeAnchor])
+
+        const handleImeKeyboardEvent = useCallback(
+            (event: KeyboardEvent) => {
+                syncImeAnchor()
+
+                if (imeStateRef.current.isComposing || event.isComposing) {
+                    stopXtermInputPropagation(event)
+                }
+            },
+            [syncImeAnchor],
+        )
+
+        const handleImeInputEvent = useCallback((event: Event) => {
+            const inputEvent = event as InputEvent
+            const inputType = inputEvent.inputType ?? ""
+            const isCompositionInput = inputType.includes("Composition")
+
+            if (
+                imeStateRef.current.isComposing ||
+                imeStateRef.current.blockNextInput ||
+                inputEvent.isComposing ||
+                isCompositionInput
+            ) {
+                stopXtermInputPropagation(event)
+            }
         }, [])
 
         const doResize = useCallback(() => {
@@ -160,8 +226,13 @@ export const XtermComponent = forwardRef<HTMLDivElement, XtermProps & JSX.Intrin
             syncImeAnchor()
             terminal.focus()
             window.addEventListener("resize", onResize)
-            container.addEventListener("compositionstart", syncImeAnchor, true)
-            container.addEventListener("keydown", syncImeAnchor, true)
+            container.addEventListener("compositionstart", handleImeCompositionStart, true)
+            container.addEventListener("compositionupdate", syncImeAnchor, true)
+            container.addEventListener("compositionend", handleImeCompositionEnd, true)
+            container.addEventListener("keydown", handleImeKeyboardEvent, true)
+            container.addEventListener("keypress", handleImeKeyboardEvent, true)
+            container.addEventListener("beforeinput", handleImeInputEvent, true)
+            container.addEventListener("input", handleImeInputEvent, true)
             container.addEventListener("focusin", syncImeAnchor, true)
 
             ws.onopen = () => {
@@ -180,9 +251,15 @@ export const XtermComponent = forwardRef<HTMLDivElement, XtermProps & JSX.Intrin
 
             return () => {
                 window.removeEventListener("resize", onResize)
-                container.removeEventListener("compositionstart", syncImeAnchor, true)
-                container.removeEventListener("keydown", syncImeAnchor, true)
+                container.removeEventListener("compositionstart", handleImeCompositionStart, true)
+                container.removeEventListener("compositionupdate", syncImeAnchor, true)
+                container.removeEventListener("compositionend", handleImeCompositionEnd, true)
+                container.removeEventListener("keydown", handleImeKeyboardEvent, true)
+                container.removeEventListener("keypress", handleImeKeyboardEvent, true)
+                container.removeEventListener("beforeinput", handleImeInputEvent, true)
+                container.removeEventListener("input", handleImeInputEvent, true)
                 container.removeEventListener("focusin", syncImeAnchor, true)
+                clearPendingImeInputBlock()
                 ws.onopen = null
                 ws.onclose = null
                 ws.onerror = null
@@ -191,7 +268,18 @@ export const XtermComponent = forwardRef<HTMLDivElement, XtermProps & JSX.Intrin
                 if (wsRef.current === ws) wsRef.current = null
                 if (terminalRef.current === terminal) terminalRef.current = null
             }
-        }, [fitAddon, onResize, setClose, syncImeAnchor, wsUrl])
+        }, [
+            clearPendingImeInputBlock,
+            fitAddon,
+            handleImeCompositionEnd,
+            handleImeCompositionStart,
+            handleImeInputEvent,
+            handleImeKeyboardEvent,
+            onResize,
+            setClose,
+            syncImeAnchor,
+            wsUrl,
+        ])
 
         useEffect(() => {
             const terminal = terminalRef.current
