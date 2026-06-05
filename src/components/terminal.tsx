@@ -56,7 +56,7 @@ export const XtermComponent = forwardRef<HTMLDivElement, XtermProps & JSX.Intrin
             }
         }, [])
 
-        const fitAddon = useRef(new FitAddon()).current
+        const [fitAddon] = useState(() => new FitAddon())
         const sendResize = useRef(false)
 
         const doResize = useCallback(() => {
@@ -79,7 +79,10 @@ export const XtermComponent = forwardRef<HTMLDivElement, XtermProps & JSX.Intrin
                 msg.set(prefix)
                 msg.set(resizeMessage, prefix.length)
 
-                wsRef.current?.send(msg)
+                const ws = wsRef.current
+                if (ws?.readyState !== WebSocket.OPEN) return
+
+                ws.send(msg)
             }
         }, [fitAddon])
 
@@ -103,7 +106,7 @@ export const XtermComponent = forwardRef<HTMLDivElement, XtermProps & JSX.Intrin
 
             const terminal = new Terminal({
                 cursorBlink: true,
-                fontSize,
+                fontSize: TERMINAL_FONT_SIZE_DEFAULT,
             })
             const url = new URL(wsUrl, window.location.origin)
             url.protocol = url.protocol.replace("http", "ws")

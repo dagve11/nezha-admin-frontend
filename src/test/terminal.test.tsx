@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
 
 vi.mock("sonner", () => ({ toast: () => undefined }))
@@ -59,6 +59,10 @@ vi.mock("@xterm/xterm", () => ({
 }))
 
 class FakeWebSocket {
+    static CONNECTING = 0
+    static OPEN = 1
+    static CLOSING = 2
+    static CLOSED = 3
     static instances: FakeWebSocket[] = []
     url: string
     binaryType = "arraybuffer"
@@ -68,6 +72,7 @@ class FakeWebSocket {
     onmessage: ((ev: MessageEvent) => unknown) | null = null
     readyState = 0
     closeCalls = 0
+    sent: unknown[] = []
 
     constructor(url: string | URL) {
         this.url = url.toString()
@@ -79,7 +84,20 @@ class FakeWebSocket {
         this.readyState = 3
     }
 
-    send() {}
+    open() {
+        this.readyState = 1
+        this.onopen?.(new Event("open"))
+    }
+
+    send(data: unknown) {
+        if (this.readyState !== 1) {
+            throw new DOMException(
+                "Failed to execute 'send' on 'WebSocket': Still in CONNECTING state.",
+                "InvalidStateError",
+            )
+        }
+        this.sent.push(data)
+    }
     addEventListener() {}
     removeEventListener() {}
     dispatchEvent() {
@@ -132,6 +150,33 @@ test("XtermComponent closes the previous WebSocket and re-attaches xterm when ws
     expect(firstSocket.closeCalls).toBeGreaterThanOrEqual(1)
     expect(attachAddonInstances).toHaveLength(2)
     expect(attachAddonInstances[1].ws).toBe(secondSocket as unknown as WebSocket)
+})
+
+test("XtermComponent does not send resize frames before WebSocket opens", async () => {
+    const { XtermComponent } = await import("../components/terminal")
+    const noop = () => undefined
+
+    expect(() => {
+        render(<XtermComponent wsUrl="/api/v1/ws/terminal/session-1" setClose={noop} />)
+    }).not.toThrow()
+
+    expect(FakeWebSocket.instances).toHaveLength(1)
+    expect(FakeWebSocket.instances[0].readyState).toBe(0)
+    expect(FakeWebSocket.instances[0].sent).toHaveLength(0)
+})
+
+test("XtermComponent sends resize frames after WebSocket opens", async () => {
+    const { XtermComponent } = await import("../components/terminal")
+    const noop = () => undefined
+
+    render(<XtermComponent wsUrl="/api/v1/ws/terminal/session-1" setClose={noop} />)
+
+    const socket = FakeWebSocket.instances[0]
+    socket.open()
+
+    await waitFor(() => {
+        expect(socket.sent).toHaveLength(1)
+    })
 })
 
 test("TerminalPage renders as a standalone mac style terminal window", async () => {
