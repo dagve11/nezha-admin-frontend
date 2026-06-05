@@ -120,6 +120,7 @@ export const XtermComponent = forwardRef<HTMLDivElement, XtermProps & JSX.Intrin
             terminal.loadAddon(attachAddon)
             terminal.loadAddon(fitAddon)
             terminal.open(container)
+            terminal.focus()
             window.addEventListener("resize", onResize)
 
             ws.onopen = () => {

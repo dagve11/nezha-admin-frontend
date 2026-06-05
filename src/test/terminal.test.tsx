@@ -21,7 +21,7 @@ vi.mock("@/lib/utils", () => ({
 }))
 
 const attachAddonInstances: { ws: WebSocket }[] = []
-const terminalInstances: { options: { fontSize?: number } }[] = []
+const terminalInstances: { options: { fontSize?: number }; focusCalls: number }[] = []
 vi.mock("@xterm/addon-attach", () => ({
     AttachAddon: class {
         ws: WebSocket
@@ -48,12 +48,16 @@ vi.mock("@xterm/addon-fit", () => ({
 vi.mock("@xterm/xterm", () => ({
     Terminal: class {
         options: { fontSize?: number }
+        focusCalls = 0
         constructor(options: { fontSize?: number } = {}) {
             this.options = { ...options }
             terminalInstances.push(this)
         }
         loadAddon() {}
         open() {}
+        focus() {
+            this.focusCalls += 1
+        }
         dispose() {}
     },
 }))
@@ -177,6 +181,15 @@ test("XtermComponent sends resize frames after WebSocket opens", async () => {
     await waitFor(() => {
         expect(socket.sent).toHaveLength(1)
     })
+})
+
+test("XtermComponent focuses xterm after opening so IME follows cursor position", async () => {
+    const { XtermComponent } = await import("../components/terminal")
+    const noop = () => undefined
+
+    render(<XtermComponent wsUrl="/api/v1/ws/terminal/session-1" setClose={noop} />)
+
+    expect(terminalInstances[0].focusCalls).toBe(1)
 })
 
 test("TerminalPage renders as a standalone mac style terminal window", async () => {
