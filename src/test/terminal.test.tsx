@@ -66,6 +66,7 @@ vi.mock("@xterm/xterm", () => ({
             this.options = { ...options }
             terminalInstances.push(this)
         }
+        attachCustomKeyEventHandler() {}
         loadAddon() {}
         open(container: HTMLElement) {
             const xterm = document.createElement("div")
@@ -330,6 +331,49 @@ test("XtermComponent keeps IME composition keystrokes away from xterm input hand
 
     expect(targetHandlers.keydown).toHaveBeenCalledTimes(1)
     expect(targetHandlers.input).toHaveBeenCalledTimes(1)
+})
+
+test("XtermComponent blocks pending IME keyCode 229 input before composition starts", async () => {
+    const { XtermComponent } = await import("../components/terminal")
+    const noop = () => undefined
+
+    render(
+        <XtermComponent
+            data-testid="terminal-viewport"
+            wsUrl="/api/v1/ws/terminal/session-1"
+            setClose={noop}
+        />,
+    )
+
+    const textarea = terminalInstances[0].textarea!
+    const targetHandlers = {
+        keydown: vi.fn(),
+        input: vi.fn(),
+    }
+    textarea.addEventListener("keydown", targetHandlers.keydown)
+    textarea.addEventListener("input", targetHandlers.input)
+
+    const pendingImeKeyDown = new KeyboardEvent("keydown", {
+        bubbles: true,
+        cancelable: true,
+        key: "Process",
+    })
+    Object.defineProperties(pendingImeKeyDown, {
+        keyCode: { value: 229 },
+        which: { value: 229 },
+    })
+    textarea.dispatchEvent(pendingImeKeyDown)
+
+    textarea.dispatchEvent(
+        new InputEvent("input", {
+            bubbles: true,
+            data: "x",
+            inputType: "insertText",
+        }),
+    )
+
+    expect(targetHandlers.keydown).not.toHaveBeenCalled()
+    expect(targetHandlers.input).not.toHaveBeenCalled()
 })
 
 test("TerminalPage renders as a standalone mac style terminal window", async () => {

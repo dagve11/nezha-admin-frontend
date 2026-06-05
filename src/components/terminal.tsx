@@ -40,6 +40,8 @@ interface XtermProps {
 const TERMINAL_FONT_SIZE_DEFAULT = 16
 const TERMINAL_FONT_SIZE_MIN = 12
 const TERMINAL_FONT_SIZE_MAX = 24
+const IME_PENDING_INPUT_BLOCK_MS = 100
+
 type ImeState = {
     isComposing: boolean
     blockNextInput: boolean
@@ -49,6 +51,16 @@ type ImeState = {
 const stopXtermInputPropagation = (event: Event) => {
     event.stopPropagation()
     event.stopImmediatePropagation()
+}
+
+const isImeKeyboardEvent = (event: KeyboardEvent) => {
+    return (
+        event.isComposing ||
+        event.key === "Process" ||
+        event.key === "Unidentified" ||
+        event.keyCode === 229 ||
+        event.which === 229
+    )
 }
 
 export const XtermComponent = forwardRef<HTMLDivElement, XtermProps & JSX.IntrinsicElements["div"]>(
@@ -80,6 +92,18 @@ export const XtermComponent = forwardRef<HTMLDivElement, XtermProps & JSX.Intrin
             window.clearTimeout(clearBlockTimer)
             imeStateRef.current.clearBlockTimer = undefined
         }, [])
+
+        const scheduleImeInputBlock = useCallback(
+            (delay = 0) => {
+                clearPendingImeInputBlock()
+                imeStateRef.current.blockNextInput = true
+                imeStateRef.current.clearBlockTimer = window.setTimeout(() => {
+                    imeStateRef.current.blockNextInput = false
+                    imeStateRef.current.clearBlockTimer = undefined
+                }, delay)
+            },
+            [clearPendingImeInputBlock],
+        )
 
         const syncImeAnchor = useCallback(() => {
             const terminal = terminalRef.current
@@ -126,23 +150,31 @@ export const XtermComponent = forwardRef<HTMLDivElement, XtermProps & JSX.Intrin
         const handleImeCompositionEnd = useCallback(() => {
             clearPendingImeInputBlock()
             imeStateRef.current.isComposing = false
-            imeStateRef.current.blockNextInput = true
             syncImeAnchor()
-            imeStateRef.current.clearBlockTimer = window.setTimeout(() => {
-                imeStateRef.current.blockNextInput = false
-                imeStateRef.current.clearBlockTimer = undefined
-            }, 0)
-        }, [clearPendingImeInputBlock, syncImeAnchor])
+            scheduleImeInputBlock()
+        }, [clearPendingImeInputBlock, scheduleImeInputBlock, syncImeAnchor])
 
-        const handleImeKeyboardEvent = useCallback(
+        const blockImeKeyboardEventForXterm = useCallback(
             (event: KeyboardEvent) => {
                 syncImeAnchor()
 
-                if (imeStateRef.current.isComposing || event.isComposing) {
+                const isPendingImeKey = isImeKeyboardEvent(event)
+                if (isPendingImeKey && !imeStateRef.current.isComposing) {
+                    scheduleImeInputBlock(IME_PENDING_INPUT_BLOCK_MS)
+                }
+
+                return !(imeStateRef.current.isComposing || isPendingImeKey)
+            },
+            [scheduleImeInputBlock, syncImeAnchor],
+        )
+
+        const handleImeKeyboardEvent = useCallback(
+            (event: KeyboardEvent) => {
+                if (!blockImeKeyboardEventForXterm(event)) {
                     stopXtermInputPropagation(event)
                 }
             },
-            [syncImeAnchor],
+            [blockImeKeyboardEventForXterm],
         )
 
         const handleImeInputEvent = useCallback((event: Event) => {
@@ -219,6 +251,7 @@ export const XtermComponent = forwardRef<HTMLDivElement, XtermProps & JSX.Intrin
             wsRef.current = ws
 
             const attachAddon = new AttachAddon(ws)
+            terminal.attachCustomKeyEventHandler(blockImeKeyboardEventForXterm)
             terminal.loadAddon(attachAddon)
             terminal.loadAddon(fitAddon)
             terminal.open(container)
@@ -271,6 +304,7 @@ export const XtermComponent = forwardRef<HTMLDivElement, XtermProps & JSX.Intrin
         }, [
             clearPendingImeInputBlock,
             fitAddon,
+            blockImeKeyboardEventForXterm,
             handleImeCompositionEnd,
             handleImeCompositionStart,
             handleImeInputEvent,
