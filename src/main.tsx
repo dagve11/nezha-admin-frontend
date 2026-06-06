@@ -15,6 +15,7 @@ import Root from "./routes/root"
 import ErrorPage from "./error-page"
 
 import ProtectedRoute from "./routes/protect"
+import BestIPPage from "./routes/bestip"
 import CronPage from "./routes/cron"
 import LoginPage from "./routes/login"
 import ServerPage from "./routes/server"
@@ -104,8 +105,16 @@ const router = createBrowserRouter([
                 element: <DDNSPage />,
             },
             {
+                path: "/dashboard/bestip",
+                element: <BestIPPage />,
+            },
+            {
                 path: "/dashboard/nat",
-                element: <NATPage />,
+                element: (
+                    <ServerProvider withServer>
+                        <NATPage />
+                    </ServerProvider>
+                ),
             },
             {
                 path: "/dashboard/server-group",

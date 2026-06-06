@@ -11,9 +11,13 @@ vi.mock("react-router-dom", async (importOriginal) => {
     }
 })
 
-vi.mock("@/hooks/useTerminal", () => ({
-    default: () => ({ session_id: "session-1" }),
-}))
+vi.mock("@/hooks/useTerminal", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("@/hooks/useTerminal")>()
+    return {
+        ...actual,
+        default: () => ({ session_id: "session-1" }),
+    }
+})
 
 vi.mock("@/lib/utils", () => ({
     sleep: () => Promise.resolve(),

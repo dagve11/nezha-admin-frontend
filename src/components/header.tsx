@@ -50,6 +50,7 @@ const pages = [
     { href: "/dashboard/cron", label: i18next.t("Task") },
     { href: "/dashboard/notification", label: i18next.t("Notification") },
     { href: "/dashboard/ddns", label: i18next.t("DDNS") },
+    { href: "/dashboard/bestip", label: i18next.t("BestIP.Nav") },
     { href: "/dashboard/nat", label: i18next.t("NATT") },
     { href: "/dashboard/server-group", label: i18next.t("Group") },
     { href: "/dashboard/transfer", label: i18next.t("Transfer.Title") },
@@ -243,6 +244,15 @@ export default function Header() {
                                     className={navigationMenuTriggerStyle()}
                                 >
                                     <Link to="/dashboard/ddns">{t("DDNS")}</Link>
+                                </NzNavigationMenuLink>
+                            </NavigationMenuItem>
+                            <NavigationMenuItem>
+                                <NzNavigationMenuLink
+                                    asChild
+                                    active={location.pathname === "/dashboard/bestip"}
+                                    className={navigationMenuTriggerStyle()}
+                                >
+                                    <Link to="/dashboard/bestip">{t("BestIP.Nav")}</Link>
                                 </NzNavigationMenuLink>
                             </NavigationMenuItem>
                             <NavigationMenuItem>
