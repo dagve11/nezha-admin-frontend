@@ -70,6 +70,12 @@ const encodeBinaryString = (data: string) => {
     return bytes
 }
 
+const setStyleValue = (element: HTMLElement, property: string, value: string) => {
+    if (element.style.getPropertyValue(property) !== value) {
+        element.style.setProperty(property, value)
+    }
+}
+
 const getTerminalBufferLine = (terminal: Terminal, viewportRow: number) => {
     const activeBuffer = terminal.buffer.active
     return activeBuffer.getLine(activeBuffer.baseY + viewportRow)
@@ -174,11 +180,38 @@ const getClaudeCodePromptAnchorColumn = (
     )
 }
 
+const getClaudeCodeWrappedInputAnchor = (terminal: Terminal, viewportRow: number) => {
+    const line = getTerminalBufferLine(terminal, viewportRow)
+    if (!line?.isWrapped) return undefined
+
+    let promptRow = viewportRow - 1
+    while (promptRow >= 0 && getTerminalBufferLine(terminal, promptRow)?.isWrapped) {
+        promptRow -= 1
+    }
+    if (promptRow < 0) return undefined
+
+    const promptLine = getTerminalBufferLineText(terminal, promptRow)
+    if (getClaudeCodePromptIndex(promptLine) === -1) return undefined
+
+    const continuationLine = getTerminalBufferLineText(terminal, viewportRow)
+    return {
+        cursorX: getTerminalBufferLineDisplayWidth(
+            terminal,
+            viewportRow,
+            continuationLine.trimEnd(),
+        ),
+        cursorY: viewportRow,
+    }
+}
+
 const findClaudeCodeInputPromptAnchor = (terminal: Terminal, cursorY: number) => {
     const startRow = Math.min(Math.max(cursorY, 0), Math.max(terminal.rows - 1, 0))
     const endRow = Math.max(0, startRow - CLAUDE_CODE_INPUT_PROMPT_SCAN_ROWS)
 
     for (let row = startRow; row >= endRow; row -= 1) {
+        const wrappedAnchor = getClaudeCodeWrappedInputAnchor(terminal, row)
+        if (wrappedAnchor) return wrappedAnchor
+
         const line = getTerminalBufferLineText(terminal, row)
         const promptIndex = getClaudeCodePromptIndex(line)
         if (promptIndex === -1) continue
@@ -220,6 +253,7 @@ export const XtermComponent = forwardRef<HTMLDivElement, XtermProps & JSX.Intrin
         const imePendingInputBlockUntilRef = useRef(0)
         const imeAnchorAnimationFrameRef = useRef<number | undefined>(undefined)
         const imeAnchorTimerRef = useRef<number | undefined>(undefined)
+        const imeAnchorMutationObserverRef = useRef<MutationObserver | null>(null)
 
         useImperativeHandle(ref, () => {
             return {
@@ -290,23 +324,55 @@ export const XtermComponent = forwardRef<HTMLDivElement, XtermProps & JSX.Intrin
             const height = `${Math.max(cellHeight, 1)}px`
 
             if (helpersElement) {
-                helpersElement.style.left = "0px"
-                helpersElement.style.top = "0px"
+                setStyleValue(helpersElement, "left", "0px")
+                setStyleValue(helpersElement, "top", "0px")
             }
 
             screenElement.style.overflowX = "hidden"
-            textarea.style.left = left
-            textarea.style.top = top
-            textarea.style.width = width
-            textarea.style.height = height
-            textarea.style.lineHeight = height
-            compositionView.style.left = left
-            compositionView.style.top = top
-            compositionView.style.height = height
-            compositionView.style.lineHeight = height
-            compositionView.style.maxWidth = `${Math.max(screenWidth - cursorLeft, cellWidth)}px`
-            compositionView.style.overflow = "hidden"
+            setStyleValue(textarea, "left", left)
+            setStyleValue(textarea, "top", top)
+            setStyleValue(textarea, "width", width)
+            setStyleValue(textarea, "height", height)
+            setStyleValue(textarea, "line-height", height)
+            setStyleValue(compositionView, "left", left)
+            setStyleValue(compositionView, "top", top)
+            setStyleValue(compositionView, "height", height)
+            setStyleValue(compositionView, "line-height", height)
+            setStyleValue(
+                compositionView,
+                "max-width",
+                `${Math.max(screenWidth - cursorLeft, cellWidth)}px`,
+            )
+            setStyleValue(compositionView, "overflow", "hidden")
         }, [resetImeHorizontalScroll])
+
+        const disconnectImeAnchorObserver = useCallback(() => {
+            imeAnchorMutationObserverRef.current?.disconnect()
+            imeAnchorMutationObserverRef.current = null
+        }, [])
+
+        const observeImeAnchorStyles = useCallback(() => {
+            disconnectImeAnchorObserver()
+
+            if (typeof MutationObserver === "undefined") return
+
+            const terminal = terminalRef.current
+            const container = terminalIdRef.current
+            if (!terminal || !container) return
+
+            const textarea =
+                terminal.textarea ??
+                container.querySelector<HTMLTextAreaElement>(".xterm-helper-textarea")
+            const compositionView = container.querySelector<HTMLElement>(".composition-view")
+            if (!textarea || !compositionView) return
+
+            const observer = new MutationObserver(() => {
+                if (isComposingRef.current) syncImeCompositionAnchor()
+            })
+            observer.observe(textarea, { attributes: true, attributeFilter: ["style"] })
+            observer.observe(compositionView, { attributes: true, attributeFilter: ["style"] })
+            imeAnchorMutationObserverRef.current = observer
+        }, [disconnectImeAnchorObserver, syncImeCompositionAnchor])
 
         const cancelQueuedImeAnchorSync = useCallback(() => {
             if (imeAnchorAnimationFrameRef.current !== undefined) {
@@ -347,8 +413,9 @@ export const XtermComponent = forwardRef<HTMLDivElement, XtermProps & JSX.Intrin
         const handleImeCompositionStart = useCallback(() => {
             isComposingRef.current = true
             imePendingInputBlockUntilRef.current = 0
+            observeImeAnchorStyles()
             queueImeAnchorSync()
-        }, [queueImeAnchorSync])
+        }, [observeImeAnchorStyles, queueImeAnchorSync])
 
         const handleImeCompositionUpdate = useCallback(() => {
             queueImeAnchorSync()
@@ -357,9 +424,10 @@ export const XtermComponent = forwardRef<HTMLDivElement, XtermProps & JSX.Intrin
         const handleImeCompositionEnd = useCallback(() => {
             isComposingRef.current = false
             imePendingInputBlockUntilRef.current = 0
+            disconnectImeAnchorObserver()
             cancelQueuedImeAnchorSync()
             resetImeHorizontalScroll()
-        }, [cancelQueuedImeAnchorSync, resetImeHorizontalScroll])
+        }, [cancelQueuedImeAnchorSync, disconnectImeAnchorObserver, resetImeHorizontalScroll])
 
         const blockImeKeyboardEventForXterm = useCallback((event: KeyboardEvent) => {
             const isPendingImeKey = isImeKeyboardEvent(event)
@@ -507,6 +575,7 @@ export const XtermComponent = forwardRef<HTMLDivElement, XtermProps & JSX.Intrin
                 textarea?.removeEventListener("compositionstart", handleImeCompositionStart)
                 textarea?.removeEventListener("compositionupdate", handleImeCompositionUpdate)
                 textarea?.removeEventListener("compositionend", handleImeCompositionEnd)
+                disconnectImeAnchorObserver()
                 cancelQueuedImeAnchorSync()
                 dataDisposable.dispose()
                 binaryDisposable.dispose()
@@ -523,6 +592,7 @@ export const XtermComponent = forwardRef<HTMLDivElement, XtermProps & JSX.Intrin
             fitAddon,
             blockImeKeyboardEventForXterm,
             cancelQueuedImeAnchorSync,
+            disconnectImeAnchorObserver,
             handleImeCompositionEnd,
             handleImeCompositionStart,
             handleImeCompositionUpdate,

@@ -35,8 +35,10 @@ type TerminalMock = {
             cursorY: number
             baseY: number
             lines: string[]
+            wrappedLines: Set<number>
             getLine: (line: number) =>
                 | {
+                      isWrapped: boolean
                       length: number
                       getCell: (
                           column: number,
@@ -100,12 +102,14 @@ vi.mock("@xterm/xterm", () => ({
                 cursorY: 3,
                 baseY: 0,
                 lines: [] as string[],
+                wrappedLines: new Set<number>(),
                 getLine(line: number) {
                     const value = this.lines[line]
                     if (value === undefined) return undefined
                     const cells = createBufferCells(value)
 
                     return {
+                        isWrapped: this.wrappedLines.has(line),
                         length: cells.length,
                         getCell: (column: number) => {
                             const cell = cells[column]
@@ -528,6 +532,78 @@ test("XtermComponent anchors Claude Code IME to the visible input prompt when xt
     const compositionView = terminal.compositionView!
     textarea.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }))
     textarea.dispatchEvent(new CompositionEvent("compositionupdate", { bubbles: true, data: "pi" }))
+
+    expect(textarea.style.left).toBe("80px")
+    expect(textarea.style.top).toBe("280px")
+    expect(compositionView.style.left).toBe("80px")
+    expect(compositionView.style.top).toBe("280px")
+})
+
+test("XtermComponent anchors Claude Code IME to the wrapped continuation input row", async () => {
+    const { XtermComponent } = await import("../components/terminal")
+    const noop = () => undefined
+
+    render(
+        <XtermComponent
+            data-testid="terminal-viewport"
+            wsUrl="/api/v1/ws/terminal/session-1"
+            setClose={noop}
+        />,
+    )
+
+    const terminal = terminalInstances[0]
+    terminal.buffer.active.cursorX = 79
+    terminal.buffer.active.cursorY = 15
+    terminal.buffer.active.lines[2] = "Claude Code v2.1.150"
+    terminal.buffer.active.lines[14] =
+        "> 好惊快i就偶是继续哦你你挨个下个啊hi好多次哦还很低慈爱"
+    terminal.buffer.active.lines[15] = "库存盘点库存课程"
+    terminal.buffer.active.wrappedLines.add(15)
+
+    const textarea = terminal.textarea!
+    const compositionView = terminal.compositionView!
+    textarea.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }))
+    textarea.dispatchEvent(new CompositionEvent("compositionupdate", { bubbles: true, data: "di" }))
+
+    expect(textarea.style.left).toBe("160px")
+    expect(textarea.style.top).toBe("300px")
+    expect(compositionView.style.left).toBe("160px")
+    expect(compositionView.style.top).toBe("300px")
+})
+
+test("XtermComponent restores the Claude Code IME anchor when xterm rewrites helper styles", async () => {
+    const { XtermComponent } = await import("../components/terminal")
+    const noop = () => undefined
+
+    render(
+        <XtermComponent
+            data-testid="terminal-viewport"
+            wsUrl="/api/v1/ws/terminal/session-1"
+            setClose={noop}
+        />,
+    )
+
+    const terminal = terminalInstances[0]
+    terminal.buffer.active.cursorX = 79
+    terminal.buffer.active.cursorY = 16
+    terminal.buffer.active.lines[2] = "Claude Code v2.1.150"
+    terminal.buffer.active.lines[14] = "> 宣布搜"
+    terminal.buffer.active.lines[16] = ""
+
+    const textarea = terminal.textarea!
+    const compositionView = terminal.compositionView!
+    textarea.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }))
+    textarea.dispatchEvent(new CompositionEvent("compositionupdate", { bubbles: true, data: "pi" }))
+
+    await new Promise((resolve) => window.setTimeout(resolve, 0))
+    await new Promise((resolve) => window.requestAnimationFrame(resolve))
+
+    textarea.style.left = "790px"
+    textarea.style.top = "320px"
+    compositionView.style.left = "790px"
+    compositionView.style.top = "320px"
+
+    await Promise.resolve()
 
     expect(textarea.style.left).toBe("80px")
     expect(textarea.style.top).toBe("280px")
