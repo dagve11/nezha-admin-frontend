@@ -8,8 +8,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import useTerminal from "@/hooks/useTerminal"
-import { cn, sleep } from "@/lib/utils"
-import { AttachAddon } from "@xterm/addon-attach"
+import { sleep } from "@/lib/utils"
 import { FitAddon } from "@xterm/addon-fit"
 import { Terminal } from "@xterm/xterm"
 import "@xterm/xterm/css/xterm.css"
@@ -40,18 +39,10 @@ interface XtermProps {
 const TERMINAL_FONT_SIZE_DEFAULT = 16
 const TERMINAL_FONT_SIZE_MIN = 12
 const TERMINAL_FONT_SIZE_MAX = 24
+const TERMINAL_INPUT_COMMAND = 0
+const TERMINAL_RESIZE_COMMAND = 1
 const IME_PENDING_INPUT_BLOCK_MS = 100
-
-type ImeState = {
-    isComposing: boolean
-    blockNextInput: boolean
-    clearBlockTimer?: number
-}
-
-const stopXtermInputPropagation = (event: Event) => {
-    event.stopPropagation()
-    event.stopImmediatePropagation()
-}
+const textEncoder = new TextEncoder()
 
 const isImeKeyboardEvent = (event: KeyboardEvent) => {
     return (
@@ -63,15 +54,28 @@ const isImeKeyboardEvent = (event: KeyboardEvent) => {
     )
 }
 
+const createTerminalFrame = (command: number, payload: Uint8Array) => {
+    const message = new Uint8Array(1 + payload.length)
+    message[0] = command
+    message.set(payload, 1)
+    return message
+}
+
+const encodeBinaryString = (data: string) => {
+    const bytes = new Uint8Array(data.length)
+    for (let index = 0; index < data.length; index += 1) {
+        bytes[index] = data.charCodeAt(index) & 0xff
+    }
+    return bytes
+}
+
 export const XtermComponent = forwardRef<HTMLDivElement, XtermProps & JSX.IntrinsicElements["div"]>(
     ({ wsUrl, setClose, fontSize = TERMINAL_FONT_SIZE_DEFAULT, className, ...props }, ref) => {
         const terminalIdRef = useRef<HTMLDivElement>(null)
         const terminalRef = useRef<Terminal | null>(null)
         const wsRef = useRef<WebSocket | null>(null)
-        const imeStateRef = useRef<ImeState>({
-            isComposing: false,
-            blockNextInput: false,
-        })
+        const isComposingRef = useRef(false)
+        const imePendingInputBlockUntilRef = useRef(0)
 
         useImperativeHandle(ref, () => {
             return {
@@ -85,140 +89,71 @@ export const XtermComponent = forwardRef<HTMLDivElement, XtermProps & JSX.Intrin
         const [fitAddon] = useState(() => new FitAddon())
         const sendResize = useRef(false)
 
-        const clearPendingImeInputBlock = useCallback(() => {
-            const clearBlockTimer = imeStateRef.current.clearBlockTimer
-            if (clearBlockTimer === undefined) return
-
-            window.clearTimeout(clearBlockTimer)
-            imeStateRef.current.clearBlockTimer = undefined
-        }, [])
-
-        const scheduleImeInputBlock = useCallback(
-            (delay = 0) => {
-                clearPendingImeInputBlock()
-                imeStateRef.current.blockNextInput = true
-                imeStateRef.current.clearBlockTimer = window.setTimeout(() => {
-                    imeStateRef.current.blockNextInput = false
-                    imeStateRef.current.clearBlockTimer = undefined
-                }, delay)
-            },
-            [clearPendingImeInputBlock],
-        )
-
-        const syncImeAnchor = useCallback(() => {
-            const terminal = terminalRef.current
-            const container = terminalIdRef.current
-            if (!terminal || !container || terminal.cols <= 0 || terminal.rows <= 0) return
-
-            const textarea = container.querySelector<HTMLTextAreaElement>(
-                ".xterm-helper-textarea",
-            )
-            const screenElement = container.querySelector<HTMLElement>(".xterm-screen")
-            if (!textarea || !screenElement) return
-
-            const screenBounds = screenElement.getBoundingClientRect()
-            const screenWidth = screenBounds.width || screenElement.clientWidth
-            const screenHeight = screenBounds.height || screenElement.clientHeight
-            if (!screenWidth || !screenHeight) return
-
-            const cellWidth = screenWidth / terminal.cols
-            const cellHeight = screenHeight / terminal.rows
-            const cursorX = Math.min(
-                Math.max(terminal.buffer.active.cursorX, 0),
-                Math.max(terminal.cols - 1, 0),
-            )
-            const cursorY = Math.min(
-                Math.max(terminal.buffer.active.cursorY, 0),
-                Math.max(terminal.rows - 1, 0),
-            )
-
-            textarea.style.left = `${cursorX * cellWidth}px`
-            textarea.style.top = `${cursorY * cellHeight}px`
-            textarea.style.width = `${Math.max(cellWidth, 1)}px`
-            textarea.style.height = `${Math.max(cellHeight, 1)}px`
-            textarea.style.lineHeight = `${Math.max(cellHeight, 1)}px`
-            textarea.style.zIndex = "1000"
-        }, [])
-
         const handleImeCompositionStart = useCallback(() => {
-            clearPendingImeInputBlock()
-            imeStateRef.current.isComposing = true
-            imeStateRef.current.blockNextInput = false
-            syncImeAnchor()
-        }, [clearPendingImeInputBlock, syncImeAnchor])
+            isComposingRef.current = true
+            imePendingInputBlockUntilRef.current = 0
+        }, [])
 
         const handleImeCompositionEnd = useCallback(() => {
-            clearPendingImeInputBlock()
-            imeStateRef.current.isComposing = false
-            syncImeAnchor()
-            scheduleImeInputBlock()
-        }, [clearPendingImeInputBlock, scheduleImeInputBlock, syncImeAnchor])
-
-        const blockImeKeyboardEventForXterm = useCallback(
-            (event: KeyboardEvent) => {
-                syncImeAnchor()
-
-                const isPendingImeKey = isImeKeyboardEvent(event)
-                if (isPendingImeKey && !imeStateRef.current.isComposing) {
-                    scheduleImeInputBlock(IME_PENDING_INPUT_BLOCK_MS)
-                }
-
-                return !(imeStateRef.current.isComposing || isPendingImeKey)
-            },
-            [scheduleImeInputBlock, syncImeAnchor],
-        )
-
-        const handleImeKeyboardEvent = useCallback(
-            (event: KeyboardEvent) => {
-                if (!blockImeKeyboardEventForXterm(event)) {
-                    stopXtermInputPropagation(event)
-                }
-            },
-            [blockImeKeyboardEventForXterm],
-        )
-
-        const handleImeInputEvent = useCallback((event: Event) => {
-            const inputEvent = event as InputEvent
-            const inputType = inputEvent.inputType ?? ""
-            const isCompositionInput = inputType.includes("Composition")
-
-            if (
-                imeStateRef.current.isComposing ||
-                imeStateRef.current.blockNextInput ||
-                inputEvent.isComposing ||
-                isCompositionInput
-            ) {
-                stopXtermInputPropagation(event)
-            }
+            isComposingRef.current = false
+            imePendingInputBlockUntilRef.current = 0
         }, [])
+
+        const blockImeKeyboardEventForXterm = useCallback((event: KeyboardEvent) => {
+            const isPendingImeKey = isImeKeyboardEvent(event)
+            if (isPendingImeKey) {
+                imePendingInputBlockUntilRef.current = Date.now() + IME_PENDING_INPUT_BLOCK_MS
+            }
+
+            return !(isComposingRef.current || isPendingImeKey)
+        }, [])
+
+        const shouldBlockTerminalInput = useCallback(() => {
+            if (isComposingRef.current) return true
+            return imePendingInputBlockUntilRef.current > Date.now()
+        }, [])
+
+        const sendFrame = useCallback((command: number, payload: Uint8Array) => {
+            const ws = wsRef.current
+            if (ws?.readyState !== WebSocket.OPEN) return
+
+            ws.send(createTerminalFrame(command, payload))
+        }, [])
+
+        const sendTerminalData = useCallback(
+            (data: string) => {
+                if (shouldBlockTerminalInput()) return
+                sendFrame(TERMINAL_INPUT_COMMAND, textEncoder.encode(data))
+            },
+            [sendFrame, shouldBlockTerminalInput],
+        )
+
+        const sendTerminalBinary = useCallback(
+            (data: string) => {
+                if (shouldBlockTerminalInput()) return
+                sendFrame(TERMINAL_INPUT_COMMAND, encodeBinaryString(data))
+            },
+            [sendFrame, shouldBlockTerminalInput],
+        )
 
         const doResize = useCallback(() => {
             if (!terminalIdRef.current) return
 
             fitAddon.fit()
-            syncImeAnchor()
 
             const dimensions = fitAddon.proposeDimensions()
 
             if (dimensions) {
-                const prefix = new Int8Array([1])
-                const resizeMessage = new TextEncoder().encode(
+                const resizeMessage = textEncoder.encode(
                     JSON.stringify({
                         Rows: dimensions.rows,
                         Cols: dimensions.cols,
                     }),
                 )
 
-                const msg = new Int8Array(prefix.length + resizeMessage.length)
-                msg.set(prefix)
-                msg.set(resizeMessage, prefix.length)
-
-                const ws = wsRef.current
-                if (ws?.readyState !== WebSocket.OPEN) return
-
-                ws.send(msg)
+                sendFrame(TERMINAL_RESIZE_COMMAND, resizeMessage)
             }
-        }, [fitAddon, syncImeAnchor])
+        }, [fitAddon, sendFrame])
 
         const onResize = useCallback(async () => {
             if (sendResize.current) return
@@ -250,26 +185,48 @@ export const XtermComponent = forwardRef<HTMLDivElement, XtermProps & JSX.Intrin
             terminalRef.current = terminal
             wsRef.current = ws
 
-            const attachAddon = new AttachAddon(ws)
             terminal.attachCustomKeyEventHandler(blockImeKeyboardEventForXterm)
-            terminal.loadAddon(attachAddon)
+            const dataDisposable = terminal.onData(sendTerminalData)
+            const binaryDisposable = terminal.onBinary(sendTerminalBinary)
             terminal.loadAddon(fitAddon)
             terminal.open(container)
             fitAddon.fit()
-            syncImeAnchor()
             terminal.focus()
             window.addEventListener("resize", onResize)
-            container.addEventListener("compositionstart", handleImeCompositionStart, true)
-            container.addEventListener("compositionupdate", syncImeAnchor, true)
-            container.addEventListener("compositionend", handleImeCompositionEnd, true)
-            container.addEventListener("keydown", handleImeKeyboardEvent, true)
-            container.addEventListener("keypress", handleImeKeyboardEvent, true)
-            container.addEventListener("beforeinput", handleImeInputEvent, true)
-            container.addEventListener("input", handleImeInputEvent, true)
-            container.addEventListener("focusin", syncImeAnchor, true)
+
+            const textarea = terminal.textarea
+            textarea?.addEventListener("compositionstart", handleImeCompositionStart)
+            textarea?.addEventListener("compositionend", handleImeCompositionEnd)
 
             ws.onopen = () => {
                 onResize()
+            }
+            ws.onmessage = (event) => {
+                const data = event.data
+                if (typeof data === "string") {
+                    terminal.write(data)
+                    return
+                }
+
+                if (data instanceof ArrayBuffer) {
+                    terminal.write(new Uint8Array(data))
+                    return
+                }
+
+                if (ArrayBuffer.isView(data)) {
+                    terminal.write(
+                        new Uint8Array(data.buffer, data.byteOffset, data.byteLength),
+                    )
+                    return
+                }
+
+                if (data instanceof Blob) {
+                    void data.arrayBuffer().then((buffer) => {
+                        if (terminalRef.current === terminal) {
+                            terminal.write(new Uint8Array(buffer))
+                        }
+                    })
+                }
             }
             ws.onclose = () => {
                 terminal.dispose()
@@ -284,16 +241,12 @@ export const XtermComponent = forwardRef<HTMLDivElement, XtermProps & JSX.Intrin
 
             return () => {
                 window.removeEventListener("resize", onResize)
-                container.removeEventListener("compositionstart", handleImeCompositionStart, true)
-                container.removeEventListener("compositionupdate", syncImeAnchor, true)
-                container.removeEventListener("compositionend", handleImeCompositionEnd, true)
-                container.removeEventListener("keydown", handleImeKeyboardEvent, true)
-                container.removeEventListener("keypress", handleImeKeyboardEvent, true)
-                container.removeEventListener("beforeinput", handleImeInputEvent, true)
-                container.removeEventListener("input", handleImeInputEvent, true)
-                container.removeEventListener("focusin", syncImeAnchor, true)
-                clearPendingImeInputBlock()
+                textarea?.removeEventListener("compositionstart", handleImeCompositionStart)
+                textarea?.removeEventListener("compositionend", handleImeCompositionEnd)
+                dataDisposable.dispose()
+                binaryDisposable.dispose()
                 ws.onopen = null
+                ws.onmessage = null
                 ws.onclose = null
                 ws.onerror = null
                 ws.close()
@@ -302,16 +255,14 @@ export const XtermComponent = forwardRef<HTMLDivElement, XtermProps & JSX.Intrin
                 if (terminalRef.current === terminal) terminalRef.current = null
             }
         }, [
-            clearPendingImeInputBlock,
             fitAddon,
             blockImeKeyboardEventForXterm,
             handleImeCompositionEnd,
             handleImeCompositionStart,
-            handleImeInputEvent,
-            handleImeKeyboardEvent,
             onResize,
+            sendTerminalBinary,
+            sendTerminalData,
             setClose,
-            syncImeAnchor,
             wsUrl,
         ])
 
@@ -326,10 +277,7 @@ export const XtermComponent = forwardRef<HTMLDivElement, XtermProps & JSX.Intrin
         return (
             <div
                 ref={terminalIdRef}
-                className={cn(
-                    "xterm-ime-stable [&_.composition-view]:!opacity-0 [&_.composition-view]:pointer-events-none [&_.xterm-helper-textarea]:!z-[1000]",
-                    className,
-                )}
+                className={className}
                 {...props}
             />
         )

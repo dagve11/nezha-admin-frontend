@@ -20,27 +20,22 @@ vi.mock("@/lib/utils", () => ({
     cn: (...args: unknown[]) => args.filter(Boolean).join(" "),
 }))
 
-const attachAddonInstances: { ws: WebSocket }[] = []
-const terminalInstances: {
+type TerminalMock = {
     options: { fontSize?: number }
     focusCalls: number
+    disposeCalls: number
     textarea?: HTMLTextAreaElement
     screen?: HTMLElement
     buffer: { active: { cursorX: number; cursorY: number } }
     cols: number
     rows: number
-}[] = []
-vi.mock("@xterm/addon-attach", () => ({
-    AttachAddon: class {
-        ws: WebSocket
-        constructor(ws: WebSocket) {
-            this.ws = ws
-            attachAddonInstances.push(this)
-        }
-        activate() {}
-        dispose() {}
-    },
-}))
+    customKeyEventHandler?: (event: KeyboardEvent) => boolean
+    writeCalls: Array<string | Uint8Array>
+    emitData: (data: string) => void
+    emitBinary: (data: string) => void
+}
+
+const terminalInstances: TerminalMock[] = []
 
 vi.mock("@xterm/addon-fit", () => ({
     FitAddon: class {
@@ -57,17 +52,54 @@ vi.mock("@xterm/xterm", () => ({
     Terminal: class {
         options: { fontSize?: number }
         focusCalls = 0
+        disposeCalls = 0
         cols = 80
         rows = 24
         buffer = { active: { cursorX: 7, cursorY: 3 } }
         textarea?: HTMLTextAreaElement
         screen?: HTMLElement
+        customKeyEventHandler?: (event: KeyboardEvent) => boolean
+        writeCalls: Array<string | Uint8Array> = []
+        private dataListeners: Array<(data: string) => void> = []
+        private binaryListeners: Array<(data: string) => void> = []
+
         constructor(options: { fontSize?: number } = {}) {
             this.options = { ...options }
-            terminalInstances.push(this)
+            terminalInstances.push(this as TerminalMock)
         }
-        attachCustomKeyEventHandler() {}
+
+        attachCustomKeyEventHandler(handler: (event: KeyboardEvent) => boolean) {
+            this.customKeyEventHandler = handler
+        }
+
+        onData(listener: (data: string) => void) {
+            this.dataListeners.push(listener)
+            return {
+                dispose: () => {
+                    this.dataListeners = this.dataListeners.filter((item) => item !== listener)
+                },
+            }
+        }
+
+        onBinary(listener: (data: string) => void) {
+            this.binaryListeners.push(listener)
+            return {
+                dispose: () => {
+                    this.binaryListeners = this.binaryListeners.filter((item) => item !== listener)
+                },
+            }
+        }
+
+        emitData(data: string) {
+            this.dataListeners.forEach((listener) => listener(data))
+        }
+
+        emitBinary(data: string) {
+            this.binaryListeners.forEach((listener) => listener(data))
+        }
+
         loadAddon() {}
+
         open(container: HTMLElement) {
             const xterm = document.createElement("div")
             xterm.className = "xterm"
@@ -89,10 +121,18 @@ vi.mock("@xterm/xterm", () => ({
             this.textarea = textarea
             this.screen = screen
         }
+
         focus() {
             this.focusCalls += 1
         }
-        dispose() {}
+
+        write(data: string | Uint8Array) {
+            this.writeCalls.push(data)
+        }
+
+        dispose() {
+            this.disposeCalls += 1
+        }
     },
 }))
 
@@ -127,6 +167,10 @@ class FakeWebSocket {
         this.onopen?.(new Event("open"))
     }
 
+    message(data: unknown) {
+        this.onmessage?.(new MessageEvent("message", { data }))
+    }
+
     send(data: unknown) {
         if (this.readyState !== 1) {
             throw new DOMException(
@@ -136,6 +180,7 @@ class FakeWebSocket {
         }
         this.sent.push(data)
     }
+
     addEventListener() {}
     removeEventListener() {}
     dispatchEvent() {
@@ -143,9 +188,24 @@ class FakeWebSocket {
     }
 }
 
+const bytesFromSentFrame = (data: unknown) => {
+    expect(ArrayBuffer.isView(data)).toBe(true)
+    const view = data as ArrayBufferView
+    return new Uint8Array(view.buffer, view.byteOffset, view.byteLength)
+}
+
+const decodeFrame = (data: unknown) => {
+    const bytes = bytesFromSentFrame(data)
+    const payload = bytes.slice(1)
+    return {
+        command: bytes[0],
+        payload,
+        text: new TextDecoder().decode(payload),
+    }
+}
+
 beforeEach(() => {
     FakeWebSocket.instances = []
-    attachAddonInstances.length = 0
     terminalInstances.length = 0
     ;(globalThis as { WebSocket: typeof WebSocket }).WebSocket =
         FakeWebSocket as unknown as typeof WebSocket
@@ -168,7 +228,7 @@ afterEach(() => {
     vi.clearAllMocks()
 })
 
-test("XtermComponent closes the previous WebSocket and re-attaches xterm when wsUrl changes", async () => {
+test("XtermComponent closes the previous WebSocket and reconnects when wsUrl changes", async () => {
     const { XtermComponent } = await import("../components/terminal")
     const noop = () => undefined
 
@@ -178,16 +238,12 @@ test("XtermComponent closes the previous WebSocket and re-attaches xterm when ws
 
     expect(FakeWebSocket.instances).toHaveLength(1)
     const firstSocket = FakeWebSocket.instances[0]
-    expect(attachAddonInstances).toHaveLength(1)
-    expect(attachAddonInstances[0].ws).toBe(firstSocket as unknown as WebSocket)
 
     rerender(<XtermComponent wsUrl="/api/v1/ws/terminal/session-2" setClose={noop} />)
 
     expect(FakeWebSocket.instances).toHaveLength(2)
-    const secondSocket = FakeWebSocket.instances[1]
     expect(firstSocket.closeCalls).toBeGreaterThanOrEqual(1)
-    expect(attachAddonInstances).toHaveLength(2)
-    expect(attachAddonInstances[1].ws).toBe(secondSocket as unknown as WebSocket)
+    expect(terminalInstances[0].disposeCalls).toBeGreaterThanOrEqual(1)
 })
 
 test("XtermComponent does not send resize frames before WebSocket opens", async () => {
@@ -199,7 +255,7 @@ test("XtermComponent does not send resize frames before WebSocket opens", async 
     }).not.toThrow()
 
     expect(FakeWebSocket.instances).toHaveLength(1)
-    expect(FakeWebSocket.instances[0].readyState).toBe(0)
+    expect(FakeWebSocket.instances[0].readyState).toBe(FakeWebSocket.CONNECTING)
     expect(FakeWebSocket.instances[0].sent).toHaveLength(0)
 })
 
@@ -221,6 +277,10 @@ test("XtermComponent sends resize frames after WebSocket opens", async () => {
     await waitFor(() => {
         expect(socket.sent).toHaveLength(1)
     })
+
+    const frame = decodeFrame(socket.sent[0])
+    expect(frame.command).toBe(1)
+    expect(JSON.parse(frame.text)).toEqual({ Rows: 24, Cols: 80 })
 })
 
 test("XtermComponent focuses xterm after opening so IME follows cursor position", async () => {
@@ -238,7 +298,7 @@ test("XtermComponent focuses xterm after opening so IME follows cursor position"
     expect(terminalInstances[0].focusCalls).toBe(1)
 })
 
-test("XtermComponent anchors the IME textarea to the xterm cursor before composition", async () => {
+test("XtermComponent sends xterm text data as terminal input frames", async () => {
     const { XtermComponent } = await import("../components/terminal")
     const noop = () => undefined
 
@@ -250,18 +310,22 @@ test("XtermComponent anchors the IME textarea to the xterm cursor before composi
         />,
     )
 
-    fireEvent.compositionStart(screen.getByTestId("terminal-viewport"))
+    const socket = FakeWebSocket.instances[0]
+    socket.open()
 
-    const textarea = terminalInstances[0].textarea
-    expect(textarea?.style.left).toBe("70px")
-    expect(textarea?.style.top).toBe("60px")
-    expect(textarea?.style.width).toBe("10px")
-    expect(textarea?.style.height).toBe("20px")
-    expect(textarea?.style.lineHeight).toBe("20px")
-    expect(textarea?.style.zIndex).toBe("1000")
+    await waitFor(() => {
+        expect(socket.sent).toHaveLength(1)
+    })
+
+    socket.sent = []
+    terminalInstances[0].emitData("a")
+
+    const frame = decodeFrame(socket.sent[0])
+    expect(frame.command).toBe(0)
+    expect(frame.text).toBe("a")
 })
 
-test("XtermComponent keeps IME composition keystrokes away from xterm input handlers", async () => {
+test("XtermComponent blocks IME composing data and sends only the committed Chinese text", async () => {
     const { XtermComponent } = await import("../components/terminal")
     const noop = () => undefined
 
@@ -273,67 +337,28 @@ test("XtermComponent keeps IME composition keystrokes away from xterm input hand
         />,
     )
 
-    const textarea = terminalInstances[0].textarea!
-    const targetHandlers = {
-        compositionstart: vi.fn(),
-        compositionend: vi.fn(),
-        keydown: vi.fn(),
-        input: vi.fn(),
-    }
-    textarea.addEventListener("compositionstart", targetHandlers.compositionstart)
-    textarea.addEventListener("compositionend", targetHandlers.compositionend)
-    textarea.addEventListener("keydown", targetHandlers.keydown)
-    textarea.addEventListener("input", targetHandlers.input)
+    const socket = FakeWebSocket.instances[0]
+    socket.open()
 
-    textarea.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }))
-
-    const composingKeyDown = new KeyboardEvent("keydown", {
-        bubbles: true,
-        cancelable: true,
-        key: "x",
+    await waitFor(() => {
+        expect(socket.sent).toHaveLength(1)
     })
-    Object.defineProperty(composingKeyDown, "isComposing", { value: true })
-    textarea.dispatchEvent(composingKeyDown)
 
-    textarea.dispatchEvent(
-        new InputEvent("input", {
-            bubbles: true,
-            data: "x",
-            inputType: "insertCompositionText",
-            isComposing: true,
-        }),
-    )
+    socket.sent = []
+    const textarea = terminalInstances[0].textarea!
+    textarea.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }))
+    terminalInstances[0].emitData("x'ao")
+    expect(socket.sent).toHaveLength(0)
 
     textarea.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true, data: "小" }))
-    textarea.dispatchEvent(
-        new InputEvent("input", {
-            bubbles: true,
-            data: "小",
-            inputType: "insertText",
-        }),
-    )
+    terminalInstances[0].emitData("小")
 
-    expect(targetHandlers.compositionstart).toHaveBeenCalledTimes(1)
-    expect(targetHandlers.compositionend).toHaveBeenCalledTimes(1)
-    expect(targetHandlers.keydown).not.toHaveBeenCalled()
-    expect(targetHandlers.input).not.toHaveBeenCalled()
-
-    await new Promise((resolve) => setTimeout(resolve, 0))
-
-    textarea.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "a" }))
-    textarea.dispatchEvent(
-        new InputEvent("input", {
-            bubbles: true,
-            data: "a",
-            inputType: "insertText",
-        }),
-    )
-
-    expect(targetHandlers.keydown).toHaveBeenCalledTimes(1)
-    expect(targetHandlers.input).toHaveBeenCalledTimes(1)
+    const frame = decodeFrame(socket.sent[0])
+    expect(frame.command).toBe(0)
+    expect(frame.text).toBe("小")
 })
 
-test("XtermComponent blocks pending IME keyCode 229 input before composition starts", async () => {
+test("XtermComponent lets xterm ignore IME keyboard events during composition", async () => {
     const { XtermComponent } = await import("../components/terminal")
     const noop = () => undefined
 
@@ -346,12 +371,12 @@ test("XtermComponent blocks pending IME keyCode 229 input before composition sta
     )
 
     const textarea = terminalInstances[0].textarea!
-    const targetHandlers = {
-        keydown: vi.fn(),
-        input: vi.fn(),
-    }
-    textarea.addEventListener("keydown", targetHandlers.keydown)
-    textarea.addEventListener("input", targetHandlers.input)
+    const handler = terminalInstances[0].customKeyEventHandler!
+    textarea.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }))
+
+    expect(handler(new KeyboardEvent("keydown", { key: "a" }))).toBe(false)
+
+    textarea.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true, data: "小" }))
 
     const pendingImeKeyDown = new KeyboardEvent("keydown", {
         bubbles: true,
@@ -362,18 +387,59 @@ test("XtermComponent blocks pending IME keyCode 229 input before composition sta
         keyCode: { value: 229 },
         which: { value: 229 },
     })
-    textarea.dispatchEvent(pendingImeKeyDown)
 
-    textarea.dispatchEvent(
-        new InputEvent("input", {
-            bubbles: true,
-            data: "x",
-            inputType: "insertText",
-        }),
+    expect(handler(pendingImeKeyDown)).toBe(false)
+    expect(handler(new KeyboardEvent("keydown", { key: "a" }))).toBe(true)
+})
+
+test("XtermComponent forwards binary xterm input as terminal input frames", async () => {
+    const { XtermComponent } = await import("../components/terminal")
+    const noop = () => undefined
+
+    render(
+        <XtermComponent
+            data-testid="terminal-viewport"
+            wsUrl="/api/v1/ws/terminal/session-1"
+            setClose={noop}
+        />,
     )
 
-    expect(targetHandlers.keydown).not.toHaveBeenCalled()
-    expect(targetHandlers.input).not.toHaveBeenCalled()
+    const socket = FakeWebSocket.instances[0]
+    socket.open()
+
+    await waitFor(() => {
+        expect(socket.sent).toHaveLength(1)
+    })
+
+    socket.sent = []
+    terminalInstances[0].emitBinary("\xff")
+
+    const frame = decodeFrame(socket.sent[0])
+    expect(frame.command).toBe(0)
+    expect(frame.payload).toEqual(new Uint8Array([255]))
+})
+
+test("XtermComponent writes WebSocket messages into xterm", async () => {
+    const { XtermComponent } = await import("../components/terminal")
+    const noop = () => undefined
+
+    render(
+        <XtermComponent
+            data-testid="terminal-viewport"
+            wsUrl="/api/v1/ws/terminal/session-1"
+            setClose={noop}
+        />,
+    )
+
+    const socket = FakeWebSocket.instances[0]
+    socket.message("server output")
+
+    expect(terminalInstances[0].writeCalls[0]).toBe("server output")
+
+    const binaryOutput = new Uint8Array([27, 91, 65])
+    socket.message(binaryOutput.buffer)
+
+    expect(terminalInstances[0].writeCalls[1]).toEqual(binaryOutput)
 })
 
 test("TerminalPage renders as a standalone mac style terminal window", async () => {
@@ -398,8 +464,8 @@ test("TerminalPage bounds the terminal window to the first viewport", async () =
     expect(screen.getByTestId("mac-terminal-window").className).toContain("h-full")
     expect(screen.getByTestId("terminal-viewport").className).toContain("min-h-0")
     expect(screen.getByTestId("terminal-viewport").className).toContain("h-full")
-    expect(screen.getByTestId("terminal-viewport").className).toContain("xterm-ime-stable")
-    expect(screen.getByTestId("terminal-viewport").className).toContain(
+    expect(screen.getByTestId("terminal-viewport").className).not.toContain("xterm-ime-stable")
+    expect(screen.getByTestId("terminal-viewport").className).not.toContain(
         "[&_.composition-view]:!opacity-0",
     )
 })
