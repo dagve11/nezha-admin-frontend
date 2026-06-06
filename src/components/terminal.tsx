@@ -42,6 +42,7 @@ const TERMINAL_FONT_SIZE_MAX = 24
 const TERMINAL_INPUT_COMMAND = 0
 const TERMINAL_RESIZE_COMMAND = 1
 const IME_PENDING_INPUT_BLOCK_MS = 100
+const CLAUDE_CODE_INPUT_PROMPT_SCAN_ROWS = 4
 const textEncoder = new TextEncoder()
 
 const isImeKeyboardEvent = (event: KeyboardEvent) => {
@@ -69,14 +70,126 @@ const encodeBinaryString = (data: string) => {
     return bytes
 }
 
-const getTerminalBufferLineText = (terminal: Terminal, viewportRow: number) => {
+const getTerminalBufferLine = (terminal: Terminal, viewportRow: number) => {
     const activeBuffer = terminal.buffer.active
-    const line = activeBuffer.getLine(activeBuffer.baseY + viewportRow)
+    return activeBuffer.getLine(activeBuffer.baseY + viewportRow)
+}
+
+const getTerminalBufferLineText = (terminal: Terminal, viewportRow: number) => {
+    const line = getTerminalBufferLine(terminal, viewportRow)
     return line?.translateToString(true) ?? ""
 }
 
+const isWideTerminalCharacter = (codePoint: number) => {
+    return (
+        codePoint >= 0x1100 &&
+        (codePoint <= 0x115f ||
+            codePoint === 0x2329 ||
+            codePoint === 0x232a ||
+            (codePoint >= 0x2e80 && codePoint <= 0xa4cf && codePoint !== 0x303f) ||
+            (codePoint >= 0xac00 && codePoint <= 0xd7a3) ||
+            (codePoint >= 0xf900 && codePoint <= 0xfaff) ||
+            (codePoint >= 0xfe10 && codePoint <= 0xfe19) ||
+            (codePoint >= 0xfe30 && codePoint <= 0xfe6f) ||
+            (codePoint >= 0xff00 && codePoint <= 0xff60) ||
+            (codePoint >= 0xffe0 && codePoint <= 0xffe6) ||
+            (codePoint >= 0x20000 && codePoint <= 0x3fffd))
+    )
+}
+
+const getTerminalDisplayWidth = (value: string) => {
+    let width = 0
+
+    for (const character of value) {
+        const codePoint = character.codePointAt(0)
+        if (codePoint === undefined) continue
+
+        if (codePoint >= 0x300 && codePoint <= 0x36f) continue
+        width += isWideTerminalCharacter(codePoint) ? 2 : 1
+    }
+
+    return width
+}
+
+const getTerminalBufferLineDisplayWidth = (
+    terminal: Terminal,
+    viewportRow: number,
+    fallbackText: string,
+) => {
+    const line = getTerminalBufferLine(terminal, viewportRow)
+    if (!line) return getTerminalDisplayWidth(fallbackText)
+
+    const maxColumn = Math.min(line.length, terminal.cols)
+    for (let column = maxColumn - 1; column >= 0; column -= 1) {
+        const cell = line.getCell(column)
+        if (!cell?.getChars()) continue
+
+        return column + Math.max(cell.getWidth(), 1)
+    }
+
+    return 0
+}
+
 const isClaudeCodeFooterLine = (line: string) => {
-    return line.includes("for shortcuts") && line.includes("for agents")
+    return (
+        (line.includes("for shortcuts") && line.includes("for agents")) ||
+        (line.includes("shortcuts") && line.trimStart().startsWith("?"))
+    )
+}
+
+const isClaudeCodeVisible = (terminal: Terminal) => {
+    for (let row = 0; row < terminal.rows; row += 1) {
+        if (getTerminalBufferLineText(terminal, row).includes("Claude Code")) return true
+    }
+
+    return false
+}
+
+const getClaudeCodePromptIndex = (line: string) => {
+    const match = line.match(/^\s*>\s?/)
+    if (!match) return -1
+
+    return match[0].indexOf(">")
+}
+
+const isClaudeCodePlaceholderInput = (input: string) => {
+    return input.startsWith('Try "')
+}
+
+const getClaudeCodePromptAnchorColumn = (
+    terminal: Terminal,
+    viewportRow: number,
+    line: string,
+    promptIndex: number,
+) => {
+    const inputStartIndex = line[promptIndex + 1] === " " ? promptIndex + 2 : promptIndex + 1
+    const input = line.slice(inputStartIndex).trimEnd()
+    const inputStartColumn = getTerminalDisplayWidth(line.slice(0, inputStartIndex))
+
+    if (!input || isClaudeCodePlaceholderInput(input)) return inputStartColumn
+
+    return Math.max(
+        inputStartColumn,
+        getTerminalBufferLineDisplayWidth(terminal, viewportRow, line.trimEnd()),
+    )
+}
+
+const findClaudeCodeInputPromptAnchor = (terminal: Terminal, cursorY: number) => {
+    const startRow = Math.min(Math.max(cursorY, 0), Math.max(terminal.rows - 1, 0))
+    const endRow = Math.max(0, startRow - CLAUDE_CODE_INPUT_PROMPT_SCAN_ROWS)
+
+    for (let row = startRow; row >= endRow; row -= 1) {
+        const line = getTerminalBufferLineText(terminal, row)
+        const promptIndex = getClaudeCodePromptIndex(line)
+        if (promptIndex === -1) continue
+
+        return {
+            cursorX: getClaudeCodePromptAnchorColumn(terminal, row, line, promptIndex),
+            cursorY: row,
+        }
+    }
+
+    return undefined
 }
 
 const getClaudeCodeInputAnchor = (
@@ -84,18 +197,17 @@ const getClaudeCodeInputAnchor = (
     cursorX: number,
     cursorY: number,
 ) => {
-    if (cursorY <= 0) return { cursorX, cursorY }
-
     const currentLine = getTerminalBufferLineText(terminal, cursorY)
-    if (!isClaudeCodeFooterLine(currentLine)) return { cursorX, cursorY }
+    const shouldUseClaudeInputAnchor =
+        isClaudeCodeFooterLine(currentLine) || isClaudeCodeVisible(terminal)
+    if (!shouldUseClaudeInputAnchor) return { cursorX, cursorY }
 
-    const previousLine = getTerminalBufferLineText(terminal, cursorY - 1)
-    const promptIndex = previousLine.indexOf(">")
-    if (promptIndex === -1) return { cursorX, cursorY }
+    const promptAnchor = findClaudeCodeInputPromptAnchor(terminal, cursorY)
+    if (!promptAnchor) return { cursorX, cursorY }
 
     return {
-        cursorX: Math.min(promptIndex + 2, Math.max(terminal.cols - 1, 0)),
-        cursorY: cursorY - 1,
+        cursorX: Math.min(promptAnchor.cursorX, Math.max(terminal.cols - 1, 0)),
+        cursorY: promptAnchor.cursorY,
     }
 }
 

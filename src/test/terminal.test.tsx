@@ -35,7 +35,15 @@ type TerminalMock = {
             cursorY: number
             baseY: number
             lines: string[]
-            getLine: (line: number) => { translateToString: (trimRight?: boolean) => string } | undefined
+            getLine: (line: number) =>
+                | {
+                      length: number
+                      getCell: (
+                          column: number,
+                      ) => { getChars: () => string; getWidth: () => number } | undefined
+                      translateToString: (trimRight?: boolean) => string
+                  }
+                | undefined
         }
     }
     cols: number
@@ -47,6 +55,26 @@ type TerminalMock = {
 }
 
 const terminalInstances: TerminalMock[] = []
+
+const isWideTestCharacter = (codePoint: number) => {
+    return codePoint >= 0x2e80 && codePoint <= 0x9fff
+}
+
+const createBufferCells = (value: string) => {
+    const cells: Array<{ chars: string; width: number }> = []
+
+    for (const character of value) {
+        const codePoint = character.codePointAt(0) ?? 0
+        if (isWideTestCharacter(codePoint)) {
+            cells.push({ chars: character, width: 2 }, { chars: "", width: 0 })
+            continue
+        }
+
+        cells.push({ chars: character, width: 1 })
+    }
+
+    return cells
+}
 
 vi.mock("@xterm/addon-fit", () => ({
     FitAddon: class {
@@ -75,8 +103,19 @@ vi.mock("@xterm/xterm", () => ({
                 getLine(line: number) {
                     const value = this.lines[line]
                     if (value === undefined) return undefined
+                    const cells = createBufferCells(value)
 
                     return {
+                        length: cells.length,
+                        getCell: (column: number) => {
+                            const cell = cells[column]
+                            if (!cell) return undefined
+
+                            return {
+                                getChars: () => cell.chars,
+                                getWidth: () => cell.width,
+                            }
+                        },
                         translateToString: (trimRight = false) =>
                             trimRight ? value.trimEnd() : value,
                     }
@@ -464,6 +503,36 @@ test("XtermComponent anchors IME composition to Claude Code input row instead of
     expect(textarea.style.top).toBe("420px")
     expect(compositionView.style.left).toBe("20px")
     expect(compositionView.style.top).toBe("420px")
+})
+
+test("XtermComponent anchors Claude Code IME to the visible input prompt when xterm cursor is elsewhere", async () => {
+    const { XtermComponent } = await import("../components/terminal")
+    const noop = () => undefined
+
+    render(
+        <XtermComponent
+            data-testid="terminal-viewport"
+            wsUrl="/api/v1/ws/terminal/session-1"
+            setClose={noop}
+        />,
+    )
+
+    const terminal = terminalInstances[0]
+    terminal.buffer.active.cursorX = 79
+    terminal.buffer.active.cursorY = 16
+    terminal.buffer.active.lines[2] = "Claude Code v2.1.150"
+    terminal.buffer.active.lines[14] = "> 宣布搜"
+    terminal.buffer.active.lines[16] = ""
+
+    const textarea = terminal.textarea!
+    const compositionView = terminal.compositionView!
+    textarea.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }))
+    textarea.dispatchEvent(new CompositionEvent("compositionupdate", { bubbles: true, data: "pi" }))
+
+    expect(textarea.style.left).toBe("80px")
+    expect(textarea.style.top).toBe("280px")
+    expect(compositionView.style.left).toBe("80px")
+    expect(compositionView.style.top).toBe("280px")
 })
 
 test("XtermComponent resets horizontal scroll while IME composition is active", async () => {
