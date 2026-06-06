@@ -24,8 +24,11 @@ type TerminalMock = {
     options: { fontSize?: number }
     focusCalls: number
     disposeCalls: number
+    xterm?: HTMLElement
     textarea?: HTMLTextAreaElement
     screen?: HTMLElement
+    viewport?: HTMLElement
+    compositionView?: HTMLElement
     buffer: { active: { cursorX: number; cursorY: number } }
     cols: number
     rows: number
@@ -56,8 +59,11 @@ vi.mock("@xterm/xterm", () => ({
         cols = 80
         rows = 24
         buffer = { active: { cursorX: 7, cursorY: 3 } }
+        xterm?: HTMLElement
         textarea?: HTMLTextAreaElement
         screen?: HTMLElement
+        viewport?: HTMLElement
+        compositionView?: HTMLElement
         customKeyEventHandler?: (event: KeyboardEvent) => boolean
         writeCalls: Array<string | Uint8Array> = []
         private dataListeners: Array<(data: string) => void> = []
@@ -103,10 +109,27 @@ vi.mock("@xterm/xterm", () => ({
         open(container: HTMLElement) {
             const xterm = document.createElement("div")
             xterm.className = "xterm"
+            Object.defineProperty(xterm, "scrollLeft", {
+                configurable: true,
+                writable: true,
+                value: 0,
+            })
+            const viewport = document.createElement("div")
+            viewport.className = "xterm-viewport"
+            Object.defineProperty(viewport, "scrollLeft", {
+                configurable: true,
+                writable: true,
+                value: 0,
+            })
             const screen = document.createElement("div")
             screen.className = "xterm-screen"
             Object.defineProperty(screen, "clientWidth", { configurable: true, value: 800 })
             Object.defineProperty(screen, "clientHeight", { configurable: true, value: 480 })
+            Object.defineProperty(screen, "scrollLeft", {
+                configurable: true,
+                writable: true,
+                value: 0,
+            })
             const helpers = document.createElement("div")
             helpers.className = "xterm-helpers"
             const textarea = document.createElement("textarea")
@@ -116,10 +139,13 @@ vi.mock("@xterm/xterm", () => ({
 
             helpers.append(textarea, compositionView)
             screen.append(helpers)
-            xterm.append(screen)
+            xterm.append(viewport, screen)
             container.append(xterm)
+            this.xterm = xterm
             this.textarea = textarea
             this.screen = screen
+            this.viewport = viewport
+            this.compositionView = compositionView
         }
 
         focus() {
@@ -356,6 +382,63 @@ test("XtermComponent blocks IME composing data and sends only the committed Chin
     const frame = decodeFrame(socket.sent[0])
     expect(frame.command).toBe(0)
     expect(frame.text).toBe("小")
+})
+
+test("XtermComponent anchors IME helper elements to the xterm cursor during composition", async () => {
+    const { XtermComponent } = await import("../components/terminal")
+    const noop = () => undefined
+
+    render(
+        <XtermComponent
+            data-testid="terminal-viewport"
+            wsUrl="/api/v1/ws/terminal/session-1"
+            setClose={noop}
+        />,
+    )
+
+    const textarea = terminalInstances[0].textarea!
+    const compositionView = terminalInstances[0].compositionView!
+    textarea.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }))
+    textarea.dispatchEvent(new CompositionEvent("compositionupdate", { bubbles: true, data: "ni" }))
+
+    expect(textarea.style.left).toBe("70px")
+    expect(textarea.style.top).toBe("60px")
+    expect(textarea.style.width).toBe("10px")
+    expect(textarea.style.height).toBe("20px")
+    expect(textarea.style.lineHeight).toBe("20px")
+    expect(compositionView.style.left).toBe("70px")
+    expect(compositionView.style.top).toBe("60px")
+    expect(compositionView.style.height).toBe("20px")
+    expect(compositionView.style.lineHeight).toBe("20px")
+    expect(compositionView.className).not.toContain("opacity-0")
+})
+
+test("XtermComponent resets horizontal scroll while IME composition is active", async () => {
+    const { XtermComponent } = await import("../components/terminal")
+    const noop = () => undefined
+
+    render(
+        <XtermComponent
+            data-testid="terminal-viewport"
+            wsUrl="/api/v1/ws/terminal/session-1"
+            setClose={noop}
+        />,
+    )
+
+    const container = screen.getByTestId("terminal-viewport")
+    const terminal = terminalInstances[0]
+    const textarea = terminal.textarea!
+    container.scrollLeft = 320
+    terminal.xterm!.scrollLeft = 240
+    terminal.screen!.scrollLeft = 160
+    terminal.viewport!.scrollLeft = 80
+
+    textarea.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }))
+
+    expect(container.scrollLeft).toBe(0)
+    expect(terminal.xterm!.scrollLeft).toBe(0)
+    expect(terminal.screen!.scrollLeft).toBe(0)
+    expect(terminal.viewport!.scrollLeft).toBe(0)
 })
 
 test("XtermComponent lets xterm ignore IME keyboard events during composition", async () => {

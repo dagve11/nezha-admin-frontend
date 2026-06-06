@@ -8,7 +8,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import useTerminal from "@/hooks/useTerminal"
-import { sleep } from "@/lib/utils"
+import { cn, sleep } from "@/lib/utils"
 import { FitAddon } from "@xterm/addon-fit"
 import { Terminal } from "@xterm/xterm"
 import "@xterm/xterm/css/xterm.css"
@@ -76,6 +76,8 @@ export const XtermComponent = forwardRef<HTMLDivElement, XtermProps & JSX.Intrin
         const wsRef = useRef<WebSocket | null>(null)
         const isComposingRef = useRef(false)
         const imePendingInputBlockUntilRef = useRef(0)
+        const imeAnchorAnimationFrameRef = useRef<number | undefined>(undefined)
+        const imeAnchorTimerRef = useRef<number | undefined>(undefined)
 
         useImperativeHandle(ref, () => {
             return {
@@ -89,15 +91,132 @@ export const XtermComponent = forwardRef<HTMLDivElement, XtermProps & JSX.Intrin
         const [fitAddon] = useState(() => new FitAddon())
         const sendResize = useRef(false)
 
+        const resetImeHorizontalScroll = useCallback(() => {
+            const container = terminalIdRef.current
+            if (!container) return
+
+            const scrollContainers = [
+                container,
+                container.querySelector<HTMLElement>(".xterm"),
+                container.querySelector<HTMLElement>(".xterm-screen"),
+                container.querySelector<HTMLElement>(".xterm-viewport"),
+            ]
+
+            scrollContainers.forEach((element) => {
+                if (element) element.scrollLeft = 0
+            })
+        }, [])
+
+        const syncImeCompositionAnchor = useCallback(() => {
+            if (!isComposingRef.current) return
+
+            resetImeHorizontalScroll()
+
+            const terminal = terminalRef.current
+            const container = terminalIdRef.current
+            if (!terminal || !container || terminal.cols <= 0 || terminal.rows <= 0) return
+
+            const textarea =
+                terminal.textarea ??
+                container.querySelector<HTMLTextAreaElement>(".xterm-helper-textarea")
+            const screenElement = container.querySelector<HTMLElement>(".xterm-screen")
+            const helpersElement = container.querySelector<HTMLElement>(".xterm-helpers")
+            const compositionView = container.querySelector<HTMLElement>(".composition-view")
+            if (!textarea || !screenElement || !compositionView) return
+
+            const screenBounds = screenElement.getBoundingClientRect()
+            const screenWidth = screenElement.clientWidth || screenBounds.width
+            const screenHeight = screenElement.clientHeight || screenBounds.height
+            if (!screenWidth || !screenHeight) return
+
+            const cellWidth = screenWidth / terminal.cols
+            const cellHeight = screenHeight / terminal.rows
+            const cursorX = Math.min(
+                Math.max(terminal.buffer.active.cursorX, 0),
+                Math.max(terminal.cols - 1, 0),
+            )
+            const cursorY = Math.min(
+                Math.max(terminal.buffer.active.cursorY, 0),
+                Math.max(terminal.rows - 1, 0),
+            )
+            const cursorLeft = cursorX * cellWidth
+            const cursorTop = cursorY * cellHeight
+            const left = `${cursorLeft}px`
+            const top = `${cursorTop}px`
+            const width = `${Math.max(cellWidth, 1)}px`
+            const height = `${Math.max(cellHeight, 1)}px`
+
+            if (helpersElement) {
+                helpersElement.style.left = "0px"
+                helpersElement.style.top = "0px"
+            }
+
+            screenElement.style.overflowX = "hidden"
+            textarea.style.left = left
+            textarea.style.top = top
+            textarea.style.width = width
+            textarea.style.height = height
+            textarea.style.lineHeight = height
+            compositionView.style.left = left
+            compositionView.style.top = top
+            compositionView.style.height = height
+            compositionView.style.lineHeight = height
+            compositionView.style.maxWidth = `${Math.max(screenWidth - cursorLeft, cellWidth)}px`
+            compositionView.style.overflow = "hidden"
+        }, [resetImeHorizontalScroll])
+
+        const cancelQueuedImeAnchorSync = useCallback(() => {
+            if (imeAnchorAnimationFrameRef.current !== undefined) {
+                if (typeof window.cancelAnimationFrame === "function") {
+                    window.cancelAnimationFrame(imeAnchorAnimationFrameRef.current)
+                } else {
+                    window.clearTimeout(imeAnchorAnimationFrameRef.current)
+                }
+                imeAnchorAnimationFrameRef.current = undefined
+            }
+
+            if (imeAnchorTimerRef.current !== undefined) {
+                window.clearTimeout(imeAnchorTimerRef.current)
+                imeAnchorTimerRef.current = undefined
+            }
+        }, [])
+
+        const queueImeAnchorSync = useCallback(() => {
+            syncImeCompositionAnchor()
+            cancelQueuedImeAnchorSync()
+
+            const runFrameSync = () => {
+                imeAnchorAnimationFrameRef.current = undefined
+                syncImeCompositionAnchor()
+            }
+            if (typeof window.requestAnimationFrame === "function") {
+                imeAnchorAnimationFrameRef.current = window.requestAnimationFrame(runFrameSync)
+            } else {
+                imeAnchorAnimationFrameRef.current = window.setTimeout(runFrameSync, 0)
+            }
+
+            imeAnchorTimerRef.current = window.setTimeout(() => {
+                imeAnchorTimerRef.current = undefined
+                syncImeCompositionAnchor()
+            }, 0)
+        }, [cancelQueuedImeAnchorSync, syncImeCompositionAnchor])
+
         const handleImeCompositionStart = useCallback(() => {
             isComposingRef.current = true
             imePendingInputBlockUntilRef.current = 0
-        }, [])
+            queueImeAnchorSync()
+        }, [queueImeAnchorSync])
+
+        const handleImeCompositionUpdate = useCallback(() => {
+            queueImeAnchorSync()
+        }, [queueImeAnchorSync])
 
         const handleImeCompositionEnd = useCallback(() => {
             isComposingRef.current = false
             imePendingInputBlockUntilRef.current = 0
-        }, [])
+            cancelQueuedImeAnchorSync()
+            resetImeHorizontalScroll()
+        }, [cancelQueuedImeAnchorSync, resetImeHorizontalScroll])
 
         const blockImeKeyboardEventForXterm = useCallback((event: KeyboardEvent) => {
             const isPendingImeKey = isImeKeyboardEvent(event)
@@ -196,6 +315,7 @@ export const XtermComponent = forwardRef<HTMLDivElement, XtermProps & JSX.Intrin
 
             const textarea = terminal.textarea
             textarea?.addEventListener("compositionstart", handleImeCompositionStart)
+            textarea?.addEventListener("compositionupdate", handleImeCompositionUpdate)
             textarea?.addEventListener("compositionend", handleImeCompositionEnd)
 
             ws.onopen = () => {
@@ -242,7 +362,9 @@ export const XtermComponent = forwardRef<HTMLDivElement, XtermProps & JSX.Intrin
             return () => {
                 window.removeEventListener("resize", onResize)
                 textarea?.removeEventListener("compositionstart", handleImeCompositionStart)
+                textarea?.removeEventListener("compositionupdate", handleImeCompositionUpdate)
                 textarea?.removeEventListener("compositionend", handleImeCompositionEnd)
+                cancelQueuedImeAnchorSync()
                 dataDisposable.dispose()
                 binaryDisposable.dispose()
                 ws.onopen = null
@@ -257,8 +379,10 @@ export const XtermComponent = forwardRef<HTMLDivElement, XtermProps & JSX.Intrin
         }, [
             fitAddon,
             blockImeKeyboardEventForXterm,
+            cancelQueuedImeAnchorSync,
             handleImeCompositionEnd,
             handleImeCompositionStart,
+            handleImeCompositionUpdate,
             onResize,
             sendTerminalBinary,
             sendTerminalData,
@@ -277,7 +401,10 @@ export const XtermComponent = forwardRef<HTMLDivElement, XtermProps & JSX.Intrin
         return (
             <div
                 ref={terminalIdRef}
-                className={className}
+                className={cn(
+                    "xterm-ime-anchor [&_.xterm-helpers]:!left-0 [&_.xterm-helpers]:!top-0 [&_.xterm-screen]:overflow-hidden",
+                    className,
+                )}
                 {...props}
             />
         )
