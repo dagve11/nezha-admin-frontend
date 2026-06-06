@@ -69,6 +69,36 @@ const encodeBinaryString = (data: string) => {
     return bytes
 }
 
+const getTerminalBufferLineText = (terminal: Terminal, viewportRow: number) => {
+    const activeBuffer = terminal.buffer.active
+    const line = activeBuffer.getLine(activeBuffer.baseY + viewportRow)
+    return line?.translateToString(true) ?? ""
+}
+
+const isClaudeCodeFooterLine = (line: string) => {
+    return line.includes("for shortcuts") && line.includes("for agents")
+}
+
+const getClaudeCodeInputAnchor = (
+    terminal: Terminal,
+    cursorX: number,
+    cursorY: number,
+) => {
+    if (cursorY <= 0) return { cursorX, cursorY }
+
+    const currentLine = getTerminalBufferLineText(terminal, cursorY)
+    if (!isClaudeCodeFooterLine(currentLine)) return { cursorX, cursorY }
+
+    const previousLine = getTerminalBufferLineText(terminal, cursorY - 1)
+    const promptIndex = previousLine.indexOf(">")
+    if (promptIndex === -1) return { cursorX, cursorY }
+
+    return {
+        cursorX: Math.min(promptIndex + 2, Math.max(terminal.cols - 1, 0)),
+        cursorY: cursorY - 1,
+    }
+}
+
 export const XtermComponent = forwardRef<HTMLDivElement, XtermProps & JSX.IntrinsicElements["div"]>(
     ({ wsUrl, setClose, fontSize = TERMINAL_FONT_SIZE_DEFAULT, className, ...props }, ref) => {
         const terminalIdRef = useRef<HTMLDivElement>(null)
@@ -139,8 +169,9 @@ export const XtermComponent = forwardRef<HTMLDivElement, XtermProps & JSX.Intrin
                 Math.max(terminal.buffer.active.cursorY, 0),
                 Math.max(terminal.rows - 1, 0),
             )
-            const cursorLeft = cursorX * cellWidth
-            const cursorTop = cursorY * cellHeight
+            const imeAnchor = getClaudeCodeInputAnchor(terminal, cursorX, cursorY)
+            const cursorLeft = imeAnchor.cursorX * cellWidth
+            const cursorTop = imeAnchor.cursorY * cellHeight
             const left = `${cursorLeft}px`
             const top = `${cursorTop}px`
             const width = `${Math.max(cellWidth, 1)}px`

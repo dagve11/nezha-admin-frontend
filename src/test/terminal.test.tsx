@@ -29,7 +29,15 @@ type TerminalMock = {
     screen?: HTMLElement
     viewport?: HTMLElement
     compositionView?: HTMLElement
-    buffer: { active: { cursorX: number; cursorY: number } }
+    buffer: {
+        active: {
+            cursorX: number
+            cursorY: number
+            baseY: number
+            lines: string[]
+            getLine: (line: number) => { translateToString: (trimRight?: boolean) => string } | undefined
+        }
+    }
     cols: number
     rows: number
     customKeyEventHandler?: (event: KeyboardEvent) => boolean
@@ -58,7 +66,23 @@ vi.mock("@xterm/xterm", () => ({
         disposeCalls = 0
         cols = 80
         rows = 24
-        buffer = { active: { cursorX: 7, cursorY: 3 } }
+        buffer = {
+            active: {
+                cursorX: 7,
+                cursorY: 3,
+                baseY: 0,
+                lines: [] as string[],
+                getLine(line: number) {
+                    const value = this.lines[line]
+                    if (value === undefined) return undefined
+
+                    return {
+                        translateToString: (trimRight = false) =>
+                            trimRight ? value.trimEnd() : value,
+                    }
+                },
+            },
+        }
         xterm?: HTMLElement
         textarea?: HTMLTextAreaElement
         screen?: HTMLElement
@@ -411,6 +435,35 @@ test("XtermComponent anchors IME helper elements to the xterm cursor during comp
     expect(compositionView.style.height).toBe("20px")
     expect(compositionView.style.lineHeight).toBe("20px")
     expect(compositionView.className).not.toContain("opacity-0")
+})
+
+test("XtermComponent anchors IME composition to Claude Code input row instead of footer row", async () => {
+    const { XtermComponent } = await import("../components/terminal")
+    const noop = () => undefined
+
+    render(
+        <XtermComponent
+            data-testid="terminal-viewport"
+            wsUrl="/api/v1/ws/terminal/session-1"
+            setClose={noop}
+        />,
+    )
+
+    const terminal = terminalInstances[0]
+    terminal.buffer.active.cursorX = 31
+    terminal.buffer.active.cursorY = 22
+    terminal.buffer.active.lines[21] = '> Try "edit <filepath> to..."'
+    terminal.buffer.active.lines[22] = "? for shortcuts · ← for agents"
+
+    const textarea = terminal.textarea!
+    const compositionView = terminal.compositionView!
+    textarea.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }))
+    textarea.dispatchEvent(new CompositionEvent("compositionupdate", { bubbles: true, data: "ni" }))
+
+    expect(textarea.style.left).toBe("20px")
+    expect(textarea.style.top).toBe("420px")
+    expect(compositionView.style.left).toBe("20px")
+    expect(compositionView.style.top).toBe("420px")
 })
 
 test("XtermComponent resets horizontal scroll while IME composition is active", async () => {
