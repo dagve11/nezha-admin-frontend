@@ -1,0 +1,96 @@
+export interface ModelAgentVPNPolicy {
+    id: number
+    name: string
+    entry_server_id: number
+    exit_server_id: number
+    mode: string
+    rule_mode: string
+    domains?: string[]
+    cidrs?: string[]
+    direct_cidrs?: string[]
+    listen_http?: string
+    listen_socks?: string
+    tun_name?: string
+    dns_server?: string
+    expires_seconds?: number
+    max_upload_bytes?: number
+    max_download_bytes?: number
+    max_connections?: number
+    idle_timeout_seconds?: number
+    notification_group_id?: number
+    auto_restart?: boolean
+    set_system_proxy?: boolean
+    tun_health_url?: string
+    tun_health_timeout_seconds?: number
+    egress_probe_url?: string
+    core_version?: string
+    core_download_url?: string
+    core_sha256?: string
+}
+
+export interface ModelAgentVPNPolicyForm {
+    name: string
+    entry_server_id: number
+    exit_server_id: number
+    mode: string
+    rule_mode: string
+    domains: string[]
+    cidrs: string[]
+    direct_cidrs: string[]
+    listen_http: string
+    listen_socks: string
+    tun_name: string
+    dns_server: string
+    expires_seconds: number
+    max_upload_bytes: number
+    max_download_bytes: number
+    max_connections: number
+    idle_timeout_seconds: number
+    notification_group_id: number
+    auto_restart: boolean
+    set_system_proxy: boolean
+    tun_health_url: string
+    tun_health_timeout_seconds: number
+    egress_probe_url: string
+    core_version: string
+    core_download_url: string
+    core_sha256: string
+}
+
+export interface ModelAgentVPNSession {
+    id: number
+    policy_id: number
+    entry_server_id: number
+    exit_server_id: number
+    session_id: string
+    mode: string
+    relay_mode?: string
+    state: string
+    entry_state?: string
+    exit_state?: string
+    upload_bytes?: number
+    download_bytes?: number
+    active_connections?: number
+    last_error?: string
+    started_at?: string
+    expires_at?: string
+    stopped_at?: string
+}
+
+export interface ModelAgentVPNAuditLog {
+    id: number
+    session_id?: string
+    user_id?: number
+    action: string
+    entry_server_id?: number
+    exit_server_id?: number
+    success: boolean
+    message?: string
+    detail?: Record<string, string>
+    created_at?: string
+}
+
+export interface ModelVPNSessionStreamFrame {
+    session: ModelAgentVPNSession
+    logs?: string[]
+}

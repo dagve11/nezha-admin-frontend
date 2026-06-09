@@ -32,6 +32,7 @@ import ProfilePage from "./routes/profile"
 import SettingsPage from "./routes/settings"
 import TransferPage from "./routes/transfer"
 import UserPage from "./routes/user"
+import VPNPage from "./routes/vpn"
 import WAFPage from "./routes/waf"
 
 const router = createBrowserRouter([
@@ -106,7 +107,11 @@ const router = createBrowserRouter([
             },
             {
                 path: "/dashboard/bestip",
-                element: <BestIPPage />,
+                element: (
+                    <NotificationProvider withNotifierGroup>
+                        <BestIPPage />
+                    </NotificationProvider>
+                ),
             },
             {
                 path: "/dashboard/nat",
@@ -171,6 +176,16 @@ const router = createBrowserRouter([
             {
                 path: "/dashboard/transfer",
                 element: <TransferPage />,
+            },
+            {
+                path: "/dashboard/vpn",
+                element: (
+                    <ServerProvider withServer>
+                        <NotificationProvider withNotifierGroup>
+                            <VPNPage />
+                        </NotificationProvider>
+                    </ServerProvider>
+                ),
             },
         ],
     },

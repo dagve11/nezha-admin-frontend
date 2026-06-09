@@ -52,6 +52,7 @@ const pages = [
     { href: "/dashboard/ddns", label: i18next.t("DDNS") },
     { href: "/dashboard/bestip", label: i18next.t("BestIP.Nav") },
     { href: "/dashboard/nat", label: i18next.t("NATT") },
+    { href: "/dashboard/vpn", label: i18next.t("VPN.Nav") },
     { href: "/dashboard/server-group", label: i18next.t("Group") },
     { href: "/dashboard/transfer", label: i18next.t("Transfer.Title") },
 ]
@@ -262,6 +263,15 @@ export default function Header() {
                                     className={navigationMenuTriggerStyle()}
                                 >
                                     <Link to="/dashboard/nat">{t("NATT")}</Link>
+                                </NzNavigationMenuLink>
+                            </NavigationMenuItem>
+                            <NavigationMenuItem>
+                                <NzNavigationMenuLink
+                                    asChild
+                                    active={location.pathname === "/dashboard/vpn"}
+                                    className={navigationMenuTriggerStyle()}
+                                >
+                                    <Link to="/dashboard/vpn">{t("VPN.Nav")}</Link>
                                 </NzNavigationMenuLink>
                             </NavigationMenuItem>
                             <NavigationMenuItem>

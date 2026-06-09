@@ -1,0 +1,1049 @@
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { MemoryRouter } from "react-router-dom"
+import { beforeEach, expect, test, vi } from "vitest"
+
+import Header from "@/components/header"
+import enTranslation from "@/locales/en/translation.json"
+import zhCNTranslation from "@/locales/zh-CN/translation.json"
+import zhTWTranslation from "@/locales/zh-TW/translation.json"
+import VPNPage from "@/routes/vpn"
+
+const createVPNPolicy = vi.fn()
+const updateVPNPolicy = vi.fn()
+const deleteVPNPolicy = vi.fn()
+const startVPNSession = vi.fn()
+const stopVPNSession = vi.fn()
+const restartVPNSession = vi.fn()
+const refreshVPNSessionStatus = vi.fn()
+const writeClipboardText = vi.fn()
+const toastMock = vi.fn()
+let swrKeys: string[] = []
+const validSHA256 = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+
+class MockVPNWebSocket {
+    static instances: MockVPNWebSocket[] = []
+
+    url: string
+    onmessage: ((event: MessageEvent<string>) => void) | null = null
+    onclose: (() => void) | null = null
+    onerror: (() => void) | null = null
+    closed = false
+
+    constructor(url: string) {
+        this.url = url
+        MockVPNWebSocket.instances.push(this)
+    }
+
+    close() {
+        this.closed = true
+    }
+
+    sendFrame(frame: unknown) {
+        this.onmessage?.({ data: JSON.stringify(frame) } as MessageEvent<string>)
+    }
+
+    disconnect() {
+        this.onclose?.()
+    }
+}
+
+type MockAuditRow = {
+    id: number
+    session_id: string
+    user_id: number
+    action: string
+    success: boolean
+    message: string
+    entry_server_id?: number
+    exit_server_id?: number
+    created_at: string
+}
+
+function filterAuditRowsForKey(rows: MockAuditRow[], key: string): MockAuditRow[] {
+    const params = new URLSearchParams(key.slice(key.indexOf("?") + 1))
+    return rows.filter((row) => {
+        const action = params.get("action")
+        if (action && !row.action.includes(action)) return false
+        const result = params.get("result")
+        if (result === "success" && !row.success) return false
+        if (result === "failure" && row.success) return false
+        const user = params.get("user")
+        if (user && String(row.user_id) !== user) return false
+        const entry = params.get("entry")
+        if (entry && String(row.entry_server_id ?? "") !== entry) return false
+        const exit = params.get("exit")
+        if (exit && String(row.exit_server_id ?? "") !== exit) return false
+        const createdAt = new Date(row.created_at).getTime()
+        const from = params.get("from")
+        if (from && createdAt < new Date(from).getTime()) return false
+        const to = params.get("to")
+        if (to && createdAt > new Date(to).getTime()) return false
+        return true
+    })
+}
+
+vi.mock("@/api/vpn", () => ({
+    createVPNPolicy: (...args: unknown[]) => createVPNPolicy(...args),
+    updateVPNPolicy: (...args: unknown[]) => updateVPNPolicy(...args),
+    deleteVPNPolicy: (...args: unknown[]) => deleteVPNPolicy(...args),
+    startVPNSession: (...args: unknown[]) => startVPNSession(...args),
+    stopVPNSession: (...args: unknown[]) => stopVPNSession(...args),
+    restartVPNSession: (...args: unknown[]) => restartVPNSession(...args),
+    refreshVPNSessionStatus: (...args: unknown[]) => refreshVPNSessionStatus(...args),
+}))
+
+vi.mock("@/api/api", () => ({
+    swrFetcher: vi.fn(),
+}))
+
+vi.mock("@/hooks/useServer", () => ({
+    useServer: () => ({
+        servers: [
+            {
+                id: 1,
+                name: "entry-cn",
+                last_active: new Date().toISOString(),
+                host: {
+                    platform: "linux",
+                    arch: "amd64",
+                    vpn_enabled: true,
+                    vpn_allow_system_proxy: true,
+                    vpn_allow_tun: true,
+                    vpn_core_version: "1.12.0",
+                    vpn_last_error: "",
+                },
+            },
+            {
+                id: 2,
+                name: "exit-jp",
+                last_active: "2026-06-08T00:00:00Z",
+                host: {
+                    platform: "windows",
+                    arch: "amd64",
+                    vpn_enabled: true,
+                    vpn_allow_system_proxy: true,
+                    vpn_allow_tun: false,
+                    vpn_core_version: "",
+                    vpn_last_error: "Core not installed",
+                },
+            },
+        ],
+    }),
+}))
+
+vi.mock("@/hooks/useNotfication", () => ({
+    useNotification: () => ({
+        notifierGroup: [
+            {
+                group: { id: 9, name: "vpn-notify" },
+                notifications: [1],
+            },
+        ],
+    }),
+}))
+
+vi.mock("sonner", () => ({
+    toast: (...args: unknown[]) => toastMock(...args),
+}))
+
+vi.mock("swr", () => ({
+    default: (key: string) => {
+        swrKeys.push(key)
+        const audits = [
+            {
+                id: 21,
+                session_id: "vpn_session_1",
+                user_id: 1,
+                action: "start_session",
+                success: true,
+                message: "session started",
+                created_at: "2026-06-08T13:22:24+08:00",
+            },
+            {
+                id: 22,
+                session_id: "vpn_session_2",
+                user_id: 2,
+                action: "stop_session",
+                success: false,
+                message: "session failed",
+                entry_server_id: 2,
+                exit_server_id: 1,
+                created_at: "2026-06-08T14:00:00+08:00",
+                detail: {
+                    agent_cleanup_ok: "system_proxy_restore",
+                    agent_cleanup_failed: "tun_restore",
+                    agent_cleanup_state_kept: "true",
+                    agent_cleanup_logs: "[cleanup] system_proxy_restore=ok; [cleanup] tun_restore=failed: route restore failed; [cleanup] state=kept-for-restore-retry path=/tmp/nezha-vpn/state.json",
+                },
+            },
+            {
+                id: 23,
+                session_id: "",
+                user_id: 1,
+                action: "delete_policy",
+                success: true,
+                message: "policy deleted",
+                entry_server_id: 1,
+                exit_server_id: 2,
+                created_at: "2026-06-08T15:00:00+08:00",
+                detail: {
+                    policy_name: "github split",
+                },
+            },
+        ]
+        const dataByKey: Record<string, unknown> = {
+            "/api/v1/vpn/policy": [
+                {
+                    id: 7,
+                    name: "github split",
+                    entry_server_id: 1,
+                    exit_server_id: 2,
+                    mode: "system_proxy",
+                    rule_mode: "domain",
+                    domains: ["github.com"],
+                    cidrs: [],
+                    direct_cidrs: [],
+                    listen_socks: "127.0.0.1:1080",
+                    listen_http: "",
+                    expires_seconds: 3600,
+                    max_upload_bytes: 1048576,
+                    max_download_bytes: 2097152,
+                    idle_timeout_seconds: 60,
+                    notification_group_id: 9,
+                    set_system_proxy: false,
+                    egress_probe_url: "https://ifconfig.example/ip",
+                    core_version: "1.12.0",
+                    core_download_url: "https://download.example.com/sing-box.exe",
+                    core_sha256: validSHA256,
+                },
+                {
+                    id: 8,
+                    name: "global tunnel",
+                    entry_server_id: 2,
+                    exit_server_id: 1,
+                    mode: "tun_global",
+                    rule_mode: "global",
+                    domains: [],
+                    cidrs: [],
+                    direct_cidrs: ["10.0.0.0/8"],
+                    listen_socks: "",
+                    listen_http: "",
+                    tun_name: "nezha-vpn",
+                    dns_server: "https://1.1.1.1/dns-query",
+                    expires_seconds: 7200,
+                    notification_group_id: 0,
+                    tun_health_url: "https://old.example.com/generate_204",
+                    tun_health_timeout_seconds: 5,
+                },
+            ],
+            "/api/v1/vpn/session": [
+                {
+                    id: 11,
+                    policy_id: 7,
+                    entry_server_id: 1,
+                    exit_server_id: 2,
+                    session_id: "vpn_session_1",
+                    mode: "system_proxy",
+                    state: "running",
+                    entry_state: "running",
+                    exit_state: "running",
+                    upload_bytes: 123,
+                    download_bytes: 456,
+                },
+                {
+                    id: 12,
+                    policy_id: 8,
+                    entry_server_id: 2,
+                    exit_server_id: 1,
+                    session_id: "vpn_session_2",
+                    mode: "tun_global",
+                    state: "failed",
+                    entry_state: "failed",
+                    exit_state: "running",
+                    upload_bytes: 789,
+                    download_bytes: 1024,
+                    active_connections: 3,
+                    last_error: "tun preflight failed",
+                    started_at: "2026-06-08T13:00:00+08:00",
+                    expires_at: "2026-06-08T15:00:00+08:00",
+                },
+            ],
+            "/api/v1/vpn/audit": key.startsWith("/api/v1/vpn/audit?")
+                ? filterAuditRowsForKey(audits, key)
+                : audits,
+        }
+        const normalizedKey = key.startsWith("/api/v1/vpn/audit?")
+            ? "/api/v1/vpn/audit"
+            : key
+        return {
+            data: dataByKey[normalizedKey],
+            mutate: vi.fn(),
+            error: undefined,
+            isLoading: false,
+        }
+    },
+}))
+
+vi.mock("i18next", () => ({
+    default: {
+        t: (key: string) => key,
+        use: vi.fn().mockReturnThis(),
+        init: vi.fn().mockResolvedValue(undefined),
+        on: vi.fn(),
+        changeLanguage: vi.fn(),
+    },
+    t: (key: string) => key,
+}))
+
+vi.mock("react-i18next", () => ({
+    useTranslation: () => ({
+        t: (key: string) => key,
+    }),
+    initReactI18next: { type: "3rdParty", init: () => undefined },
+    Trans: ({ children }: { children?: React.ReactNode }) => children ?? null,
+}))
+
+vi.mock("@/hooks/useAuth", () => ({
+    useAuth: () => ({
+        logout: vi.fn(),
+    }),
+}))
+
+vi.mock("@/hooks/useMainStore", () => ({
+    useMainStore: (selector?: (store: { profile: { id: number; role: number; username: string } }) => unknown) => {
+        const store = { profile: { id: 1, role: 0, username: "admin" } }
+        return selector ? selector(store) : store
+    },
+}))
+
+vi.mock("@/hooks/useMediaQuery", () => ({
+    useMediaQuery: () => true,
+}))
+
+vi.mock("@/hooks/useSetting", () => ({
+    default: () => ({
+        data: {
+            config: {
+                site_name: "Nezha",
+            },
+        },
+        isLoading: false,
+    }),
+}))
+
+beforeEach(() => {
+    vi.useRealTimers()
+    createVPNPolicy.mockReset()
+    updateVPNPolicy.mockReset()
+    deleteVPNPolicy.mockReset()
+    startVPNSession.mockReset()
+    stopVPNSession.mockReset()
+    restartVPNSession.mockReset()
+    refreshVPNSessionStatus.mockReset()
+    writeClipboardText.mockReset()
+    toastMock.mockReset()
+    swrKeys = []
+    createVPNPolicy.mockResolvedValue(8)
+    updateVPNPolicy.mockResolvedValue(undefined)
+    deleteVPNPolicy.mockResolvedValue(undefined)
+    startVPNSession.mockResolvedValue({ session_id: "vpn_session_2" })
+    stopVPNSession.mockResolvedValue({ session_id: "vpn_session_1", state: "stopped" })
+    restartVPNSession.mockResolvedValue({ session_id: "vpn_session_3", state: "running" })
+    refreshVPNSessionStatus.mockResolvedValue({ session_id: "vpn_session_1", state: "running" })
+    writeClipboardText.mockResolvedValue(undefined)
+    Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: {
+            writeText: writeClipboardText,
+        },
+    })
+    MockVPNWebSocket.instances = []
+    Reflect.deleteProperty(globalThis, "WebSocket")
+})
+
+test("Agent VPN page exposes the four planned dashboard tabs", () => {
+    render(<VPNPage />)
+
+    expect(screen.getByRole("heading", { name: "VPN.Title" })).toBeTruthy()
+    expect(screen.getByRole("tab", { name: "VPN.Overview" })).toBeTruthy()
+    expect(screen.getByRole("tab", { name: "VPN.Policy" })).toBeTruthy()
+    expect(screen.getByRole("tab", { name: "VPN.Session" })).toBeTruthy()
+    expect(screen.getByRole("tab", { name: "VPN.Audit" })).toBeTruthy()
+})
+
+test("Agent VPN overview shows VPN-capable agent status", () => {
+    render(<VPNPage />)
+
+    expect(screen.getByRole("heading", { name: "VPN.AgentCapability" })).toBeTruthy()
+    expect(screen.getByText("entry-cn")).toBeTruthy()
+    expect(screen.getByText("exit-jp")).toBeTruthy()
+    expect(screen.getByText("linux/amd64")).toBeTruthy()
+    expect(screen.getByText("windows/amd64")).toBeTruthy()
+    expect(screen.getByText("1.12.0")).toBeTruthy()
+    expect(screen.getByText("VPN.CoreMissing")).toBeTruthy()
+    expect(screen.getByText("Core not installed")).toBeTruthy()
+})
+
+test("Agent VPN page renders API policies, sessions, audits, and calls session actions", async () => {
+    render(<VPNPage />)
+
+    fireEvent.click(screen.getByRole("tab", { name: "VPN.Policy" }))
+    expect(screen.getByText("github split")).toBeTruthy()
+    expect(screen.getAllByText("entry-cn").length).toBeGreaterThan(0)
+    expect(screen.getAllByText("exit-jp").length).toBeGreaterThan(0)
+
+    fireEvent.click(screen.getByRole("button", { name: "VPN.StartSession github split" }))
+    await waitFor(() => {
+        expect(startVPNSession).toHaveBeenCalledWith(7)
+    })
+
+    fireEvent.click(screen.getByRole("tab", { name: "VPN.Session" }))
+    expect(screen.getByText("vpn_session_1")).toBeTruthy()
+    expect(screen.getByText("123 B / 456 B")).toBeTruthy()
+
+    fireEvent.click(screen.getByRole("button", { name: "VPN.StopSession vpn_session_1" }))
+    expect(stopVPNSession).not.toHaveBeenCalled()
+    expect(screen.getByText("VPN.ConfirmStopSession")).toBeTruthy()
+    fireEvent.click(screen.getByRole("button", { name: "Confirm" }))
+    await waitFor(() => {
+        expect(stopVPNSession).toHaveBeenCalledWith("vpn_session_1")
+    })
+
+    fireEvent.click(screen.getByRole("button", { name: "VPN.RefreshSession vpn_session_1" }))
+    await waitFor(() => {
+        expect(refreshVPNSessionStatus).toHaveBeenCalledWith("vpn_session_1")
+    })
+
+    fireEvent.click(screen.getByRole("tab", { name: "VPN.Audit" }))
+    expect(screen.getByText("session started")).toBeTruthy()
+})
+
+test("Agent VPN policy tab edits, deletes, and requires TUN risk confirmation", async () => {
+    render(<VPNPage />)
+
+    fireEvent.click(screen.getByRole("tab", { name: "VPN.Policy" }))
+    fireEvent.click(screen.getByRole("button", { name: "VPN.EditPolicy github split" }))
+    fireEvent.change(screen.getByLabelText("Name"), {
+        target: { value: "github split edited" },
+    })
+    fireEvent.change(screen.getByLabelText("VPN.DirectCIDRs"), {
+        target: { value: "127.0.0.0/8\n10.0.0.0/8" },
+    })
+    fireEvent.change(screen.getByLabelText("VPN.MaxUpload"), {
+        target: { value: "3145728" },
+    })
+    fireEvent.change(screen.getByLabelText("VPN.MaxDownload"), {
+        target: { value: "4194304" },
+    })
+    fireEvent.change(screen.getByLabelText("VPN.IdleTimeout"), {
+        target: { value: "120" },
+    })
+    expect((screen.getByLabelText("VPN.CoreVersion") as HTMLInputElement).value).toBe("1.12.0")
+    fireEvent.change(screen.getByLabelText("VPN.CoreVersion"), {
+        target: { value: " 1.13.0 " },
+    })
+    expect((screen.getByLabelText("VPN.CoreDownloadURL") as HTMLInputElement).value).toBe(
+        "https://download.example.com/sing-box.exe",
+    )
+    fireEvent.change(screen.getByLabelText("VPN.CoreDownloadURL"), {
+        target: { value: " https://cdn.example.com/sing-box.exe " },
+    })
+    expect((screen.getByLabelText("VPN.CoreSHA256") as HTMLInputElement).value).toBe(validSHA256)
+    fireEvent.change(screen.getByLabelText("VPN.CoreSHA256"), {
+        target: { value: ` ${validSHA256} ` },
+    })
+    fireEvent.click(screen.getByLabelText("VPN.SetSystemProxy"))
+    expect((screen.getByLabelText("VPN.EgressProbeURL") as HTMLInputElement).value).toBe(
+        "https://ifconfig.example/ip",
+    )
+    fireEvent.change(screen.getByLabelText("VPN.EgressProbeURL"), {
+        target: { value: " https://ip.example.com/plain " },
+    })
+    fireEvent.click(screen.getByRole("button", { name: "VPN.SavePolicy" }))
+
+    await waitFor(() => {
+        expect(updateVPNPolicy).toHaveBeenCalledWith(
+            7,
+            expect.objectContaining({
+                name: "github split edited",
+                direct_cidrs: ["127.0.0.0/8", "10.0.0.0/8"],
+                max_upload_bytes: 3145728,
+                max_download_bytes: 4194304,
+                idle_timeout_seconds: 120,
+                core_version: "1.13.0",
+                core_download_url: "https://cdn.example.com/sing-box.exe",
+                core_sha256: validSHA256,
+                set_system_proxy: true,
+                egress_probe_url: "https://ip.example.com/plain",
+            }),
+        )
+    })
+
+    fireEvent.click(screen.getByRole("button", { name: "VPN.DeletePolicy github split" }))
+    expect(deleteVPNPolicy).not.toHaveBeenCalled()
+    expect(screen.getByText("ConfirmDeletion")).toBeTruthy()
+    fireEvent.click(screen.getByRole("button", { name: "Confirm" }))
+    await waitFor(() => {
+        expect(deleteVPNPolicy).toHaveBeenCalledWith([7])
+    })
+
+    updateVPNPolicy.mockClear()
+    fireEvent.click(screen.getByRole("button", { name: "VPN.EditPolicy global tunnel" }))
+    expect((screen.getByLabelText("VPN.TunHealthURL") as HTMLInputElement).value).toBe(
+        "https://old.example.com/generate_204",
+    )
+    fireEvent.change(screen.getByLabelText("VPN.TunHealthURL"), {
+        target: { value: " https://connectivity.example.com/generate_204 " },
+    })
+    expect((screen.getByLabelText("VPN.TunName") as HTMLInputElement).value).toBe("nezha-vpn")
+    fireEvent.change(screen.getByLabelText("VPN.TunName"), {
+        target: { value: "nezha-vpn-custom" },
+    })
+    expect((screen.getByLabelText("VPN.DNSServer") as HTMLInputElement).value).toBe(
+        "https://1.1.1.1/dns-query",
+    )
+    fireEvent.change(screen.getByLabelText("VPN.DNSServer"), {
+        target: { value: " https://9.9.9.9/dns-query " },
+    })
+    fireEvent.change(screen.getByLabelText("VPN.TunHealthTimeout"), {
+        target: { value: "7" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: "VPN.SavePolicy" }))
+    expect(updateVPNPolicy).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByLabelText("VPN.TunRiskConfirm"))
+    fireEvent.click(screen.getByRole("button", { name: "VPN.SavePolicy" }))
+    await waitFor(() => {
+        expect(updateVPNPolicy).toHaveBeenCalledWith(
+            8,
+            expect.objectContaining({
+                mode: "tun_global",
+                tun_name: "nezha-vpn-custom",
+                dns_server: "https://9.9.9.9/dns-query",
+                tun_health_url: "https://connectivity.example.com/generate_204",
+                tun_health_timeout_seconds: 7,
+            }),
+        )
+    })
+})
+
+test("Agent VPN policy form validates listen addresses and CIDR before saving", async () => {
+    render(<VPNPage />)
+
+    fireEvent.click(screen.getByRole("tab", { name: "VPN.Policy" }))
+    fireEvent.click(screen.getByRole("button", { name: "VPN.EditPolicy github split" }))
+    fireEvent.change(screen.getByLabelText("VPN.LocalSocks"), {
+        target: { value: "0.0.0.0:1080" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: "VPN.SavePolicy" }))
+
+    expect(updateVPNPolicy).not.toHaveBeenCalled()
+    expect(toastMock).toHaveBeenCalledWith(
+        "Error",
+        expect.objectContaining({ description: "VPN.ValidationLoopbackListen" }),
+    )
+
+    toastMock.mockClear()
+    fireEvent.change(screen.getByLabelText("VPN.LocalSocks"), {
+        target: { value: "127.0.0.1:1080" },
+    })
+    fireEvent.change(screen.getByLabelText("VPN.DirectCIDRs"), {
+        target: { value: "not-a-cidr" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: "VPN.SavePolicy" }))
+
+    expect(updateVPNPolicy).not.toHaveBeenCalled()
+    expect(toastMock).toHaveBeenCalledWith(
+        "Error",
+        expect.objectContaining({ description: "VPN.ValidationCIDRInvalid" }),
+    )
+})
+
+test("Agent VPN policy form validates URLs and SHA256 before saving", async () => {
+    render(<VPNPage />)
+
+    fireEvent.click(screen.getByRole("tab", { name: "VPN.Policy" }))
+    fireEvent.click(screen.getByRole("button", { name: "VPN.EditPolicy github split" }))
+    fireEvent.change(screen.getByLabelText("VPN.CoreDownloadURL"), {
+        target: { value: "file:///tmp/sing-box" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: "VPN.SavePolicy" }))
+
+    expect(updateVPNPolicy).not.toHaveBeenCalled()
+    expect(toastMock).toHaveBeenCalledWith(
+        "Error",
+        expect.objectContaining({ description: "VPN.ValidationHTTPURLInvalid" }),
+    )
+
+    toastMock.mockClear()
+    fireEvent.change(screen.getByLabelText("VPN.CoreDownloadURL"), {
+        target: { value: "https://cdn.example.com/sing-box.exe" },
+    })
+    fireEvent.change(screen.getByLabelText("VPN.CoreSHA256"), {
+        target: { value: "sha256:abcdef" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: "VPN.SavePolicy" }))
+
+    expect(updateVPNPolicy).not.toHaveBeenCalled()
+    expect(toastMock).toHaveBeenCalledWith(
+        "Error",
+        expect.objectContaining({ description: "VPN.ValidationSHA256Invalid" }),
+    )
+
+    toastMock.mockClear()
+    fireEvent.change(screen.getByLabelText("VPN.CoreSHA256"), {
+        target: { value: `sha256:${validSHA256}` },
+    })
+    fireEvent.click(screen.getByRole("button", { name: "VPN.SavePolicy" }))
+
+    expect(updateVPNPolicy).not.toHaveBeenCalled()
+    expect(toastMock).toHaveBeenCalledWith(
+        "Error",
+        expect.objectContaining({ description: "VPN.ValidationSHA256Invalid" }),
+    )
+
+    toastMock.mockClear()
+    fireEvent.change(screen.getByLabelText("VPN.CoreSHA256"), {
+        target: { value: `SHA256:${validSHA256}` },
+    })
+    fireEvent.click(screen.getByRole("button", { name: "VPN.SavePolicy" }))
+
+    expect(updateVPNPolicy).not.toHaveBeenCalled()
+    expect(toastMock).toHaveBeenCalledWith(
+        "Error",
+        expect.objectContaining({ description: "VPN.ValidationSHA256Invalid" }),
+    )
+
+    toastMock.mockClear()
+    fireEvent.change(screen.getByLabelText("VPN.CoreSHA256"), {
+        target: { value: validSHA256 },
+    })
+    fireEvent.change(screen.getByLabelText("VPN.EgressProbeURL"), {
+        target: { value: "ftp://ip.example.com/plain" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: "VPN.SavePolicy" }))
+
+    expect(updateVPNPolicy).not.toHaveBeenCalled()
+    expect(toastMock).toHaveBeenCalledWith(
+        "Error",
+        expect.objectContaining({ description: "VPN.ValidationHTTPURLInvalid" }),
+    )
+
+    toastMock.mockClear()
+    fireEvent.click(screen.getByRole("button", { name: "VPN.EditPolicy global tunnel" }))
+    fireEvent.change(screen.getByLabelText("VPN.TunHealthURL"), {
+        target: { value: "file:///tmp/health" },
+    })
+    fireEvent.click(screen.getByLabelText("VPN.TunRiskConfirm"))
+    fireEvent.click(screen.getByRole("button", { name: "VPN.SavePolicy" }))
+
+    expect(updateVPNPolicy).not.toHaveBeenCalled()
+    expect(toastMock).toHaveBeenCalledWith(
+        "Error",
+        expect.objectContaining({ description: "VPN.ValidationHTTPURLInvalid" }),
+    )
+})
+
+test("Agent VPN policy tab copies a saved policy into a new form", async () => {
+    render(<VPNPage />)
+
+    fireEvent.click(screen.getByRole("tab", { name: "VPN.Policy" }))
+    fireEvent.click(screen.getByRole("button", { name: "VPN.CopyPolicy github split" }))
+
+    expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("github split copy")
+    fireEvent.click(screen.getByRole("button", { name: "VPN.SavePolicy" }))
+
+    await waitFor(() => {
+        expect(createVPNPolicy).toHaveBeenCalledWith(
+            expect.objectContaining({
+                name: "github split copy",
+                entry_server_id: 1,
+                exit_server_id: 2,
+                mode: "system_proxy",
+                domains: ["github.com"],
+            }),
+        )
+    })
+    expect(updateVPNPolicy).not.toHaveBeenCalled()
+})
+
+test("Agent VPN policy form start button starts the edited policy", async () => {
+    render(<VPNPage />)
+
+    fireEvent.click(screen.getByRole("tab", { name: "VPN.Policy" }))
+    fireEvent.click(screen.getByRole("button", { name: "VPN.EditPolicy global tunnel" }))
+
+    const formStartButton = screen.getAllByRole("button", { name: "VPN.StartSession" })[1]
+    fireEvent.click(formStartButton)
+
+    await waitFor(() => {
+        expect(startVPNSession).toHaveBeenCalledWith(8)
+    })
+    expect(startVPNSession).not.toHaveBeenCalledWith(7)
+})
+
+test("Agent VPN new policy button resets the form into create mode", () => {
+    render(<VPNPage />)
+
+    fireEvent.click(screen.getByRole("tab", { name: "VPN.Policy" }))
+    fireEvent.click(screen.getByRole("button", { name: "VPN.EditPolicy global tunnel" }))
+
+    expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("global tunnel")
+    expect(
+        (screen.getAllByRole("button", { name: "VPN.StartSession" })[1] as HTMLButtonElement)
+            .disabled,
+    ).toBe(false)
+
+    fireEvent.click(screen.getByRole("button", { name: "VPN.NewPolicy" }))
+
+    expect(screen.getByRole("tab", { name: "VPN.Policy" }).getAttribute("data-state")).toBe(
+        "active",
+    )
+    expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("")
+    expect(
+        (screen.getAllByRole("button", { name: "VPN.StartSession" })[1] as HTMLButtonElement)
+            .disabled,
+    ).toBe(true)
+})
+
+test("Agent VPN start selects the new session and reconnects the log stream", async () => {
+    vi.stubGlobal("WebSocket", MockVPNWebSocket)
+
+    render(<VPNPage />)
+
+    await waitFor(() => {
+        expect(MockVPNWebSocket.instances.length).toBe(1)
+    })
+    expect(MockVPNWebSocket.instances[0].url).toContain("/api/v1/ws/vpn/session/vpn_session_1")
+
+    fireEvent.click(screen.getByRole("tab", { name: "VPN.Policy" }))
+    fireEvent.click(screen.getByRole("button", { name: "VPN.StartSession github split" }))
+
+    await waitFor(() => {
+        expect(startVPNSession).toHaveBeenCalledWith(7)
+        expect(MockVPNWebSocket.instances.length).toBe(2)
+    })
+    expect(MockVPNWebSocket.instances[0].closed).toBe(true)
+    expect(MockVPNWebSocket.instances[1].url).toContain("/api/v1/ws/vpn/session/vpn_session_2")
+    expect(screen.getAllByText("vpn_session_2").length).toBeGreaterThan(0)
+})
+
+test("Agent VPN session tab confirms before restarting sessions", async () => {
+    render(<VPNPage />)
+
+    fireEvent.click(screen.getByRole("tab", { name: "VPN.Session" }))
+    fireEvent.click(screen.getByRole("button", { name: "VPN.RestartSession vpn_session_1" }))
+    expect(restartVPNSession).not.toHaveBeenCalled()
+    expect(screen.getByText("VPN.ConfirmRestartSession")).toBeTruthy()
+
+    fireEvent.click(screen.getByRole("button", { name: "Confirm" }))
+
+    await waitFor(() => {
+        expect(restartVPNSession).toHaveBeenCalledWith("vpn_session_1")
+    })
+})
+
+test("Agent VPN session actions are gated by session state", () => {
+    render(<VPNPage />)
+
+    fireEvent.click(screen.getByRole("tab", { name: "VPN.Session" }))
+
+    expect(
+        (screen.getByRole("button", { name: "VPN.StopSession vpn_session_1" }) as HTMLButtonElement)
+            .disabled,
+    ).toBe(false)
+    expect(
+        (screen.getByRole("button", { name: "VPN.RestartSession vpn_session_1" }) as HTMLButtonElement)
+            .disabled,
+    ).toBe(false)
+    expect(
+        (screen.getByRole("button", { name: "VPN.RefreshSession vpn_session_1" }) as HTMLButtonElement)
+            .disabled,
+    ).toBe(false)
+
+    expect(
+        (screen.getByRole("button", { name: "VPN.StopSession vpn_session_2" }) as HTMLButtonElement)
+            .disabled,
+    ).toBe(true)
+    expect(
+        (screen.getByRole("button", { name: "VPN.RestartSession vpn_session_2" }) as HTMLButtonElement)
+            .disabled,
+    ).toBe(false)
+    expect(
+        (screen.getByRole("button", { name: "VPN.RefreshSession vpn_session_2" }) as HTMLButtonElement)
+            .disabled,
+    ).toBe(false)
+})
+
+test("Agent VPN session tab filters sessions by state and entry or exit node", () => {
+    render(<VPNPage />)
+
+    fireEvent.click(screen.getByRole("tab", { name: "VPN.Session" }))
+    expect(screen.getByRole("row", { name: /vpn_session_1/ })).toBeTruthy()
+    expect(screen.getByRole("row", { name: /vpn_session_2/ })).toBeTruthy()
+
+    fireEvent.change(screen.getByLabelText("VPN.SessionStateFilter"), {
+        target: { value: "failed" },
+    })
+    expect(screen.queryByRole("row", { name: /vpn_session_1/ })).toBeNull()
+    expect(screen.getByRole("row", { name: /vpn_session_2/ })).toBeTruthy()
+
+    fireEvent.change(screen.getByLabelText("VPN.SessionEntryFilter"), {
+        target: { value: "1" },
+    })
+    expect(screen.queryByRole("row", { name: /vpn_session_1/ })).toBeNull()
+    expect(screen.queryByRole("row", { name: /vpn_session_2/ })).toBeNull()
+    expect(screen.getByText("NoResults")).toBeTruthy()
+
+    fireEvent.change(screen.getByLabelText("VPN.SessionEntryFilter"), {
+        target: { value: "all" },
+    })
+    fireEvent.change(screen.getByLabelText("VPN.SessionExitFilter"), {
+        target: { value: "1" },
+    })
+    expect(screen.queryByRole("row", { name: /vpn_session_1/ })).toBeNull()
+    expect(screen.getByRole("row", { name: /vpn_session_2/ })).toBeTruthy()
+})
+
+test("Agent VPN table action buttons include visible text labels", () => {
+    render(<VPNPage />)
+
+    fireEvent.click(screen.getByRole("tab", { name: "VPN.Policy" }))
+    const policyStartButton = screen.getByRole("button", { name: "VPN.StartSession github split" })
+    expect(policyStartButton.textContent).toContain("VPN.StartSession")
+    const policyDeleteButton = screen.getByRole("button", { name: "VPN.DeletePolicy github split" })
+    expect(policyDeleteButton.textContent).toContain("VPN.DeletePolicy")
+
+    fireEvent.click(screen.getByRole("tab", { name: "VPN.Session" }))
+    const stopButton = screen.getByRole("button", { name: "VPN.StopSession vpn_session_1" })
+    expect(stopButton.textContent).toContain("VPN.StopSession")
+    const restartButton = screen.getByRole("button", { name: "VPN.RestartSession vpn_session_1" })
+    expect(restartButton.textContent).toContain("VPN.RestartSession")
+    const refreshButton = screen.getByRole("button", { name: "VPN.RefreshSession vpn_session_1" })
+    expect(refreshButton.textContent).toContain("VPN.RefreshSession")
+    const logButton = screen.getByRole("button", { name: "VPN.ViewSessionLog vpn_session_1" })
+    expect(logButton.textContent).toContain("VPN.ViewSessionLog")
+    const copyButton = screen.getByRole("button", { name: "VPN.CopyProxy vpn_session_1" })
+    expect(copyButton.textContent).toContain("VPN.CopyProxy")
+})
+
+test("Agent VPN session tab views logs and copies the running system proxy address", async () => {
+    render(<VPNPage />)
+
+    fireEvent.click(screen.getByRole("tab", { name: "VPN.Session" }))
+    fireEvent.click(screen.getByRole("button", { name: "VPN.ViewSessionLog vpn_session_2" }))
+    expect(screen.getAllByText("vpn_session_2").length).toBeGreaterThan(1)
+
+    fireEvent.click(screen.getByRole("button", { name: "VPN.CopyProxy vpn_session_1" }))
+    await waitFor(() => {
+        expect(writeClipboardText).toHaveBeenCalledWith("127.0.0.1:1080")
+    })
+
+    expect(
+        (screen.getByRole("button", { name: "VPN.CopyProxy vpn_session_2" }) as HTMLButtonElement)
+            .disabled,
+    ).toBe(true)
+})
+
+test("Agent VPN session log stream appends, caps logs, and reconnects", async () => {
+    vi.stubGlobal("WebSocket", MockVPNWebSocket)
+
+    render(<VPNPage />)
+
+    await waitFor(() => {
+        expect(MockVPNWebSocket.instances.length).toBe(1)
+    })
+    expect(MockVPNWebSocket.instances[0].url).toContain("/api/v1/ws/vpn/session/vpn_session_1")
+
+    const lines = Array.from({ length: 1005 }, (_, index) => `line-${index}`)
+    act(() => {
+        MockVPNWebSocket.instances[0].sendFrame({
+            session: { session_id: "vpn_session_1", state: "running" },
+            logs: lines,
+        })
+    })
+
+    expect(screen.queryByText(/line-0/)).toBeNull()
+    expect(screen.getByText(/line-1004/)).toBeTruthy()
+
+    vi.useFakeTimers()
+    try {
+        act(() => {
+            MockVPNWebSocket.instances[0].disconnect()
+        })
+        expect(screen.getByText(/reconnecting/)).toBeTruthy()
+
+        await act(async () => {
+            vi.advanceTimersByTime(1000)
+        })
+        expect(MockVPNWebSocket.instances.length).toBe(2)
+        expect(MockVPNWebSocket.instances[1].url).toContain("/api/v1/ws/vpn/session/vpn_session_1")
+    } finally {
+        vi.useRealTimers()
+    }
+})
+
+test("Agent VPN session log stream adds readable context to raw log lines", async () => {
+    vi.stubGlobal("WebSocket", MockVPNWebSocket)
+
+    render(<VPNPage />)
+
+    await waitFor(() => {
+        expect(MockVPNWebSocket.instances.length).toBe(1)
+    })
+
+    act(() => {
+        MockVPNWebSocket.instances[0].sendFrame({
+            session: {
+                session_id: "vpn_session_1",
+                entry_state: "running",
+                exit_state: "running",
+            },
+            logs: ["sidecar accepted connection"],
+        })
+    })
+
+    expect(screen.getByText(/\[\d{2}:\d{2}:\d{2}\] \[vpn_session_1\] \[entry:running\/exit:running\] \[entry-cn -> exit-jp\] sidecar accepted connection/)).toBeTruthy()
+})
+
+test("Agent VPN session tab renders the planned session detail columns", () => {
+    render(<VPNPage />)
+
+    fireEvent.click(screen.getByRole("tab", { name: "VPN.Session" }))
+
+    expect(screen.getByRole("columnheader", { name: "VPN.PolicyName" })).toBeTruthy()
+    expect(screen.getByRole("columnheader", { name: "VPN.Mode" })).toBeTruthy()
+    expect(screen.getByRole("columnheader", { name: "VPN.ActiveConnections" })).toBeTruthy()
+    expect(screen.getByRole("columnheader", { name: "VPN.LocalProxy" })).toBeTruthy()
+    expect(screen.getByRole("columnheader", { name: "VPN.TunName" })).toBeTruthy()
+    expect(screen.getByRole("columnheader", { name: "VPN.StartedAt" })).toBeTruthy()
+    expect(screen.getByRole("columnheader", { name: "VPN.ExpiresAt" })).toBeTruthy()
+    expect(screen.getByRole("columnheader", { name: "VPN.LastError" })).toBeTruthy()
+
+    expect(screen.getByText("github split")).toBeTruthy()
+    expect(screen.getByText("VPN.ModeSystemProxy")).toBeTruthy()
+    expect(screen.getByText("127.0.0.1:1080")).toBeTruthy()
+    expect(screen.getByText("global tunnel")).toBeTruthy()
+    expect(screen.getByText("VPN.ModeTunGlobal")).toBeTruthy()
+    expect(screen.getByText("nezha-vpn")).toBeTruthy()
+    expect(screen.getByText("3")).toBeTruthy()
+    expect(screen.getByText("2026-06-08T13:00:00+08:00")).toBeTruthy()
+    expect(screen.getByText("2026-06-08T15:00:00+08:00")).toBeTruthy()
+    expect(screen.getByText("tun preflight failed")).toBeTruthy()
+})
+
+test("Agent VPN audit tab filters by action, result, server, user, and time", () => {
+    render(<VPNPage />)
+
+    fireEvent.click(screen.getByRole("tab", { name: "VPN.Audit" }))
+    expect(screen.getByText("session started")).toBeTruthy()
+    expect(screen.getByText("session failed")).toBeTruthy()
+
+    fireEvent.change(screen.getByLabelText("VPN.AuditActionFilter"), {
+        target: { value: "stop" },
+    })
+    fireEvent.change(screen.getByLabelText("VPN.AuditResultFilter"), {
+        target: { value: "failure" },
+    })
+    fireEvent.change(screen.getByLabelText("VPN.AuditUserFilter"), {
+        target: { value: "2" },
+    })
+    fireEvent.change(screen.getByLabelText("VPN.AuditEntryFilter"), {
+        target: { value: "2" },
+    })
+    fireEvent.change(screen.getByLabelText("VPN.AuditExitFilter"), {
+        target: { value: "1" },
+    })
+    fireEvent.change(screen.getByLabelText("VPN.AuditFromFilter"), {
+        target: { value: "2026-06-08T13:30" },
+    })
+    fireEvent.change(screen.getByLabelText("VPN.AuditToFilter"), {
+        target: { value: "2026-06-08T14:30" },
+    })
+
+    expect(screen.queryByText("session started")).toBeNull()
+    expect(screen.getByText("session failed")).toBeTruthy()
+    expect(screen.getByText("system_proxy_restore")).toBeTruthy()
+    expect(screen.getByText("tun_restore")).toBeTruthy()
+    expect(screen.getByText("state kept")).toBeTruthy()
+    expect(swrKeys.some((key) =>
+        key.includes("/api/v1/vpn/audit?") &&
+        key.includes("action=stop") &&
+        key.includes("result=failure") &&
+        key.includes("user=2") &&
+        key.includes("entry=2") &&
+        key.includes("exit=1") &&
+        key.includes("from=2026-06-08T13%3A30") &&
+        key.includes("to=2026-06-08T14%3A30"),
+    )).toBe(true)
+})
+
+test("Agent VPN audit action column uses locale labels instead of raw action ids", () => {
+    render(<VPNPage />)
+
+    fireEvent.click(screen.getByRole("tab", { name: "VPN.Audit" }))
+
+    expect(screen.getByText("VPN.ActionStartSession")).toBeTruthy()
+    expect(screen.getByText("VPN.ActionStopSession")).toBeTruthy()
+    expect(screen.getByText("VPN.ActionDeletePolicy")).toBeTruthy()
+    expect(screen.queryByText("start_session")).toBeNull()
+    expect(screen.queryByText("stop_session")).toBeNull()
+    expect(screen.queryByText("delete_policy")).toBeNull()
+})
+
+test("header exposes Agent VPN navigation entry", () => {
+    render(
+        <MemoryRouter initialEntries={["/dashboard"]}>
+            <Header />
+        </MemoryRouter>,
+    )
+
+    const links = screen.getAllByRole("link", { name: "VPN.Nav" })
+    expect(links.some((link) => link.getAttribute("href") === "/dashboard/vpn")).toBe(true)
+})
+
+test("Agent VPN audit detail column has locale labels", () => {
+    expect(zhCNTranslation.VPN.Detail).toBe("详情")
+    expect(zhTWTranslation.VPN.Detail).toBe("詳情")
+    expect(enTranslation.VPN.Detail).toBe("Detail")
+})
+
+test("Agent VPN audit action labels are present in all locale files", () => {
+    const expectedActionLabels = [
+        "ActionCreatePolicy",
+        "ActionUpdatePolicy",
+        "ActionDeletePolicy",
+        "ActionStartSession",
+        "ActionStopSession",
+        "ActionRestartSession",
+        "ActionStatusSession",
+    ]
+
+    for (const key of expectedActionLabels) {
+        expect(zhCNTranslation.VPN[key as keyof typeof zhCNTranslation.VPN]).toBeTruthy()
+        expect(zhTWTranslation.VPN[key as keyof typeof zhTWTranslation.VPN]).toBeTruthy()
+        expect(enTranslation.VPN[key as keyof typeof enTranslation.VPN]).toBeTruthy()
+    }
+
+    expect(zhCNTranslation.VPN.ConfirmStopSession).toBeTruthy()
+    expect(zhTWTranslation.VPN.ConfirmStopSession).toBeTruthy()
+    expect(enTranslation.VPN.ConfirmStopSession).toBeTruthy()
+    expect(zhCNTranslation.VPN.ConfirmRestartSession).toBeTruthy()
+    expect(zhTWTranslation.VPN.ConfirmRestartSession).toBeTruthy()
+    expect(enTranslation.VPN.ConfirmRestartSession).toBeTruthy()
+    expect(zhCNTranslation.VPN.NewPolicy).toBeTruthy()
+    expect(zhTWTranslation.VPN.NewPolicy).toBeTruthy()
+    expect(enTranslation.VPN.NewPolicy).toBeTruthy()
+    expect(zhCNTranslation.VPN.SessionStateFilter).toBeTruthy()
+    expect(zhTWTranslation.VPN.SessionStateFilter).toBeTruthy()
+    expect(enTranslation.VPN.SessionStateFilter).toBeTruthy()
+    expect(zhCNTranslation.VPN.SessionEntryFilter).toBeTruthy()
+    expect(zhTWTranslation.VPN.SessionEntryFilter).toBeTruthy()
+    expect(enTranslation.VPN.SessionEntryFilter).toBeTruthy()
+    expect(zhCNTranslation.VPN.SessionExitFilter).toBeTruthy()
+    expect(zhTWTranslation.VPN.SessionExitFilter).toBeTruthy()
+    expect(enTranslation.VPN.SessionExitFilter).toBeTruthy()
+    expect(zhCNTranslation.VPN.TunName).toBeTruthy()
+    expect(zhTWTranslation.VPN.TunName).toBeTruthy()
+    expect(enTranslation.VPN.TunName).toBeTruthy()
+})
