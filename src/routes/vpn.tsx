@@ -44,7 +44,6 @@ import { Textarea } from "@/components/ui/textarea"
 import { useNotification } from "@/hooks/useNotfication"
 import { useServer } from "@/hooks/useServer"
 import {
-    ModelAgentVPNAuditLog,
     ModelAgentVPNPolicy,
     ModelAgentVPNPolicyForm,
     ModelAgentVPNSession,
@@ -136,15 +135,6 @@ export default function VPNPage() {
         entry: "all",
         exit: "all",
     })
-    const [auditFilters, setAuditFilters] = useState({
-        action: "",
-        result: "all",
-        user: "",
-        entry: "",
-        exit: "",
-        from: "",
-        to: "",
-    })
     const [sessionLogs, setSessionLogs] = useState<string[]>([
         "[vpn] dashboard control plane ready",
         "[vpn] relay stream: waiting for session",
@@ -177,8 +167,6 @@ export default function VPNPage() {
         data: sessions = [],
         mutate: mutateSessions,
     } = useSWR<ModelAgentVPNSession[]>("/api/v1/vpn/session", swrFetcher)
-    const auditURL = useMemo(() => buildVPNAuditURL(auditFilters), [auditFilters])
-    const { data: audits = [] } = useSWR<ModelAgentVPNAuditLog[]>(auditURL, swrFetcher)
     const sessionsRef = useRef(sessions)
     const mutateSessionsRef = useRef(mutateSessions)
     const selectedSessionLogRef = useRef("")
@@ -473,7 +461,7 @@ export default function VPNPage() {
             </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-                <TabsList className="grid h-auto w-full grid-cols-2 md:grid-cols-4">
+                <TabsList className="grid h-auto w-full grid-cols-3">
                     <TabsTrigger value="overview" onClick={() => setActiveTab("overview")}>
                         {t("VPN.Overview")}
                     </TabsTrigger>
@@ -482,9 +470,6 @@ export default function VPNPage() {
                     </TabsTrigger>
                     <TabsTrigger value="session" onClick={() => setActiveTab("session")}>
                         {t("VPN.Session")}
-                    </TabsTrigger>
-                    <TabsTrigger value="audit" onClick={() => setActiveTab("audit")}>
-                        {t("VPN.Audit")}
                     </TabsTrigger>
                 </TabsList>
 
@@ -1342,129 +1327,6 @@ export default function VPNPage() {
                     />
                 </TabsContent>
 
-                <TabsContent value="audit">
-                    <section className="space-y-4 rounded-md border p-4">
-                        <div className="grid gap-3 md:grid-cols-4 xl:grid-cols-7">
-                            <NativeField label={t("VPN.AuditActionFilter")} id="vpn-audit-action">
-                                <Input
-                                    id="vpn-audit-action"
-                                    value={auditFilters.action}
-                                    onChange={(event) =>
-                                        setAuditFilter(setAuditFilters, "action", event.target.value)
-                                    }
-                                />
-                            </NativeField>
-                            <NativeField label={t("VPN.AuditResultFilter")} id="vpn-audit-result">
-                                <select
-                                    id="vpn-audit-result"
-                                    className="h-10 rounded-md border bg-background px-3 text-sm"
-                                    value={auditFilters.result}
-                                    onChange={(event) =>
-                                        setAuditFilter(setAuditFilters, "result", event.target.value)
-                                    }
-                                >
-                                    <option value="all">{t("VPN.FilterAll")}</option>
-                                    <option value="success">{t("Success")}</option>
-                                    <option value="failure">{t("Failure")}</option>
-                                </select>
-                            </NativeField>
-                            <NativeField label={t("VPN.AuditUserFilter")} id="vpn-audit-user">
-                                <Input
-                                    id="vpn-audit-user"
-                                    value={auditFilters.user}
-                                    onChange={(event) =>
-                                        setAuditFilter(setAuditFilters, "user", event.target.value)
-                                    }
-                                />
-                            </NativeField>
-                            <NativeField label={t("VPN.AuditEntryFilter")} id="vpn-audit-entry">
-                                <Input
-                                    id="vpn-audit-entry"
-                                    value={auditFilters.entry}
-                                    onChange={(event) =>
-                                        setAuditFilter(setAuditFilters, "entry", event.target.value)
-                                    }
-                                />
-                            </NativeField>
-                            <NativeField label={t("VPN.AuditExitFilter")} id="vpn-audit-exit">
-                                <Input
-                                    id="vpn-audit-exit"
-                                    value={auditFilters.exit}
-                                    onChange={(event) =>
-                                        setAuditFilter(setAuditFilters, "exit", event.target.value)
-                                    }
-                                />
-                            </NativeField>
-                            <NativeField label={t("VPN.AuditFromFilter")} id="vpn-audit-from">
-                                <Input
-                                    id="vpn-audit-from"
-                                    type="datetime-local"
-                                    value={auditFilters.from}
-                                    onChange={(event) =>
-                                        setAuditFilter(setAuditFilters, "from", event.target.value)
-                                    }
-                                />
-                            </NativeField>
-                            <NativeField label={t("VPN.AuditToFilter")} id="vpn-audit-to">
-                                <Input
-                                    id="vpn-audit-to"
-                                    type="datetime-local"
-                                    value={auditFilters.to}
-                                    onChange={(event) =>
-                                        setAuditFilter(setAuditFilters, "to", event.target.value)
-                                    }
-                                />
-                            </NativeField>
-                        </div>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>{t("CreatedAt")}</TableHead>
-                                    <TableHead>{t("User")}</TableHead>
-                                    <TableHead>{t("Actions")}</TableHead>
-                                    <TableHead>{t("Status")}</TableHead>
-                                    <TableHead>{t("VPN.Target")}</TableHead>
-                                    <TableHead>{t("VPN.Detail")}</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {audits.map((audit) => {
-                                    const detailItems = formatVPNAuditDetailItems(audit.detail)
-                                    return (
-                                        <TableRow key={audit.id}>
-                                            <TableCell>{audit.created_at ?? "-"}</TableCell>
-                                            <TableCell>{audit.user_id ?? "-"}</TableCell>
-                                            <TableCell>{formatVPNAuditAction(t, audit.action)}</TableCell>
-                                            <TableCell>
-                                                <Badge variant={audit.success ? "default" : "destructive"}>
-                                                    {audit.success ? t("Success") : t("Failure")}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell>{audit.message || audit.session_id || "-"}</TableCell>
-                                            <TableCell>
-                                                {detailItems.length > 0 ? (
-                                                    <div className="flex max-w-md flex-wrap gap-1">
-                                                        {detailItems.map((item) => (
-                                                            <Badge
-                                                                key={item}
-                                                                variant="outline"
-                                                                className="max-w-full break-all font-mono font-normal"
-                                                            >
-                                                                {item}
-                                                            </Badge>
-                                                        ))}
-                                                    </div>
-                                                ) : (
-                                                    "-"
-                                                )}
-                                            </TableCell>
-                                        </TableRow>
-                                    )
-                                })}
-                            </TableBody>
-                        </Table>
-                    </section>
-                </TabsContent>
             </Tabs>
         </div>
     )
@@ -1966,16 +1828,6 @@ function sessionTunName(
     return session.tun_name || policies.find((item) => item.id === session.policy_id)?.tun_name || "-"
 }
 
-type VPNAuditFilters = {
-    action: string
-    result: string
-    user: string
-    entry: string
-    exit: string
-    from: string
-    to: string
-}
-
 type VPNSessionFilters = {
     state: string
     entry: string
@@ -1988,68 +1840,6 @@ function setSessionFilter<K extends keyof VPNSessionFilters>(
     value: VPNSessionFilters[K],
 ) {
     setFilters((current) => ({ ...current, [key]: value }))
-}
-
-function setAuditFilter<K extends keyof VPNAuditFilters>(
-    setFilters: React.Dispatch<React.SetStateAction<VPNAuditFilters>>,
-    key: K,
-    value: VPNAuditFilters[K],
-) {
-    setFilters((current) => ({ ...current, [key]: value }))
-}
-
-function formatVPNAuditDetailItems(detail: Record<string, string> | undefined): string[] {
-    if (!detail) return []
-    const items: string[] = []
-    const cleanupOk = detail.agent_cleanup_ok?.trim()
-    const cleanupFailed = detail.agent_cleanup_failed?.trim()
-    const cleanupStateKept = detail.agent_cleanup_state_kept?.trim()
-    if (cleanupOk) items.push(...cleanupOk.split(",").filter(Boolean))
-    if (cleanupFailed) items.push(...cleanupFailed.split(",").filter(Boolean))
-    if (cleanupStateKept === "true") items.push("state kept")
-    const hiddenKeys = new Set([
-        "agent_cleanup_logs",
-        "agent_cleanup_ok",
-        "agent_cleanup_failed",
-        "agent_cleanup_state_kept",
-    ])
-    Object.entries(detail).forEach(([key, value]) => {
-        if (hiddenKeys.has(key)) return
-        if (!value?.trim()) return
-        items.push(`${key}=${value}`)
-    })
-    return items
-}
-
-function formatVPNAuditAction(t: (key: string) => string, action: string): string {
-    const keyByAction: Record<string, string> = {
-        create_policy: "VPN.ActionCreatePolicy",
-        update_policy: "VPN.ActionUpdatePolicy",
-        delete_policy: "VPN.ActionDeletePolicy",
-        start_session: "VPN.ActionStartSession",
-        stop_session: "VPN.ActionStopSession",
-        restart_session: "VPN.ActionRestartSession",
-        status_session: "VPN.ActionStatusSession",
-    }
-    const key = keyByAction[action]
-    return key ? t(key) : action
-}
-
-function buildVPNAuditURL(filters: VPNAuditFilters): string {
-    const params = new URLSearchParams()
-    const action = filters.action.trim()
-    if (action) params.set("action", action)
-    if (filters.result !== "all") params.set("result", filters.result)
-    const user = filters.user.trim()
-    if (user) params.set("user", user)
-    const entry = filters.entry.trim()
-    if (entry) params.set("entry", entry)
-    const exit = filters.exit.trim()
-    if (exit) params.set("exit", exit)
-    if (filters.from) params.set("from", filters.from)
-    if (filters.to) params.set("to", filters.to)
-    const query = params.toString()
-    return query ? `/api/v1/vpn/audit?${query}` : "/api/v1/vpn/audit"
 }
 
 function errorMessage(error: unknown): string {
