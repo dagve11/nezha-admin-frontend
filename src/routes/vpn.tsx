@@ -1318,13 +1318,6 @@ export default function VPNPage() {
                         </Table>
                     </section>
 
-                    <LogPanel
-                        badge={selectedSessionID ? selectedSessionID : t("VPN.LogIdle")}
-                        label={t("VPN.SessionLog")}
-                        logs={sessionLogs}
-                        refEl={logRef}
-                        onScroll={handleLogScroll}
-                    />
                 </TabsContent>
 
             </Tabs>
