@@ -94,7 +94,9 @@ function limitBestIPCandidates(
     return candidates.slice(0, maxBestIPCandidateCount)
 }
 
-function hasSavedAutomation(automation?: ModelBestIPAutomation): boolean {
+function hasSavedAutomation(
+    automation?: ModelBestIPAutomation,
+): automation is ModelBestIPAutomation {
     return Boolean(automation?.id)
 }
 
