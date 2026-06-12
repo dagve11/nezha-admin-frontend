@@ -65,14 +65,12 @@ import {
     ServerIdentifierType,
 } from "@/types"
 import {
-    Activity,
-    ArrowRight,
     ClipboardList,
     Copy,
     Eye,
-    FileClock,
     FileText,
     Globe2,
+    Minus,
     MoreHorizontal,
     Pencil,
     Network,
@@ -80,7 +78,6 @@ import {
     Plus,
     RotateCw,
     Server,
-    ShieldCheck,
     Square,
     Trash2,
 } from "lucide-react"
@@ -138,6 +135,10 @@ const vpnSessionStates = [
     "unknown",
 ]
 
+function clampNumber(value: number, min: number, max: number): number {
+    return Math.min(max, Math.max(min, value))
+}
+
 export default function VPNPage() {
     const { t } = useTranslation()
     const { servers = [] } = useServer()
@@ -152,14 +153,12 @@ export default function VPNPage() {
         entry: "all",
         exit: "all",
     })
-    const [sessionLogs, setSessionLogs] = useState<string[]>([
+    const [, setSessionLogs] = useState<string[]>([
         "[vpn] dashboard control plane ready",
         "[vpn] relay stream: waiting for session",
     ])
     const [stopSessionID, setStopSessionID] = useState("")
     const [restartSessionID, setRestartSessionID] = useState("")
-    const [logAutoScroll, setLogAutoScroll] = useState(true)
-    const logRef = useRef<HTMLPreElement>(null)
     const serverNameByID = useMemo(
         () => new Map(servers.map((server) => [server.id, server.name])),
         [servers],
@@ -302,30 +301,10 @@ export default function VPNPage() {
         selectedSessionRawLogsRef.current = []
         setSelectedSessionID(sessionID)
         setActiveTab("session")
-        setLogAutoScroll(true)
         setSessionLogs([initialLine || `[dashboard] opening VPN log stream for ${sessionID}`])
     }
 
-    useEffect(() => {
-        if (!logRef.current || !logAutoScroll) return
-        logRef.current.scrollTop = logRef.current.scrollHeight
-    }, [logAutoScroll, sessionLogs])
-
-    const handleLogScroll = () => {
-        const logElement = logRef.current
-        if (!logElement) return
-        const distanceToBottom = logElement.scrollHeight - logElement.scrollTop - logElement.clientHeight
-        setLogAutoScroll(distanceToBottom <= 8)
-    }
-
     const activeSessions = sessions.filter((session) => session.state === "running")
-    const abnormalSessions = sessions.filter((session) =>
-        ["failed", "lost", "unknown"].includes(session.state),
-    )
-    const totalTraffic = sessions.reduce(
-        (sum, session) => sum + (session.upload_bytes ?? 0) + (session.download_bytes ?? 0),
-        0,
-    )
     const vpnCapableServers = useMemo(
         () => servers.filter((server) => isVPNCapableServer(server)),
         [servers],
@@ -346,15 +325,6 @@ export default function VPNPage() {
             (sessionFilters.exit === "all" || String(session.exit_server_id) === sessionFilters.exit),
         ),
         [sessionFilters.entry, sessionFilters.exit, sessionFilters.state, sessions],
-    )
-    const overviewItems = useMemo(
-        () => [
-            { key: "VPN.EntryReady", value: String(vpnCapableServers.length), icon: ShieldCheck },
-            { key: "VPN.ExitReady", value: String(vpnCapableServers.length), icon: Server },
-            { key: "VPN.ActiveSessions", value: String(activeSessions.length), icon: Activity },
-            { key: "VPN.AbnormalSessions", value: String(abnormalSessions.length), icon: FileClock },
-        ],
-        [abnormalSessions.length, activeSessions.length, vpnCapableServers.length],
     )
     const overviewTopologySession = selectedSessionID
         ? sessions.find((session) => session.session_id === selectedSessionID)
@@ -516,93 +486,13 @@ export default function VPNPage() {
                     </TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="overview" className="space-y-4">
-                    <div className="grid gap-3 md:grid-cols-4">
-                        {overviewItems.map((item) => {
-                            const Icon = item.icon
-                            return (
-                                <div
-                                    key={item.key}
-                                    className="rounded-md border bg-card p-4 text-card-foreground"
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-sm text-muted-foreground">
-                                            {t(item.key)}
-                                        </span>
-                                        <Icon className="h-4 w-4 text-muted-foreground" />
-                                    </div>
-                                    <div className="mt-3 text-2xl font-semibold">{item.value}</div>
-                                </div>
-                            )
-                        })}
-                    </div>
-
-                    <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
-                        <TopologyDiagram
-                            entry={overviewTopologyEntryID ? serverName(overviewTopologyEntryID) : "-"}
-                            exit={overviewTopologyExitID ? serverName(overviewTopologyExitID) : "-"}
-                            mode={modeLabel(t, overviewTopologyMode)}
-                            t={t}
-                        />
-
-                        <LogPanel
-                            badge={selectedSessionID ? selectedSessionID : t("VPN.LogIdle")}
-                            label={t("VPN.LiveLog")}
-                            logs={sessionLogs}
-                            refEl={logRef}
-                            onScroll={handleLogScroll}
-                        />
-                    </div>
-
-                    <section className="rounded-md border p-4">
-                        <div className="mb-4 flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-2">
-                                <Server className="h-4 w-4 text-muted-foreground" />
-                                <h2 className="text-base font-semibold">{t("VPN.AgentCapability")}</h2>
-                            </div>
-                            <Badge variant="outline">{formatBytes(totalTraffic)}</Badge>
-                        </div>
-                        {vpnCapableServers.length === 0 ? (
-                            <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
-                                {t("VPN.NoAvailableAgent")}
-                            </div>
-                        ) : (
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>{t("Server")}</TableHead>
-                                        <TableHead>{t("Status")}</TableHead>
-                                        <TableHead>{t("VPN.Platform")}</TableHead>
-                                        <TableHead>{t("VPN.Capability")}</TableHead>
-                                        <TableHead>{t("VPN.CoreVersion")}</TableHead>
-                                        <TableHead>{t("VPN.LastError")}</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {vpnCapableServers.map((server) => (
-                                        <TableRow key={server.id}>
-                                            <TableCell className="font-medium">{server.name}</TableCell>
-                                            <TableCell>{vpnAgentStatusLabel(t, server)}</TableCell>
-                                            <TableCell>{vpnAgentPlatform(server)}</TableCell>
-                                            <TableCell>
-                                                <div className="flex flex-wrap gap-1">
-                                                    {vpnAgentCapabilityBadges(t, server).map((label) => (
-                                                        <Badge key={label} variant="secondary">
-                                                            {label}
-                                                        </Badge>
-                                                    ))}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>{vpnAgentCoreVersion(t, server)}</TableCell>
-                                            <TableCell className="max-w-72 break-words">
-                                                {server.host?.vpn_last_error || "-"}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        )}
-                    </section>
+                <TabsContent value="overview">
+                    <TopologyDiagram
+                        entry={overviewTopologyEntryID ? serverName(overviewTopologyEntryID) : "-"}
+                        exit={overviewTopologyExitID ? serverName(overviewTopologyExitID) : "-"}
+                        mode={modeLabel(t, overviewTopologyMode)}
+                        t={t}
+                    />
                 </TabsContent>
 
                 <TabsContent value="policy" className="space-y-4">
@@ -1483,121 +1373,228 @@ function TopologyDiagram({
     mode: string
     t: (key: string) => string
 }) {
+    const [view, setView] = useState({ scale: 1, x: 0, y: 0 })
+    const dragRef = useRef<{
+        originX: number
+        originY: number
+        pointerID: number
+        startX: number
+        startY: number
+    } | null>(null)
+    const zoomBy = (delta: number) => {
+        setView((current) => ({
+            ...current,
+            scale: clampNumber(current.scale + delta, 0.6, 1.8),
+        }))
+    }
+    const resetView = () => setView({ scale: 1, x: 0, y: 0 })
+    const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
+        event.preventDefault()
+        const rect = event.currentTarget.getBoundingClientRect()
+        const cursorX = event.clientX - rect.left - rect.width / 2
+        const cursorY = event.clientY - rect.top - rect.height / 2
+        setView((current) => {
+            const nextScale = clampNumber(current.scale - event.deltaY * 0.001, 0.6, 1.8)
+            const ratio = nextScale / current.scale
+            return {
+                scale: nextScale,
+                x: cursorX - (cursorX - current.x) * ratio,
+                y: cursorY - (cursorY - current.y) * ratio,
+            }
+        })
+    }
+    const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+        dragRef.current = {
+            originX: view.x,
+            originY: view.y,
+            pointerID: event.pointerId,
+            startX: event.clientX,
+            startY: event.clientY,
+        }
+        event.currentTarget.setPointerCapture(event.pointerId)
+    }
+    const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+        const drag = dragRef.current
+        if (!drag || drag.pointerID !== event.pointerId) return
+        setView((current) => ({
+            ...current,
+            x: drag.originX + event.clientX - drag.startX,
+            y: drag.originY + event.clientY - drag.startY,
+        }))
+    }
+    const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+        if (dragRef.current?.pointerID === event.pointerId) {
+            dragRef.current = null
+        }
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+            event.currentTarget.releasePointerCapture(event.pointerId)
+        }
+    }
+
     return (
-        <section className="relative overflow-hidden rounded-md border bg-zinc-950 p-4 text-zinc-50">
-            <div className="pointer-events-none absolute inset-0 opacity-70 [background-image:radial-gradient(rgba(148,163,184,0.35)_1px,transparent_1px)] [background-size:18px_18px]" />
-            <div className="relative mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <section className="relative h-[calc(100vh-13rem)] min-h-[560px] overflow-hidden rounded-md border bg-zinc-950 text-zinc-50">
+            <div className="pointer-events-none absolute inset-0 opacity-60 [background-image:linear-gradient(rgba(148,163,184,0.14)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.14)_1px,transparent_1px)] [background-size:48px_48px]" />
+            <div className="pointer-events-none absolute inset-0 opacity-70 [background-image:radial-gradient(rgba(148,163,184,0.32)_1px,transparent_1px)] [background-size:16px_16px]" />
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_45%,rgba(20,184,166,0.16),transparent_40%),linear-gradient(180deg,rgba(9,9,11,0.12),rgba(9,9,11,0.72))]" />
+            <div className="absolute left-4 top-4 z-20 max-w-xl rounded-md border border-zinc-800 bg-zinc-950/85 p-4 shadow-lg backdrop-blur">
                 <div>
                     <div className="flex items-center gap-2">
                         <Network className="h-4 w-4 text-zinc-400" />
                         <h2 className="text-base font-semibold">{t("VPN.Topology")}</h2>
                     </div>
-                    <p className="mt-1 text-xs text-zinc-400">{t("VPN.TopologyHint")}</p>
                 </div>
                 <Badge variant="outline" className="border-zinc-700 bg-zinc-900/80 text-zinc-200">
                     {mode}
                 </Badge>
             </div>
-            <div className="relative grid items-stretch gap-3 xl:grid-cols-[minmax(0,1fr)_2.5rem_minmax(0,1fr)_2.5rem_minmax(0,1fr)_2.5rem_minmax(0,0.8fr)]">
-                <TopologyNode
-                    icon={<Server className="h-5 w-5" />}
-                    label={t("VPN.EntryServer")}
-                    value={entry}
-                />
-                <TopologyConnector />
-                <TopologyNode
-                    icon={<Network className="h-5 w-5" />}
-                    label={t("VPN.FlowRelay")}
-                    value="Dashboard Relay"
-                />
-                <TopologyConnector />
-                <TopologyNode
-                    icon={<Server className="h-5 w-5" />}
-                    label={t("VPN.ExitServer")}
-                    value={exit}
-                />
-                <TopologyConnector />
-                <TopologyNode
-                    icon={<Globe2 className="h-5 w-5" />}
-                    label={t("VPN.FlowTarget")}
-                    value="Internet"
-                />
+            <div className="absolute right-4 top-4 z-30 flex items-center gap-1 rounded-md border border-zinc-800 bg-zinc-950/85 p-1 shadow-lg backdrop-blur">
+                <Button
+                    aria-label={t("VPN.TopologyZoomOut")}
+                    className="h-9 w-9 text-zinc-100 hover:bg-zinc-800"
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => zoomBy(-0.15)}
+                >
+                    <Minus className="h-4 w-4" />
+                </Button>
+                <div className="w-14 text-center text-xs tabular-nums text-zinc-300">
+                    {Math.round(view.scale * 100)}%
+                </div>
+                <Button
+                    aria-label={t("VPN.TopologyZoomIn")}
+                    className="h-9 w-9 text-zinc-100 hover:bg-zinc-800"
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => zoomBy(0.15)}
+                >
+                    <Plus className="h-4 w-4" />
+                </Button>
+                <Button
+                    aria-label={t("VPN.TopologyResetView")}
+                    className="h-9 w-9 text-zinc-100 hover:bg-zinc-800"
+                    size="icon"
+                    variant="ghost"
+                    onClick={resetView}
+                >
+                    <RotateCw className="h-4 w-4" />
+                </Button>
+            </div>
+            <div
+                aria-label={t("VPN.Topology")}
+                className="absolute inset-0 z-10 touch-none cursor-grab active:cursor-grabbing"
+                role="img"
+                onPointerCancel={handlePointerUp}
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                onWheel={handleWheel}
+            >
+                <div
+                    className="absolute left-1/2 top-1/2 h-[560px] w-[1140px] origin-center"
+                    style={{
+                        transform: `translate(-50%, -50%) translate(${view.x}px, ${view.y}px) scale(${view.scale})`,
+                    }}
+                >
+                    <svg
+                        className="absolute inset-0 h-full w-full overflow-visible"
+                        fill="none"
+                        viewBox="0 0 1140 560"
+                    >
+                        <defs>
+                            <linearGradient id="vpn-topology-link" x1="0" x2="1" y1="0" y2="0">
+                                <stop stopColor="#14b8a6" />
+                                <stop offset="0.55" stopColor="#38bdf8" />
+                                <stop offset="1" stopColor="#a78bfa" />
+                            </linearGradient>
+                            <marker
+                                id="vpn-topology-arrow"
+                                markerHeight="10"
+                                markerWidth="10"
+                                orient="auto"
+                                refX="9"
+                                refY="5"
+                                viewBox="0 0 10 10"
+                            >
+                                <path d="M 0 0 L 10 5 L 0 10 z" fill="#38bdf8" />
+                            </marker>
+                        </defs>
+                        <path
+                            d="M 294 286 C 350 286 340 170 392 170"
+                            markerEnd="url(#vpn-topology-arrow)"
+                            stroke="url(#vpn-topology-link)"
+                            strokeLinecap="round"
+                            strokeWidth="3"
+                        />
+                        <path
+                            d="M 622 170 C 680 170 612 316 676 316"
+                            markerEnd="url(#vpn-topology-arrow)"
+                            stroke="url(#vpn-topology-link)"
+                            strokeLinecap="round"
+                            strokeWidth="3"
+                        />
+                        <path
+                            d="M 906 316 C 960 316 902 176 956 176"
+                            markerEnd="url(#vpn-topology-arrow)"
+                            stroke="url(#vpn-topology-link)"
+                            strokeLinecap="round"
+                            strokeWidth="3"
+                        />
+                    </svg>
+                    <TopologyMapNode
+                        className="left-[64px] top-[220px]"
+                        icon={<Server className="h-6 w-6" />}
+                        label={t("VPN.EntryServer")}
+                        value={entry}
+                    />
+                    <TopologyMapNode
+                        className="left-[392px] top-[104px]"
+                        icon={<Network className="h-6 w-6" />}
+                        label={t("VPN.FlowRelay")}
+                        value="Dashboard Relay"
+                    />
+                    <TopologyMapNode
+                        className="left-[676px] top-[250px]"
+                        icon={<Server className="h-6 w-6" />}
+                        label={t("VPN.ExitServer")}
+                        value={exit}
+                    />
+                    <TopologyMapNode
+                        className="left-[956px] top-[110px] w-[190px]"
+                        icon={<Globe2 className="h-6 w-6" />}
+                        label={t("VPN.FlowTarget")}
+                        value="Internet"
+                    />
+                </div>
             </div>
         </section>
     )
 }
 
-function TopologyNode({
-    children,
+function TopologyMapNode({
+    className,
     icon,
     label,
     value,
 }: {
-    children?: React.ReactNode
+    className: string
     icon: React.ReactNode
     label: string
     value: string
 }) {
     return (
-        <div className="flex min-h-36 flex-col justify-between rounded-md border border-zinc-700 bg-zinc-900/95 p-4 text-zinc-50 shadow-sm">
+        <div
+            className={`absolute w-[230px] rounded-md border border-zinc-700 bg-zinc-900/95 p-4 text-zinc-50 shadow-2xl shadow-black/30 ${className}`}
+        >
             <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-zinc-700 bg-zinc-800 text-zinc-300">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md border border-zinc-700 bg-zinc-800 text-zinc-200 shadow-inner">
                     {icon}
                 </div>
                 <div className="min-w-0">
-                    <div className="text-sm font-medium">{label}</div>
-                    <div className="mt-1 truncate text-xs text-zinc-400">{value || "-"}</div>
+                    <div className="text-xs font-medium uppercase text-zinc-400">{label}</div>
+                    <div className="mt-1 break-all text-sm font-semibold">{value || "-"}</div>
                 </div>
             </div>
-            {children ? <div className="mt-4">{children}</div> : null}
         </div>
-    )
-}
-
-function TopologyConnector() {
-    return (
-        <div className="flex min-h-8 items-center justify-center text-zinc-400">
-            <div className="hidden w-full items-center xl:flex">
-                <div className="h-px flex-1 bg-zinc-600" />
-                <ArrowRight className="mx-1 h-4 w-4" />
-                <div className="h-px flex-1 bg-zinc-600" />
-            </div>
-            <div className="h-8 w-px bg-zinc-600 xl:hidden" />
-        </div>
-    )
-}
-
-function LogPanel({
-    badge,
-    label,
-    logs,
-    refEl,
-    onScroll,
-}: {
-    badge: string
-    label: string
-    logs: string[]
-    refEl: React.RefObject<HTMLPreElement | null>
-    onScroll: React.UIEventHandler<HTMLPreElement>
-}) {
-    return (
-        <section className="rounded-md border bg-black p-4 text-green-100">
-            <div className="mb-3 flex items-center justify-between">
-                <span className="text-sm font-medium text-zinc-100">{label}</span>
-                <Badge variant="outline" className="border-zinc-700 text-zinc-200">
-                    {badge}
-                </Badge>
-            </div>
-            <pre
-                ref={refEl}
-                className="min-h-56 max-h-80 overflow-auto whitespace-pre-wrap font-mono text-xs leading-6"
-                role="log"
-                aria-label={label}
-                onScroll={onScroll}
-            >
-                {logs.join("\n")}
-            </pre>
-        </section>
     )
 }
 
@@ -1870,44 +1867,6 @@ function isTunMode(mode: string): boolean {
 function isVPNCapableServer(server: ServerIdentifierType): boolean {
     const host = server.host
     return Boolean(host?.vpn_enabled || host?.vpn_allow_system_proxy || host?.vpn_allow_tun || host?.vpn_core_version || host?.vpn_last_error)
-}
-
-function vpnAgentStatusLabel(
-    t: (key: string) => string,
-    server: ServerIdentifierType,
-): string {
-    if (!server.last_active) return t("VPN.Offline")
-    const lastActive = new Date(server.last_active).getTime()
-    if (Number.isNaN(lastActive)) return t("VPN.Offline")
-    return Date.now() - lastActive <= 10 * 60 * 1000 ? t("VPN.Online") : t("VPN.Offline")
-}
-
-function vpnAgentPlatform(server: ServerIdentifierType): string {
-    const platform = server.host?.platform ?? ""
-    const arch = server.host?.arch ?? ""
-    if (platform && arch) return `${platform}/${arch}`
-    return platform || arch || "-"
-}
-
-function vpnAgentCapabilityBadges(
-    t: (key: string) => string,
-    server: ServerIdentifierType,
-): string[] {
-    const capabilities: string[] = []
-    if (server.host?.vpn_allow_system_proxy) {
-        capabilities.push(t("VPN.CapabilitySystemProxy"))
-    }
-    if (server.host?.vpn_allow_tun) {
-        capabilities.push(t("VPN.CapabilityTun"))
-    }
-    return capabilities.length > 0 ? capabilities : [t("VPN.CapabilityNone")]
-}
-
-function vpnAgentCoreVersion(
-    t: (key: string) => string,
-    server: ServerIdentifierType,
-): string {
-    return server.host?.vpn_core_version || t("VPN.CoreMissing")
 }
 
 function upsertSession(
