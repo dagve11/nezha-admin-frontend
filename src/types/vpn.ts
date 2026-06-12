@@ -68,6 +68,9 @@ export interface ModelAgentVPNSession {
     state: string
     entry_state?: string
     exit_state?: string
+    local_http?: string
+    local_socks?: string
+    tun_name?: string
     upload_bytes?: number
     download_bytes?: number
     active_connections?: number

@@ -182,6 +182,8 @@ export default function VPNPage() {
     const { data: audits = [] } = useSWR<ModelAgentVPNAuditLog[]>(auditURL, swrFetcher)
     const sessionsRef = useRef(sessions)
     const mutateSessionsRef = useRef(mutateSessions)
+    const selectedSessionLogRef = useRef("")
+    const selectedSessionRawLogsRef = useRef<string[]>([])
 
     useEffect(() => {
         sessionsRef.current = sessions
@@ -203,6 +205,11 @@ export default function VPNPage() {
 
     useEffect(() => {
         if (!selectedSessionID) return
+        if (selectedSessionLogRef.current !== selectedSessionID) {
+            selectedSessionLogRef.current = selectedSessionID
+            selectedSessionRawLogsRef.current = []
+            setSessionLogs([`[dashboard] opening VPN log stream for ${selectedSessionID}`])
+        }
         if (typeof WebSocket === "undefined") {
             const current = sessionsRef.current.find((session) => session.session_id === selectedSessionID)
             const lastError = current?.last_error
@@ -229,6 +236,10 @@ export default function VPNPage() {
                         false)
                     }
                     if (frame.logs?.length) {
+                        const rawLogs = normalizeSessionLogLines(frame.logs)
+                        const newLogs = diffSessionLogSnapshot(selectedSessionRawLogsRef.current, rawLogs)
+                        selectedSessionRawLogsRef.current = rawLogs
+                        if (newLogs.length === 0) return
                         const currentSession = mergeSessionSnapshot(
                             sessionsRef.current,
                             frame.session,
@@ -237,7 +248,7 @@ export default function VPNPage() {
                         setSessionLogs((logs) =>
                             appendSessionLogLines(
                                 logs,
-                                formatVPNSessionLogLines(frame.logs ?? [], currentSession, serverNameRef.current),
+                                formatVPNSessionLogLines(newLogs, currentSession, serverNameRef.current),
                             ),
                         )
                     } else if (frame.session?.last_error) {
@@ -279,6 +290,15 @@ export default function VPNPage() {
             ws?.close()
         }
     }, [selectedSessionID])
+
+    function selectSessionLog(sessionID: string, initialLine?: string) {
+        selectedSessionLogRef.current = sessionID
+        selectedSessionRawLogsRef.current = []
+        setSelectedSessionID(sessionID)
+        setActiveTab("session")
+        setLogAutoScroll(true)
+        setSessionLogs([initialLine || `[dashboard] opening VPN log stream for ${sessionID}`])
+    }
 
     useEffect(() => {
         if (!logRef.current || !logAutoScroll) return
@@ -395,7 +415,7 @@ export default function VPNPage() {
     async function handleStartPolicy(policyID: number) {
         try {
             const session = await startVPNSession(policyID)
-            setSelectedSessionID(session.session_id)
+            selectSessionLog(session.session_id, `[dashboard] start request submitted for policy ${policyID}`)
             setActiveTab("session")
             await mutateSessions()
         } catch (error) {
@@ -405,6 +425,7 @@ export default function VPNPage() {
 
     async function handleStopSession(sessionID: string) {
         try {
+            selectSessionLog(sessionID, `[dashboard] stop request submitted for ${sessionID}`)
             await stopVPNSession(sessionID)
             await mutateSessions()
         } catch (error) {
@@ -414,7 +435,9 @@ export default function VPNPage() {
 
     async function handleRestartSession(sessionID: string) {
         try {
+            selectSessionLog(sessionID, `[dashboard] restart request submitted for ${sessionID}`)
             const session = await restartVPNSession(sessionID)
+            selectedSessionLogRef.current = session.session_id
             setSelectedSessionID(session.session_id)
             await mutateSessions()
         } catch (error) {
@@ -424,6 +447,7 @@ export default function VPNPage() {
 
     async function handleRefreshSession(sessionID: string) {
         try {
+            selectSessionLog(sessionID, `[dashboard] status request submitted for ${sessionID}`)
             const session = await refreshVPNSessionStatus(sessionID)
             await mutateSessions((current = []) => upsertSession(current, session), false)
         } catch (error) {
@@ -432,14 +456,15 @@ export default function VPNPage() {
     }
 
     function handleViewSessionLog(sessionID: string) {
-        setSelectedSessionID(sessionID)
+        selectSessionLog(sessionID)
+        setActiveTab("session")
     }
 
     async function handleCopySessionProxy(session: ModelAgentVPNSession) {
         const proxy = getSessionProxyAddress(session, policies)
         if (!proxy) return
         try {
-            await navigator.clipboard.writeText(proxy)
+            await copyTextToClipboard(proxy)
             toast(t("CopiedToClipboard"))
         } catch (error) {
             toast(t("Error"), { description: errorMessage(error) })
@@ -1607,6 +1632,49 @@ function appendSessionLogLines(current: string[], incoming: string[]): string[] 
     return next.slice(next.length - maxVPNLogLines)
 }
 
+function normalizeSessionLogLines(lines: string[]): string[] {
+    return lines.map((line) => line.trimEnd()).filter(Boolean)
+}
+
+function diffSessionLogSnapshot(previous: string[], incoming: string[]): string[] {
+    if (previous.length === 0) return incoming
+    const maxOverlap = Math.min(previous.length, incoming.length)
+    for (let overlap = maxOverlap; overlap > 0; overlap -= 1) {
+        if (arraysEqual(previous.slice(previous.length - overlap), incoming.slice(0, overlap))) {
+            return incoming.slice(overlap)
+        }
+    }
+    return incoming
+}
+
+function arraysEqual(left: string[], right: string[]): boolean {
+    if (left.length !== right.length) return false
+    return left.every((item, index) => item === right[index])
+}
+
+async function copyTextToClipboard(value: string) {
+    if (navigator.clipboard?.writeText && window.isSecureContext) {
+        await navigator.clipboard.writeText(value)
+        return
+    }
+    const textarea = document.createElement("textarea")
+    textarea.value = value
+    textarea.setAttribute("readonly", "")
+    textarea.style.position = "fixed"
+    textarea.style.left = "-9999px"
+    textarea.style.top = "0"
+    document.body.appendChild(textarea)
+    textarea.focus()
+    textarea.select()
+    try {
+        if (!document.execCommand("copy")) {
+            throw new Error("copy command failed")
+        }
+    } finally {
+        document.body.removeChild(textarea)
+    }
+}
+
 function formatVPNSessionLogLines(
     lines: string[],
     session: ModelAgentVPNSession | undefined,
@@ -1886,9 +1954,9 @@ function getSessionProxyAddress(
     session: ModelAgentVPNSession,
     policies: ModelAgentVPNPolicy[],
 ): string {
-    if (session.mode !== "system_proxy" || session.state !== "running") return ""
+    if (session.mode !== "system_proxy") return ""
     const policy = policies.find((item) => item.id === session.policy_id)
-    return policy?.listen_socks || policy?.listen_http || ""
+    return session.local_socks || session.local_http || policy?.listen_socks || policy?.listen_http || ""
 }
 
 function canStopVPNSession(session: ModelAgentVPNSession): boolean {
@@ -1896,11 +1964,11 @@ function canStopVPNSession(session: ModelAgentVPNSession): boolean {
 }
 
 function canRestartVPNSession(session: ModelAgentVPNSession): boolean {
-    return ["running", "failed", "lost", "unknown"].includes(session.state)
+    return ["running", "failed", "lost", "unknown", "stopped"].includes(session.state)
 }
 
 function canRefreshVPNSession(session: ModelAgentVPNSession): boolean {
-    return session.state !== "stopped"
+    return Boolean(session.session_id)
 }
 
 function sessionPolicyName(
@@ -1916,7 +1984,7 @@ function sessionLocalProxy(
 ): string {
     if (session.mode !== "system_proxy") return "-"
     const policy = policies.find((item) => item.id === session.policy_id)
-    return policy?.listen_socks || policy?.listen_http || "-"
+    return session.local_socks || session.local_http || policy?.listen_socks || policy?.listen_http || "-"
 }
 
 function sessionTunName(
@@ -1924,7 +1992,7 @@ function sessionTunName(
     policies: ModelAgentVPNPolicy[],
 ): string {
     if (!isTunMode(session.mode)) return "-"
-    return policies.find((item) => item.id === session.policy_id)?.tun_name || "-"
+    return session.tun_name || policies.find((item) => item.id === session.policy_id)?.tun_name || "-"
 }
 
 type VPNAuditFilters = {
