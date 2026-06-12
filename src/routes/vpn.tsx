@@ -305,10 +305,6 @@ export default function VPNPage() {
     }
 
     const activeSessions = sessions.filter((session) => session.state === "running")
-    const vpnCapableServers = useMemo(
-        () => servers.filter((server) => isVPNCapableServer(server)),
-        [servers],
-    )
     const topologyServers = useMemo(
         () =>
             servers.filter((server) =>
