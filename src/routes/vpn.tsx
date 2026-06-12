@@ -21,6 +21,20 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button, buttonVariants } from "@/components/ui/button"
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog"
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -55,9 +69,11 @@ import {
     ArrowRight,
     ClipboardList,
     Copy,
+    Eye,
     FileClock,
     FileText,
     Globe2,
+    MoreHorizontal,
     Pencil,
     Network,
     Play,
@@ -139,6 +155,8 @@ export default function VPNPage() {
         "[vpn] dashboard control plane ready",
         "[vpn] relay stream: waiting for session",
     ])
+    const [stopSessionID, setStopSessionID] = useState("")
+    const [restartSessionID, setRestartSessionID] = useState("")
     const [logAutoScroll, setLogAutoScroll] = useState(true)
     const logRef = useRef<HTMLPreElement>(null)
     const serverNameByID = useMemo(
@@ -437,7 +455,7 @@ export default function VPNPage() {
 
     function handleViewSessionLog(sessionID: string) {
         selectSessionLog(sessionID)
-        setActiveTab("session")
+        setActiveTab("overview")
     }
 
     async function handleCopySessionProxy(session: ModelAgentVPNSession) {
@@ -1163,7 +1181,7 @@ export default function VPNPage() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>Session</TableHead>
+                                    <TableHead className="min-w-[12rem]">Session</TableHead>
                                     <TableHead>{t("VPN.PolicyName")}</TableHead>
                                     <TableHead>{t("VPN.EntryServer")}</TableHead>
                                     <TableHead>{t("VPN.ExitServer")}</TableHead>
@@ -1171,18 +1189,13 @@ export default function VPNPage() {
                                     <TableHead>{t("Status")}</TableHead>
                                     <TableHead>{t("VPN.Traffic")}</TableHead>
                                     <TableHead>{t("VPN.ActiveConnections")}</TableHead>
-                                    <TableHead>{t("VPN.LocalProxy")}</TableHead>
-                                    <TableHead>{t("VPN.TunName")}</TableHead>
-                                    <TableHead>{t("VPN.StartedAt")}</TableHead>
-                                    <TableHead>{t("VPN.ExpiresAt")}</TableHead>
-                                    <TableHead>{t("VPN.LastError")}</TableHead>
-                                    <TableHead>{t("Actions")}</TableHead>
+                                    <TableHead className="w-24 text-right">{t("Actions")}</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {filteredSessions.length === 0 && (
                                     <TableRow>
-                                        <TableCell colSpan={14} className="h-24 text-center">
+                                        <TableCell colSpan={9} className="h-24 text-center">
                                             {t("NoResults")}
                                         </TableCell>
                                     </TableRow>
@@ -1193,7 +1206,9 @@ export default function VPNPage() {
                                     const canRefresh = canRefreshVPNSession(session)
                                     return (
                                         <TableRow key={session.session_id}>
-                                            <TableCell>{session.session_id}</TableCell>
+                                            <TableCell className="max-w-[16rem] truncate font-mono text-xs">
+                                                {session.session_id}
+                                            </TableCell>
                                             <TableCell>{sessionPolicyName(session, policies)}</TableCell>
                                             <TableCell>{serverName(session.entry_server_id)}</TableCell>
                                             <TableCell>{serverName(session.exit_server_id)}</TableCell>
@@ -1208,108 +1223,63 @@ export default function VPNPage() {
                                                 {formatBytes(session.download_bytes)}
                                             </TableCell>
                                             <TableCell>{session.active_connections ?? 0}</TableCell>
-                                            <TableCell>{sessionLocalProxy(session, policies)}</TableCell>
-                                            <TableCell>{sessionTunName(session, policies)}</TableCell>
-                                            <TableCell>{session.started_at || "-"}</TableCell>
-                                            <TableCell>{session.expires_at || "-"}</TableCell>
-                                            <TableCell>{session.last_error || "-"}</TableCell>
-                                            <TableCell className="flex gap-2">
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    className="gap-1.5 whitespace-nowrap"
-                                                    aria-label={`${t("VPN.ViewSessionLog")} ${session.session_id}`}
-                                                    onClick={() => handleViewSessionLog(session.session_id)}
-                                                >
-                                                    <FileText className="h-4 w-4" />
-                                                    <span>{t("VPN.ViewSessionLog")}</span>
-                                                </Button>
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    className="gap-1.5 whitespace-nowrap"
-                                                    aria-label={`${t("VPN.CopyProxy")} ${session.session_id}`}
-                                                    disabled={!getSessionProxyAddress(session, policies)}
-                                                    onClick={() => void handleCopySessionProxy(session)}
-                                                >
-                                                    <Copy className="h-4 w-4" />
-                                                    <span>{t("VPN.CopyProxy")}</span>
-                                                </Button>
-                                                <AlertDialog>
-                                                    <AlertDialogTrigger asChild>
-                                                        <Button
-                                                            size="sm"
-                                                            variant="destructive"
-                                                            className="gap-1.5 whitespace-nowrap text-white"
-                                                            aria-label={`${t("VPN.StopSession")} ${session.session_id}`}
-                                                            disabled={!canStop}
-                                                        >
-                                                            <Square className="h-4 w-4" />
-                                                            <span>{t("VPN.StopSession")}</span>
-                                                        </Button>
-                                                    </AlertDialogTrigger>
-                                                    <AlertDialogContent className="sm:max-w-lg">
-                                                        <AlertDialogHeader>
-                                                            <AlertDialogTitle>{t("VPN.ConfirmStopSession")}</AlertDialogTitle>
-                                                            <AlertDialogDescription>
-                                                                {t("Results.ThisOperationIsUnrecoverable")}
-                                                            </AlertDialogDescription>
-                                                        </AlertDialogHeader>
-                                                        <AlertDialogFooter>
-                                                            <AlertDialogCancel>{t("Close")}</AlertDialogCancel>
-                                                            <AlertDialogAction
-                                                                className={buttonVariants({
-                                                                    variant: "destructive",
-                                                                    className: "text-white",
-                                                                })}
-                                                                onClick={() => void handleStopSession(session.session_id)}
+                                            <TableCell>
+                                                <div className="flex justify-end gap-2">
+                                                    <SessionDetailDialog
+                                                        policies={policies}
+                                                        serverName={serverName}
+                                                        session={session}
+                                                        t={t}
+                                                    />
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Button
+                                                                size="icon"
+                                                                variant="outline"
+                                                                aria-label={`${t("Actions")} ${session.session_id}`}
                                                             >
-                                                                {t("Confirm")}
-                                                            </AlertDialogAction>
-                                                        </AlertDialogFooter>
-                                                    </AlertDialogContent>
-                                                </AlertDialog>
-                                                <AlertDialog>
-                                                    <AlertDialogTrigger asChild>
-                                                        <Button
-                                                            size="sm"
-                                                            variant="outline"
-                                                            className="gap-1.5 whitespace-nowrap"
-                                                            aria-label={`${t("VPN.RestartSession")} ${session.session_id}`}
-                                                            disabled={!canRestart}
-                                                        >
-                                                            <Play className="h-4 w-4" />
-                                                            <span>{t("VPN.RestartSession")}</span>
-                                                        </Button>
-                                                    </AlertDialogTrigger>
-                                                    <AlertDialogContent className="sm:max-w-lg">
-                                                        <AlertDialogHeader>
-                                                            <AlertDialogTitle>{t("VPN.ConfirmRestartSession")}</AlertDialogTitle>
-                                                            <AlertDialogDescription>
-                                                                {t("Results.ThisOperationIsUnrecoverable")}
-                                                            </AlertDialogDescription>
-                                                        </AlertDialogHeader>
-                                                        <AlertDialogFooter>
-                                                            <AlertDialogCancel>{t("Close")}</AlertDialogCancel>
-                                                            <AlertDialogAction
-                                                                onClick={() => void handleRestartSession(session.session_id)}
+                                                                <MoreHorizontal className="h-4 w-4" />
+                                                            </Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end" className="w-48">
+                                                            <DropdownMenuItem
+                                                                onClick={() => handleViewSessionLog(session.session_id)}
                                                             >
-                                                                {t("Confirm")}
-                                                            </AlertDialogAction>
-                                                        </AlertDialogFooter>
-                                                    </AlertDialogContent>
-                                                </AlertDialog>
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    className="gap-1.5 whitespace-nowrap"
-                                                    aria-label={`${t("VPN.RefreshSession")} ${session.session_id}`}
-                                                    disabled={!canRefresh}
-                                                    onClick={() => void handleRefreshSession(session.session_id)}
-                                                >
-                                                    <RotateCw className="h-4 w-4" />
-                                                    <span>{t("VPN.RefreshSession")}</span>
-                                                </Button>
+                                                                <FileText className="h-4 w-4" />
+                                                                <span>{t("VPN.ViewSessionLog")}</span>
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem
+                                                                disabled={!getSessionProxyAddress(session, policies)}
+                                                                onClick={() => void handleCopySessionProxy(session)}
+                                                            >
+                                                                <Copy className="h-4 w-4" />
+                                                                <span>{t("VPN.CopyProxy")}</span>
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem
+                                                                disabled={!canStop}
+                                                                className="text-destructive focus:text-destructive"
+                                                                onClick={() => setStopSessionID(session.session_id)}
+                                                            >
+                                                                <Square className="h-4 w-4" />
+                                                                <span>{t("VPN.StopSession")}</span>
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem
+                                                                disabled={!canRestart}
+                                                                onClick={() => setRestartSessionID(session.session_id)}
+                                                            >
+                                                                <Play className="h-4 w-4" />
+                                                                <span>{t("VPN.RestartSession")}</span>
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem
+                                                                disabled={!canRefresh}
+                                                                onClick={() => void handleRefreshSession(session.session_id)}
+                                                            >
+                                                                <RotateCw className="h-4 w-4" />
+                                                                <span>{t("VPN.RefreshSession")}</span>
+                                                            </DropdownMenuItem>
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                </div>
                                             </TableCell>
                                         </TableRow>
                                     )
@@ -1318,6 +1288,64 @@ export default function VPNPage() {
                         </Table>
                     </section>
 
+                    <AlertDialog
+                        open={Boolean(stopSessionID)}
+                        onOpenChange={(open) => {
+                            if (!open) setStopSessionID("")
+                        }}
+                    >
+                        <AlertDialogContent className="sm:max-w-lg">
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>{t("VPN.ConfirmStopSession")}</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    {t("Results.ThisOperationIsUnrecoverable")}
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>{t("Close")}</AlertDialogCancel>
+                                <AlertDialogAction
+                                    className={buttonVariants({
+                                        variant: "destructive",
+                                        className: "text-white",
+                                    })}
+                                    onClick={() => {
+                                        const sessionID = stopSessionID
+                                        setStopSessionID("")
+                                        if (sessionID) void handleStopSession(sessionID)
+                                    }}
+                                >
+                                    {t("Confirm")}
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                    <AlertDialog
+                        open={Boolean(restartSessionID)}
+                        onOpenChange={(open) => {
+                            if (!open) setRestartSessionID("")
+                        }}
+                    >
+                        <AlertDialogContent className="sm:max-w-lg">
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>{t("VPN.ConfirmRestartSession")}</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    {t("Results.ThisOperationIsUnrecoverable")}
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>{t("Close")}</AlertDialogCancel>
+                                <AlertDialogAction
+                                    onClick={() => {
+                                        const sessionID = restartSessionID
+                                        setRestartSessionID("")
+                                        if (sessionID) void handleRestartSession(sessionID)
+                                    }}
+                                >
+                                    {t("Confirm")}
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
                 </TabsContent>
 
             </Tabs>
@@ -1355,6 +1383,110 @@ function NativeField({
         <div className="space-y-2">
             <Label htmlFor={id}>{label}</Label>
             <div className="flex flex-col">{children}</div>
+        </div>
+    )
+}
+
+function SessionDetailDialog({
+    policies,
+    serverName,
+    session,
+    t,
+}: {
+    policies: ModelAgentVPNPolicy[]
+    serverName: (id?: number) => string
+    session: ModelAgentVPNSession
+    t: (key: string) => string
+}) {
+    return (
+        <Dialog>
+            <DialogTrigger asChild>
+                <Button
+                    size="icon"
+                    variant="outline"
+                    aria-label={`${t("VPN.Detail")} ${session.session_id}`}
+                >
+                    <Eye className="h-4 w-4" />
+                </Button>
+            </DialogTrigger>
+            <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+                <DialogHeader>
+                    <DialogTitle>{t("VPN.Detail")}</DialogTitle>
+                    <DialogDescription className="break-all font-mono text-xs">
+                        {session.session_id}
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-3 sm:grid-cols-2">
+                    <SessionDetailItem label="Session" value={session.session_id} />
+                    <SessionDetailItem
+                        label={t("VPN.PolicyName")}
+                        value={sessionPolicyName(session, policies)}
+                    />
+                    <SessionDetailItem
+                        label={t("VPN.EntryServer")}
+                        value={serverName(session.entry_server_id)}
+                    />
+                    <SessionDetailItem
+                        label={t("VPN.ExitServer")}
+                        value={serverName(session.exit_server_id)}
+                    />
+                    <SessionDetailItem label={t("VPN.Mode")} value={modeLabel(t, session.mode)} />
+                    <SessionDetailItem
+                        label={t("Status")}
+                        value={
+                            <Badge variant={session.state === "running" ? "default" : "secondary"}>
+                                {session.state}
+                            </Badge>
+                        }
+                    />
+                    <SessionDetailItem
+                        label={t("VPN.Traffic")}
+                        value={`${formatBytes(session.upload_bytes)} / ${formatBytes(session.download_bytes)}`}
+                    />
+                    <SessionDetailItem
+                        label={t("VPN.ActiveConnections")}
+                        value={String(session.active_connections ?? 0)}
+                    />
+                    <SessionDetailItem
+                        label={t("VPN.LocalProxy")}
+                        value={sessionLocalProxy(session, policies)}
+                    />
+                    <SessionDetailItem
+                        label={t("VPN.TunName")}
+                        value={sessionTunName(session, policies)}
+                    />
+                    <SessionDetailItem
+                        label={t("VPN.StartedAt")}
+                        value={session.started_at || "-"}
+                    />
+                    <SessionDetailItem
+                        label={t("VPN.ExpiresAt")}
+                        value={session.expires_at || "-"}
+                    />
+                    <SessionDetailItem
+                        className="sm:col-span-2"
+                        label={t("VPN.LastError")}
+                        value={session.last_error || "-"}
+                    />
+                </div>
+            </DialogContent>
+        </Dialog>
+    )
+}
+
+function SessionDetailItem({
+    className,
+    label,
+    value,
+}: {
+    className?: string
+    label: string
+    value: React.ReactNode
+}) {
+    return (
+        <div className={`space-y-1 rounded-md border bg-muted/20 p-3 ${className ?? ""}`}>
+            <div className="text-xs text-muted-foreground">{label}</div>
+            <div className="break-all text-sm font-medium">{value}</div>
         </div>
     )
 }
