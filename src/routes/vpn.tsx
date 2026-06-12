@@ -117,22 +117,6 @@ export default function VPNPage() {
         swrFetcher,
     )
 
-    const activeSessions = sessions.filter((session) => session.state === "running")
-    const overviewTopologySession = activeSessions[0] ?? sessions[0]
-    const overviewTopologyPolicy = overviewTopologySession
-        ? policies.find((policy) => policy.id === overviewTopologySession.policy_id)
-        : policies.find((policy) => policy.id === editingPolicyID) ?? policies[0]
-    const overviewTopologyEntryID =
-        overviewTopologySession?.entry_server_id ??
-        overviewTopologyPolicy?.entry_server_id ??
-        form.entry_server_id
-    const overviewTopologyExitID =
-        overviewTopologySession?.exit_server_id ??
-        overviewTopologyPolicy?.exit_server_id ??
-        form.exit_server_id
-    const overviewTopologyMode =
-        overviewTopologySession?.mode ?? overviewTopologyPolicy?.mode ?? form.mode
-
     async function handleSavePolicy() {
         if ((form.mode === "tun_split" || form.mode === "tun_global") && !tunRiskConfirmed) {
             toast(t("Error"), { description: t("VPN.TunRiskRequired") })
@@ -284,9 +268,7 @@ export default function VPNPage() {
                 <TabsContent value="overview">
                     <OverviewTab
                         servers={servers}
-                        entryID={overviewTopologyEntryID}
-                        exitID={overviewTopologyExitID}
-                        mode={overviewTopologyMode}
+                        sessions={sessions}
                         serverName={serverName}
                     />
                 </TabsContent>
