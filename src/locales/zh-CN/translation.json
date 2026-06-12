@@ -245,7 +245,7 @@
         "StateIdle": "未运行",
         "Traffic": "流量",
         "PolicyName": "策略",
-        "ActiveConnections": "连接数",
+        "ActiveConnections": "活跃连接",
         "LocalProxy": "本地代理",
         "TunName": "TUN 名称",
         "StartedAt": "开始时间",

@@ -1182,10 +1182,6 @@ export default function VPNPage() {
                             <TableHeader>
                                 <TableRow>
                                     <TableHead className="min-w-[12rem]">Session</TableHead>
-                                    <TableHead>{t("VPN.PolicyName")}</TableHead>
-                                    <TableHead>{t("VPN.EntryServer")}</TableHead>
-                                    <TableHead>{t("VPN.ExitServer")}</TableHead>
-                                    <TableHead>{t("VPN.Mode")}</TableHead>
                                     <TableHead>{t("Status")}</TableHead>
                                     <TableHead>{t("VPN.Traffic")}</TableHead>
                                     <TableHead>{t("VPN.ActiveConnections")}</TableHead>
@@ -1195,7 +1191,7 @@ export default function VPNPage() {
                             <TableBody>
                                 {filteredSessions.length === 0 && (
                                     <TableRow>
-                                        <TableCell colSpan={9} className="h-24 text-center">
+                                        <TableCell colSpan={5} className="h-24 text-center">
                                             {t("NoResults")}
                                         </TableCell>
                                     </TableRow>
@@ -1209,10 +1205,6 @@ export default function VPNPage() {
                                             <TableCell className="max-w-[16rem] truncate font-mono text-xs">
                                                 {session.session_id}
                                             </TableCell>
-                                            <TableCell>{sessionPolicyName(session, policies)}</TableCell>
-                                            <TableCell>{serverName(session.entry_server_id)}</TableCell>
-                                            <TableCell>{serverName(session.exit_server_id)}</TableCell>
-                                            <TableCell>{modeLabel(t, session.mode)}</TableCell>
                                             <TableCell>
                                                 <Badge variant={session.state === "running" ? "default" : "secondary"}>
                                                     {session.state}

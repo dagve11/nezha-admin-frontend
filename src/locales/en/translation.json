@@ -245,7 +245,7 @@
         "StateIdle": "Idle",
         "Traffic": "Traffic",
         "PolicyName": "Policy",
-        "ActiveConnections": "Connections",
+        "ActiveConnections": "Active connections",
         "LocalProxy": "Local proxy",
         "TunName": "TUN name",
         "StartedAt": "Started at",

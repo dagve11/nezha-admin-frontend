@@ -243,7 +243,7 @@
         "StateIdle": "未執行",
         "Traffic": "流量",
         "PolicyName": "策略",
-        "ActiveConnections": "連線數",
+        "ActiveConnections": "活躍連線",
         "LocalProxy": "本地代理",
         "TunName": "TUN 名稱",
         "StartedAt": "開始時間",
