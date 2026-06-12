@@ -53,10 +53,12 @@ import {
 } from "@/types"
 import {
     Activity,
+    ArrowRight,
     ClipboardList,
     Copy,
     FileClock,
     FileText,
+    Globe2,
     Pencil,
     Network,
     Play,
@@ -301,6 +303,15 @@ export default function VPNPage() {
     const vpnCapableServers = useMemo(
         () => servers.filter((server) => isVPNCapableServer(server)),
         [servers],
+    )
+    const topologyServers = useMemo(
+        () =>
+            servers.filter((server) =>
+                isVPNCapableServer(server) ||
+                server.id === form.entry_server_id ||
+                server.id === form.exit_server_id,
+            ),
+        [form.entry_server_id, form.exit_server_id, servers],
     )
     const filteredSessions = useMemo(
         () => sessions.filter((session) =>
@@ -582,356 +593,415 @@ export default function VPNPage() {
                             <ClipboardList className="h-4 w-4 text-muted-foreground" />
                             <h2 className="text-base font-semibold">{t("VPN.PolicyForm")}</h2>
                         </div>
-                        <div className="grid gap-4 md:grid-cols-2">
-                            <Field label={t("Name")} id="vpn-policy-name">
-                                <Input
-                                    id="vpn-policy-name"
-                                    value={form.name}
-                                    onChange={(event) => setFormValue(setForm, "name", event.target.value)}
-                                    placeholder="GitHub Split"
-                                />
-                            </Field>
-                            <Field label={t("VPN.Mode")} id="vpn-policy-mode">
-                                <Select
-                                    value={form.mode}
-                                    onValueChange={(value) => {
-                                        setFormValue(setForm, "mode", value)
-                                        setTunRiskConfirmed(!isTunMode(value))
-                                    }}
-                                >
-                                    <SelectTrigger id="vpn-policy-mode">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="system_proxy">{t("VPN.ModeSystemProxy")}</SelectItem>
-                                        <SelectItem value="tun_split">{t("VPN.ModeTunSplit")}</SelectItem>
-                                        <SelectItem value="tun_global">{t("VPN.ModeTunGlobal")}</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </Field>
-                            <Field label={t("VPN.RuleMode")} id="vpn-rule-mode">
-                                <Select
-                                    value={form.rule_mode}
-                                    onValueChange={(value) =>
-                                        setFormValue(setForm, "rule_mode", value)
-                                    }
-                                >
-                                    <SelectTrigger id="vpn-rule-mode">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="global">{t("VPN.RuleModeGlobal")}</SelectItem>
-                                        <SelectItem value="domain">{t("VPN.RuleModeDomain")}</SelectItem>
-                                        <SelectItem value="ip">{t("VPN.RuleModeIP")}</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </Field>
-                            <Field label={t("VPN.EntryServer")} id="vpn-entry-server">
-                                <Select
-                                    value={String(form.entry_server_id)}
-                                    onValueChange={(value) =>
-                                        setFormValue(setForm, "entry_server_id", Number(value))
-                                    }
-                                >
-                                    <SelectTrigger id="vpn-entry-server">
-                                        <SelectValue placeholder={t("VPN.EntryServer")} />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {servers.map((server) => (
-                                            <SelectItem key={server.id} value={String(server.id)}>
-                                                {server.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </Field>
-                            <Field label={t("VPN.ExitServer")} id="vpn-exit-server">
-                                <Select
-                                    value={String(form.exit_server_id)}
-                                    onValueChange={(value) =>
-                                        setFormValue(setForm, "exit_server_id", Number(value))
-                                    }
-                                >
-                                    <SelectTrigger id="vpn-exit-server">
-                                        <SelectValue placeholder={t("VPN.ExitServer")} />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {servers.map((server) => (
-                                            <SelectItem key={server.id} value={String(server.id)}>
-                                                {server.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </Field>
-                            <Field label={t("VPN.LocalSocks")} id="vpn-local-socks">
-                                <Input
-                                    id="vpn-local-socks"
-                                    value={form.listen_socks}
-                                    onChange={(event) =>
-                                        setFormValue(setForm, "listen_socks", event.target.value)
-                                    }
-                                />
-                            </Field>
-                            <Field label={t("VPN.LocalHTTP")} id="vpn-local-http">
-                                <Input
-                                    id="vpn-local-http"
-                                    value={form.listen_http}
-                                    onChange={(event) =>
-                                        setFormValue(setForm, "listen_http", event.target.value)
-                                    }
-                                />
-                            </Field>
-                            <Field label={t("VPN.TunName")} id="vpn-tun-name">
-                                <Input
-                                    id="vpn-tun-name"
-                                    value={form.tun_name}
-                                    onChange={(event) =>
-                                        setFormValue(setForm, "tun_name", event.target.value)
-                                    }
-                                />
-                            </Field>
-                            <Field label={t("VPN.DNSServer")} id="vpn-dns-server">
-                                <Input
-                                    id="vpn-dns-server"
-                                    value={form.dns_server}
-                                    onChange={(event) =>
-                                        setFormValue(setForm, "dns_server", event.target.value)
-                                    }
-                                />
-                            </Field>
-                            <Field label={t("VPN.DomainRules")} id="vpn-domain-rules">
-                                <Textarea
-                                    id="vpn-domain-rules"
-                                    className="min-h-24"
-                                    value={form.domains.join("\n")}
-                                    onChange={(event) =>
-                                        setFormValue(setForm, "domains", splitLines(event.target.value))
-                                    }
-                                    placeholder={"github.com\napi.github.com"}
-                                />
-                            </Field>
-                            <Field label={t("VPN.CIDRRules")} id="vpn-cidr-rules">
-                                <Textarea
-                                    id="vpn-cidr-rules"
-                                    className="min-h-24"
-                                    value={form.cidrs.join("\n")}
-                                    onChange={(event) =>
-                                        setFormValue(setForm, "cidrs", splitLines(event.target.value))
-                                    }
-                                    placeholder={"140.82.112.0/20\n20.205.243.0/24"}
-                                />
-                            </Field>
-                            <Field label={t("VPN.DirectCIDRs")} id="vpn-direct-cidrs">
-                                <Textarea
-                                    id="vpn-direct-cidrs"
-                                    className="min-h-24"
-                                    value={form.direct_cidrs.join("\n")}
-                                    onChange={(event) =>
-                                        setFormValue(setForm, "direct_cidrs", splitLines(event.target.value))
-                                    }
-                                    placeholder={"127.0.0.0/8\n10.0.0.0/8"}
-                                />
-                            </Field>
-                        </div>
-                        <div className="mt-4 grid gap-4 md:grid-cols-3 xl:grid-cols-6">
-                            <Field label={t("VPN.Expires")} id="vpn-expires">
-                                <Input
-                                    id="vpn-expires"
-                                    type="number"
-                                    value={form.expires_seconds}
-                                    onChange={(event) =>
-                                        setFormValue(setForm, "expires_seconds", Number(event.target.value))
-                                    }
-                                />
-                            </Field>
-                            <Field label={t("VPN.MaxUpload")} id="vpn-max-upload">
-                                <Input
-                                    id="vpn-max-upload"
-                                    type="number"
-                                    min={0}
-                                    value={form.max_upload_bytes}
-                                    onChange={(event) =>
-                                        setFormValue(setForm, "max_upload_bytes", Number(event.target.value))
-                                    }
-                                />
-                            </Field>
-                            <Field label={t("VPN.MaxDownload")} id="vpn-max-download">
-                                <Input
-                                    id="vpn-max-download"
-                                    type="number"
-                                    min={0}
-                                    value={form.max_download_bytes}
-                                    onChange={(event) =>
-                                        setFormValue(setForm, "max_download_bytes", Number(event.target.value))
-                                    }
-                                />
-                            </Field>
-                            <Field label={t("VPN.MaxConnections")} id="vpn-max-connections">
-                                <Input
-                                    id="vpn-max-connections"
-                                    type="number"
-                                    value={form.max_connections}
-                                    onChange={(event) =>
-                                        setFormValue(setForm, "max_connections", Number(event.target.value))
-                                    }
-                                />
-                            </Field>
-                            <Field label={t("VPN.IdleTimeout")} id="vpn-idle-timeout">
-                                <Input
-                                    id="vpn-idle-timeout"
-                                    type="number"
-                                    min={0}
-                                    value={form.idle_timeout_seconds}
-                                    onChange={(event) =>
-                                        setFormValue(setForm, "idle_timeout_seconds", Number(event.target.value))
-                                    }
-                                />
-                            </Field>
-                            <Field label={t("VPN.NotificationGroup")} id="vpn-notify-group">
-                                <Select
-                                    value={String(form.notification_group_id)}
-                                    onValueChange={(value) =>
-                                        setFormValue(setForm, "notification_group_id", Number(value))
-                                    }
-                                >
-                                    <SelectTrigger id="vpn-notify-group">
-                                        <SelectValue placeholder={t("VPN.NotificationGroup")} />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="0">-</SelectItem>
-                                        {notifierGroup.map((item) => (
-                                            <SelectItem key={item.group.id} value={String(item.group.id)}>
-                                                {item.group.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </Field>
-                        </div>
-                        <div className="mt-4 flex items-center justify-between rounded-md border bg-muted/30 p-3">
-                            <Label htmlFor="vpn-auto-restore">{t("VPN.AutoRestore")}</Label>
-                            <Switch
-                                id="vpn-auto-restore"
-                                checked={form.auto_restart}
-                                onCheckedChange={(checked) =>
-                                    setFormValue(setForm, "auto_restart", checked)
-                                }
-                            />
-                        </div>
-                        <div className="mt-4 grid gap-4 rounded-md border bg-muted/30 p-3 md:grid-cols-[12rem_1fr] xl:grid-cols-[12rem_1fr_1fr]">
-                            <Field label={t("VPN.CoreVersion")} id="vpn-core-version">
-                                <Input
-                                    id="vpn-core-version"
-                                    value={form.core_version}
-                                    onChange={(event) =>
-                                        setFormValue(setForm, "core_version", event.target.value)
-                                    }
-                                    placeholder="1.12.0"
-                                />
-                            </Field>
-                            <Field label={t("VPN.CoreDownloadURL")} id="vpn-core-download-url">
-                                <Input
-                                    id="vpn-core-download-url"
-                                    value={form.core_download_url}
-                                    onChange={(event) =>
-                                        setFormValue(setForm, "core_download_url", event.target.value)
-                                    }
-                                    placeholder="https://example.com/sing-box.exe"
-                                />
-                            </Field>
-                            <Field label={t("VPN.CoreSHA256")} id="vpn-core-sha256">
-                                <Input
-                                    id="vpn-core-sha256"
-                                    value={form.core_sha256}
-                                    onChange={(event) =>
-                                        setFormValue(setForm, "core_sha256", event.target.value)
-                                    }
-                                    placeholder="0123456789abcdef..."
-                                />
-                            </Field>
-                        </div>
-                        {form.mode === "system_proxy" && (
-                            <div className="mt-4 grid gap-4 rounded-md border bg-muted/30 p-3 md:grid-cols-[12rem_1fr]">
-                                <div className="flex items-center justify-between md:col-span-2">
-                                    <Label htmlFor="vpn-set-system-proxy">{t("VPN.SetSystemProxy")}</Label>
-                                    <Switch
-                                        id="vpn-set-system-proxy"
-                                        checked={form.set_system_proxy}
-                                        onCheckedChange={(checked) =>
-                                            setFormValue(setForm, "set_system_proxy", checked)
+                        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
+                            <div className="relative overflow-hidden rounded-md border bg-zinc-950 p-4 text-zinc-50">
+                                <div className="pointer-events-none absolute inset-0 opacity-70 [background-image:radial-gradient(rgba(148,163,184,0.35)_1px,transparent_1px)] [background-size:18px_18px]" />
+                                <div className="relative mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                    <div>
+                                        <h3 className="text-sm font-semibold">{t("VPN.Topology")}</h3>
+                                        <p className="mt-1 text-xs text-zinc-400">{t("VPN.TopologyHint")}</p>
+                                    </div>
+                                    <Badge variant="outline" className="border-zinc-700 bg-zinc-900/80 text-zinc-200">
+                                        {modeLabel(t, form.mode)}
+                                    </Badge>
+                                </div>
+                                <div className="relative grid items-stretch gap-3 lg:grid-cols-[minmax(0,1fr)_2.5rem_minmax(0,1fr)_2.5rem_minmax(0,1fr)_2.5rem_minmax(0,0.8fr)]">
+                                    <TopologyNode
+                                        icon={<Server className="h-5 w-5" />}
+                                        label={t("VPN.EntryServer")}
+                                        value={
+                                            form.entry_server_id
+                                                ? serverName(form.entry_server_id)
+                                                : t("VPN.SelectAgent")
                                         }
+                                    >
+                                        <Select
+                                            value={String(form.entry_server_id)}
+                                            onValueChange={(value) =>
+                                                setFormValue(setForm, "entry_server_id", Number(value))
+                                            }
+                                        >
+                                            <SelectTrigger id="vpn-entry-server" className="bg-zinc-950/80 text-zinc-50">
+                                                <SelectValue placeholder={t("VPN.EntryServer")} />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="0" disabled>
+                                                    {t("VPN.SelectAgent")}
+                                                </SelectItem>
+                                                {topologyServers.map((server) => (
+                                                    <SelectItem key={server.id} value={String(server.id)}>
+                                                        {server.name}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </TopologyNode>
+                                    <TopologyConnector />
+                                    <TopologyNode
+                                        icon={<Network className="h-5 w-5" />}
+                                        label={t("VPN.FlowRelay")}
+                                        value="Dashboard Relay"
+                                    />
+                                    <TopologyConnector />
+                                    <TopologyNode
+                                        icon={<Server className="h-5 w-5" />}
+                                        label={t("VPN.ExitServer")}
+                                        value={
+                                            form.exit_server_id
+                                                ? serverName(form.exit_server_id)
+                                                : t("VPN.SelectAgent")
+                                        }
+                                    >
+                                        <Select
+                                            value={String(form.exit_server_id)}
+                                            onValueChange={(value) =>
+                                                setFormValue(setForm, "exit_server_id", Number(value))
+                                            }
+                                        >
+                                            <SelectTrigger id="vpn-exit-server" className="bg-zinc-950/80 text-zinc-50">
+                                                <SelectValue placeholder={t("VPN.ExitServer")} />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="0" disabled>
+                                                    {t("VPN.SelectAgent")}
+                                                </SelectItem>
+                                                {topologyServers.map((server) => (
+                                                    <SelectItem key={server.id} value={String(server.id)}>
+                                                        {server.name}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </TopologyNode>
+                                    <TopologyConnector />
+                                    <TopologyNode
+                                        icon={<Globe2 className="h-5 w-5" />}
+                                        label={t("VPN.FlowTarget")}
+                                        value="Internet"
                                     />
                                 </div>
-                                <Field label={t("VPN.EgressProbeURL")} id="vpn-egress-probe-url">
+                            </div>
+                            <div className="rounded-md border p-4">
+                                <h3 className="mb-4 text-sm font-semibold">{t("VPN.BasicSettings")}</h3>
+                                <div className="space-y-4">
+                                    <Field label={t("Name")} id="vpn-policy-name">
+                                        <Input
+                                            id="vpn-policy-name"
+                                            value={form.name}
+                                            onChange={(event) => setFormValue(setForm, "name", event.target.value)}
+                                            placeholder="GitHub Split"
+                                        />
+                                    </Field>
+                                    <Field label={t("VPN.Mode")} id="vpn-policy-mode">
+                                        <Select
+                                            value={form.mode}
+                                            onValueChange={(value) => {
+                                                setFormValue(setForm, "mode", value)
+                                                setTunRiskConfirmed(!isTunMode(value))
+                                            }}
+                                        >
+                                            <SelectTrigger id="vpn-policy-mode">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="system_proxy">{t("VPN.ModeSystemProxy")}</SelectItem>
+                                                <SelectItem value="tun_split">{t("VPN.ModeTunSplit")}</SelectItem>
+                                                <SelectItem value="tun_global">{t("VPN.ModeTunGlobal")}</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </Field>
+                                    <Field label={t("VPN.RuleMode")} id="vpn-rule-mode">
+                                        <Select
+                                            value={form.rule_mode}
+                                            onValueChange={(value) =>
+                                                setFormValue(setForm, "rule_mode", value)
+                                            }
+                                        >
+                                            <SelectTrigger id="vpn-rule-mode">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="global">{t("VPN.RuleModeGlobal")}</SelectItem>
+                                                <SelectItem value="domain">{t("VPN.RuleModeDomain")}</SelectItem>
+                                                <SelectItem value="ip">{t("VPN.RuleModeIP")}</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </Field>
+                                </div>
+                            </div>
+                        </div>
+                        <details className="mt-4 rounded-md border bg-muted/20 p-4">
+                            <summary className="cursor-pointer text-sm font-semibold">{t("VPN.AdvancedSettings")}</summary>
+                            <div className="mt-4 grid gap-4 md:grid-cols-2">
+                                <Field label={t("VPN.LocalSocks")} id="vpn-local-socks">
                                     <Input
-                                        id="vpn-egress-probe-url"
-                                        value={form.egress_probe_url}
+                                        id="vpn-local-socks"
+                                        value={form.listen_socks}
                                         onChange={(event) =>
-                                            setFormValue(setForm, "egress_probe_url", event.target.value)
+                                            setFormValue(setForm, "listen_socks", event.target.value)
                                         }
-                                        placeholder="https://ifconfig.me/ip"
+                                    />
+                                </Field>
+                                <Field label={t("VPN.LocalHTTP")} id="vpn-local-http">
+                                    <Input
+                                        id="vpn-local-http"
+                                        value={form.listen_http}
+                                        onChange={(event) =>
+                                            setFormValue(setForm, "listen_http", event.target.value)
+                                        }
+                                    />
+                                </Field>
+                                <Field label={t("VPN.TunName")} id="vpn-tun-name">
+                                    <Input
+                                        id="vpn-tun-name"
+                                        value={form.tun_name}
+                                        onChange={(event) =>
+                                            setFormValue(setForm, "tun_name", event.target.value)
+                                        }
+                                    />
+                                </Field>
+                                <Field label={t("VPN.DNSServer")} id="vpn-dns-server">
+                                    <Input
+                                        id="vpn-dns-server"
+                                        value={form.dns_server}
+                                        onChange={(event) =>
+                                            setFormValue(setForm, "dns_server", event.target.value)
+                                        }
+                                    />
+                                </Field>
+                                <Field label={t("VPN.DomainRules")} id="vpn-domain-rules">
+                                    <Textarea
+                                        id="vpn-domain-rules"
+                                        className="min-h-24"
+                                        value={form.domains.join("\n")}
+                                        onChange={(event) =>
+                                            setFormValue(setForm, "domains", splitLines(event.target.value))
+                                        }
+                                        placeholder={"github.com\napi.github.com"}
+                                    />
+                                </Field>
+                                <Field label={t("VPN.CIDRRules")} id="vpn-cidr-rules">
+                                    <Textarea
+                                        id="vpn-cidr-rules"
+                                        className="min-h-24"
+                                        value={form.cidrs.join("\n")}
+                                        onChange={(event) =>
+                                            setFormValue(setForm, "cidrs", splitLines(event.target.value))
+                                        }
+                                        placeholder={"140.82.112.0/20\n20.205.243.0/24"}
+                                    />
+                                </Field>
+                                <Field label={t("VPN.DirectCIDRs")} id="vpn-direct-cidrs">
+                                    <Textarea
+                                        id="vpn-direct-cidrs"
+                                        className="min-h-24"
+                                        value={form.direct_cidrs.join("\n")}
+                                        onChange={(event) =>
+                                            setFormValue(setForm, "direct_cidrs", splitLines(event.target.value))
+                                        }
+                                        placeholder={"127.0.0.0/8\n10.0.0.0/8"}
                                     />
                                 </Field>
                             </div>
-                        )}
-                        {isTunMode(form.mode) && (
-                            <div className="mt-4 grid gap-4 rounded-md border bg-muted/30 p-3 md:grid-cols-[1fr_12rem]">
-                                <Field label={t("VPN.TunHealthURL")} id="vpn-tun-health-url">
+                            <div className="mt-4 grid gap-4 md:grid-cols-3 xl:grid-cols-6">
+                                <Field label={t("VPN.Expires")} id="vpn-expires">
                                     <Input
-                                        id="vpn-tun-health-url"
-                                        value={form.tun_health_url}
-                                        onChange={(event) =>
-                                            setFormValue(setForm, "tun_health_url", event.target.value)
-                                        }
-                                        placeholder="https://connectivitycheck.gstatic.com/generate_204"
-                                    />
-                                </Field>
-                                <Field label={t("VPN.TunHealthTimeout")} id="vpn-tun-health-timeout">
-                                    <Input
-                                        id="vpn-tun-health-timeout"
+                                        id="vpn-expires"
                                         type="number"
-                                        min={1}
-                                        max={60}
-                                        value={form.tun_health_timeout_seconds}
+                                        value={form.expires_seconds}
                                         onChange={(event) =>
-                                            setFormValue(
-                                                setForm,
-                                                "tun_health_timeout_seconds",
-                                                Number(event.target.value),
-                                            )
+                                            setFormValue(setForm, "expires_seconds", Number(event.target.value))
                                         }
                                     />
                                 </Field>
-                            </div>
-                        )}
-                        {isTunMode(form.mode) && (
-                            <div className="mt-4 rounded-md border border-amber-500/40 bg-amber-500/10 p-3">
-                                <label
-                                    htmlFor="vpn-tun-risk-confirm"
-                                    className="flex items-start gap-3 text-sm"
-                                >
-                                    <input
-                                        id="vpn-tun-risk-confirm"
-                                        type="checkbox"
-                                        aria-label={t("VPN.TunRiskConfirm")}
-                                        checked={tunRiskConfirmed}
+                                <Field label={t("VPN.MaxUpload")} id="vpn-max-upload">
+                                    <Input
+                                        id="vpn-max-upload"
+                                        type="number"
+                                        min={0}
+                                        value={form.max_upload_bytes}
                                         onChange={(event) =>
-                                            setTunRiskConfirmed(event.target.checked)
+                                            setFormValue(setForm, "max_upload_bytes", Number(event.target.value))
                                         }
-                                        className="mt-1 h-4 w-4"
                                     />
-                                    <span>
-                                        <span className="block font-medium">
-                                            {t("VPN.TunRiskConfirm")}
-                                        </span>
-                                        <span className="mt-1 block text-muted-foreground">
-                                            {t("VPN.TunRiskHint")}
-                                        </span>
-                                    </span>
-                                </label>
+                                </Field>
+                                <Field label={t("VPN.MaxDownload")} id="vpn-max-download">
+                                    <Input
+                                        id="vpn-max-download"
+                                        type="number"
+                                        min={0}
+                                        value={form.max_download_bytes}
+                                        onChange={(event) =>
+                                            setFormValue(setForm, "max_download_bytes", Number(event.target.value))
+                                        }
+                                    />
+                                </Field>
+                                <Field label={t("VPN.MaxConnections")} id="vpn-max-connections">
+                                    <Input
+                                        id="vpn-max-connections"
+                                        type="number"
+                                        value={form.max_connections}
+                                        onChange={(event) =>
+                                            setFormValue(setForm, "max_connections", Number(event.target.value))
+                                        }
+                                    />
+                                </Field>
+                                <Field label={t("VPN.IdleTimeout")} id="vpn-idle-timeout">
+                                    <Input
+                                        id="vpn-idle-timeout"
+                                        type="number"
+                                        min={0}
+                                        value={form.idle_timeout_seconds}
+                                        onChange={(event) =>
+                                            setFormValue(setForm, "idle_timeout_seconds", Number(event.target.value))
+                                        }
+                                    />
+                                </Field>
+                                <Field label={t("VPN.NotificationGroup")} id="vpn-notify-group">
+                                    <Select
+                                        value={String(form.notification_group_id)}
+                                        onValueChange={(value) =>
+                                            setFormValue(setForm, "notification_group_id", Number(value))
+                                        }
+                                    >
+                                        <SelectTrigger id="vpn-notify-group">
+                                            <SelectValue placeholder={t("VPN.NotificationGroup")} />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="0">-</SelectItem>
+                                            {notifierGroup.map((item) => (
+                                                <SelectItem key={item.group.id} value={String(item.group.id)}>
+                                                    {item.group.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </Field>
                             </div>
-                        )}
+                            <div className="mt-4 flex items-center justify-between rounded-md border bg-muted/30 p-3">
+                                <Label htmlFor="vpn-auto-restore">{t("VPN.AutoRestore")}</Label>
+                                <Switch
+                                    id="vpn-auto-restore"
+                                    checked={form.auto_restart}
+                                    onCheckedChange={(checked) =>
+                                        setFormValue(setForm, "auto_restart", checked)
+                                    }
+                                />
+                            </div>
+                            <div className="mt-4 grid gap-4 rounded-md border bg-muted/30 p-3 md:grid-cols-[12rem_1fr] xl:grid-cols-[12rem_1fr_1fr]">
+                                <Field label={t("VPN.CoreVersion")} id="vpn-core-version">
+                                    <Input
+                                        id="vpn-core-version"
+                                        value={form.core_version}
+                                        onChange={(event) =>
+                                            setFormValue(setForm, "core_version", event.target.value)
+                                        }
+                                        placeholder="1.12.0"
+                                    />
+                                </Field>
+                                <Field label={t("VPN.CoreDownloadURL")} id="vpn-core-download-url">
+                                    <Input
+                                        id="vpn-core-download-url"
+                                        value={form.core_download_url}
+                                        onChange={(event) =>
+                                            setFormValue(setForm, "core_download_url", event.target.value)
+                                        }
+                                        placeholder="https://example.com/sing-box.exe"
+                                    />
+                                </Field>
+                                <Field label={t("VPN.CoreSHA256")} id="vpn-core-sha256">
+                                    <Input
+                                        id="vpn-core-sha256"
+                                        value={form.core_sha256}
+                                        onChange={(event) =>
+                                            setFormValue(setForm, "core_sha256", event.target.value)
+                                        }
+                                        placeholder="0123456789abcdef..."
+                                    />
+                                </Field>
+                            </div>
+                            {form.mode === "system_proxy" && (
+                                <div className="mt-4 grid gap-4 rounded-md border bg-muted/30 p-3 md:grid-cols-[12rem_1fr]">
+                                    <div className="flex items-center justify-between md:col-span-2">
+                                        <Label htmlFor="vpn-set-system-proxy">{t("VPN.SetSystemProxy")}</Label>
+                                        <Switch
+                                            id="vpn-set-system-proxy"
+                                            checked={form.set_system_proxy}
+                                            onCheckedChange={(checked) =>
+                                                setFormValue(setForm, "set_system_proxy", checked)
+                                            }
+                                        />
+                                    </div>
+                                    <Field label={t("VPN.EgressProbeURL")} id="vpn-egress-probe-url">
+                                        <Input
+                                            id="vpn-egress-probe-url"
+                                            value={form.egress_probe_url}
+                                            onChange={(event) =>
+                                                setFormValue(setForm, "egress_probe_url", event.target.value)
+                                            }
+                                            placeholder="https://ifconfig.me/ip"
+                                        />
+                                    </Field>
+                                </div>
+                            )}
+                            {isTunMode(form.mode) && (
+                                <div className="mt-4 grid gap-4 rounded-md border bg-muted/30 p-3 md:grid-cols-[1fr_12rem]">
+                                    <Field label={t("VPN.TunHealthURL")} id="vpn-tun-health-url">
+                                        <Input
+                                            id="vpn-tun-health-url"
+                                            value={form.tun_health_url}
+                                            onChange={(event) =>
+                                                setFormValue(setForm, "tun_health_url", event.target.value)
+                                            }
+                                            placeholder="https://connectivitycheck.gstatic.com/generate_204"
+                                        />
+                                    </Field>
+                                    <Field label={t("VPN.TunHealthTimeout")} id="vpn-tun-health-timeout">
+                                        <Input
+                                            id="vpn-tun-health-timeout"
+                                            type="number"
+                                            min={1}
+                                            max={60}
+                                            value={form.tun_health_timeout_seconds}
+                                            onChange={(event) =>
+                                                setFormValue(
+                                                    setForm,
+                                                    "tun_health_timeout_seconds",
+                                                    Number(event.target.value),
+                                                )
+                                            }
+                                        />
+                                    </Field>
+                                </div>
+                            )}
+                            {isTunMode(form.mode) && (
+                                <div className="mt-4 rounded-md border border-amber-500/40 bg-amber-500/10 p-3">
+                                    <label
+                                        htmlFor="vpn-tun-risk-confirm"
+                                        className="flex items-start gap-3 text-sm"
+                                    >
+                                        <input
+                                            id="vpn-tun-risk-confirm"
+                                            type="checkbox"
+                                            aria-label={t("VPN.TunRiskConfirm")}
+                                            checked={tunRiskConfirmed}
+                                            onChange={(event) =>
+                                                setTunRiskConfirmed(event.target.checked)
+                                            }
+                                            className="mt-1 h-4 w-4"
+                                        />
+                                        <span>
+                                            <span className="block font-medium">
+                                                {t("VPN.TunRiskConfirm")}
+                                            </span>
+                                            <span className="mt-1 block text-muted-foreground">
+                                                {t("VPN.TunRiskHint")}
+                                            </span>
+                                        </span>
+                                    </label>
+                                </div>
+                            )}
+                        </details>
                         <div className="mt-4 flex justify-end gap-2">
                             <Button variant="outline" onClick={() => void handleSavePolicy()}>
                                 {t("VPN.SavePolicy")}
@@ -1443,6 +1513,46 @@ function FlowStep({ label, value }: { label: string; value: string }) {
         <div className="flex items-center justify-between gap-3 rounded-md border bg-muted/30 px-3 py-2">
             <span className="text-muted-foreground">{label}</span>
             <span className="break-all font-medium">{value}</span>
+        </div>
+    )
+}
+
+function TopologyNode({
+    children,
+    icon,
+    label,
+    value,
+}: {
+    children?: React.ReactNode
+    icon: React.ReactNode
+    label: string
+    value: string
+}) {
+    return (
+        <div className="flex min-h-36 flex-col justify-between rounded-md border border-zinc-700 bg-zinc-900/95 p-4 text-zinc-50 shadow-sm">
+            <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-zinc-700 bg-zinc-800 text-zinc-300">
+                    {icon}
+                </div>
+                <div className="min-w-0">
+                    <div className="text-sm font-medium">{label}</div>
+                    <div className="mt-1 truncate text-xs text-zinc-400">{value || "-"}</div>
+                </div>
+            </div>
+            {children ? <div className="mt-4">{children}</div> : null}
+        </div>
+    )
+}
+
+function TopologyConnector() {
+    return (
+        <div className="flex min-h-8 items-center justify-center text-zinc-400">
+            <div className="hidden w-full items-center lg:flex">
+                <div className="h-px flex-1 bg-zinc-600" />
+                <ArrowRight className="mx-1 h-4 w-4" />
+                <div className="h-px flex-1 bg-zinc-600" />
+            </div>
+            <div className="h-8 w-px bg-zinc-600 lg:hidden" />
         </div>
     )
 }
