@@ -2,7 +2,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Globe2, Minus, Network, Plus, RotateCw, Server, Zap } from "lucide-react"
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 interface TopologyDiagramProps {
     entry: string
@@ -13,6 +13,7 @@ interface TopologyDiagramProps {
 
 export function TopologyDiagram({ entry, exit, mode, t }: TopologyDiagramProps) {
     const [view, setView] = useState({ scale: 1, x: 0, y: 0 })
+    const viewportRef = useRef<HTMLDivElement | null>(null)
     const dragRef = useRef<{
         originX: number
         originY: number
@@ -30,21 +31,32 @@ export function TopologyDiagram({ entry, exit, mode, t }: TopologyDiagramProps) 
 
     const resetView = () => setView({ scale: 1, x: 0, y: 0 })
 
-    const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
-        event.preventDefault()
-        const rect = event.currentTarget.getBoundingClientRect()
-        const cursorX = event.clientX - rect.left - rect.width / 2
-        const cursorY = event.clientY - rect.top - rect.height / 2
-        setView((current) => {
-            const nextScale = clampNumber(current.scale - event.deltaY * 0.001, 0.5, 2)
-            const ratio = nextScale / current.scale
-            return {
-                scale: nextScale,
-                x: cursorX - (cursorX - current.x) * ratio,
-                y: cursorY - (cursorY - current.y) * ratio,
-            }
-        })
-    }
+    useEffect(() => {
+        const viewport = viewportRef.current
+        if (!viewport) return
+
+        const handleWheel = (event: WheelEvent) => {
+            event.preventDefault()
+            event.stopPropagation()
+
+            const rect = viewport.getBoundingClientRect()
+            const cursorX = event.clientX - rect.left - rect.width / 2
+            const cursorY = event.clientY - rect.top - rect.height / 2
+            setView((current) => {
+                const nextScale = clampNumber(current.scale - event.deltaY * 0.001, 0.5, 2)
+                const ratio = nextScale / current.scale
+                return {
+                    scale: nextScale,
+                    x: cursorX - (cursorX - current.x) * ratio,
+                    y: cursorY - (cursorY - current.y) * ratio,
+                }
+            })
+        }
+
+        viewport.addEventListener("wheel", handleWheel, { passive: false })
+        return () => viewport.removeEventListener("wheel", handleWheel)
+    }, [])
+
 
     const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
         dragRef.current = {
@@ -149,14 +161,14 @@ export function TopologyDiagram({ entry, exit, mode, t }: TopologyDiagramProps) 
 
                 {/* 拓扑图主体 */}
                 <div
+                    ref={viewportRef}
                     aria-label={t("VPN.Topology")}
-                    className="absolute inset-0 z-10 touch-none cursor-grab active:cursor-grabbing"
+                    className="absolute inset-0 z-10 touch-none cursor-grab overscroll-contain active:cursor-grabbing"
                     role="img"
                     onPointerCancel={handlePointerUp}
                     onPointerDown={handlePointerDown}
                     onPointerMove={handlePointerMove}
                     onPointerUp={handlePointerUp}
-                    onWheel={handleWheel}
                 >
                     <div
                         className="absolute left-1/2 top-1/2 h-[500px] w-[1100px] origin-center transition-transform duration-150"
