@@ -77,6 +77,7 @@ import {
     Pencil,
     Network,
     Play,
+    Plus,
     RotateCw,
     Server,
     ShieldCheck,
@@ -355,6 +356,24 @@ export default function VPNPage() {
         ],
         [abnormalSessions.length, activeSessions.length, vpnCapableServers.length],
     )
+    const overviewTopologySession = selectedSessionID
+        ? sessions.find((session) => session.session_id === selectedSessionID)
+        : activeSessions[0] ?? sessions[0]
+    const overviewTopologyPolicy = overviewTopologySession
+        ? policies.find((policy) => policy.id === overviewTopologySession.policy_id)
+        : policies.find((policy) => policy.id === editingPolicyID) ?? policies[0]
+    const overviewTopologyEntryID =
+        overviewTopologySession?.entry_server_id ??
+        overviewTopologyPolicy?.entry_server_id ??
+        form.entry_server_id
+    const overviewTopologyExitID =
+        overviewTopologySession?.exit_server_id ??
+        overviewTopologyPolicy?.exit_server_id ??
+        form.exit_server_id
+    const overviewTopologyMode =
+        overviewTopologySession?.mode ??
+        overviewTopologyPolicy?.mode ??
+        form.mode
 
     async function handleSavePolicy() {
         if (isTunMode(form.mode) && !tunRiskConfirmed) {
@@ -392,6 +411,12 @@ export default function VPNPage() {
         } catch (error) {
             toast(t("Error"), { description: errorMessage(error) })
         }
+    }
+
+    function handleNewPolicy() {
+        setEditingPolicyID(null)
+        setForm(newInitialForm())
+        setTunRiskConfirmed(false)
     }
 
     function handleEditPolicy(policy: ModelAgentVPNPolicy) {
@@ -512,19 +537,13 @@ export default function VPNPage() {
                         })}
                     </div>
 
-                    <div className="grid gap-4 lg:grid-cols-[1fr_1.2fr]">
-                        <section className="rounded-md border p-4">
-                            <div className="flex items-center gap-2">
-                                <Network className="h-4 w-4 text-muted-foreground" />
-                                <h2 className="text-base font-semibold">{t("VPN.FlowTitle")}</h2>
-                            </div>
-                            <div className="mt-4 grid gap-2 text-sm">
-                                <FlowStep label={t("VPN.FlowEntry")} value={form.listen_socks || "-"} />
-                                <FlowStep label={t("VPN.FlowRelay")} value="Dashboard Relay" />
-                                <FlowStep label={t("VPN.FlowExit")} value={serverName(form.exit_server_id)} />
-                                <FlowStep label={t("VPN.FlowTarget")} value="Internet" />
-                            </div>
-                        </section>
+                    <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+                        <TopologyDiagram
+                            entry={overviewTopologyEntryID ? serverName(overviewTopologyEntryID) : "-"}
+                            exit={overviewTopologyExitID ? serverName(overviewTopologyExitID) : "-"}
+                            mode={modeLabel(t, overviewTopologyMode)}
+                            t={t}
+                        />
 
                         <LogPanel
                             badge={selectedSessionID ? selectedSessionID : t("VPN.LogIdle")}
@@ -587,146 +606,208 @@ export default function VPNPage() {
                 </TabsContent>
 
                 <TabsContent value="policy" className="space-y-4">
+                    <section className="rounded-md border">
+                        <div className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex items-center gap-2">
+                                <ClipboardList className="h-4 w-4 text-muted-foreground" />
+                                <h2 className="text-base font-semibold">{t("VPN.Policy")}</h2>
+                            </div>
+                            <Button
+                                className="gap-1.5 whitespace-nowrap"
+                                variant="outline"
+                                onClick={handleNewPolicy}
+                            >
+                                <Plus className="h-4 w-4" />
+                                <span>{t("VPN.NewPolicy")}</span>
+                            </Button>
+                        </div>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>ID</TableHead>
+                                    <TableHead>{t("Name")}</TableHead>
+                                    <TableHead>{t("VPN.EntryServer")}</TableHead>
+                                    <TableHead>{t("VPN.ExitServer")}</TableHead>
+                                    <TableHead>{t("VPN.Mode")}</TableHead>
+                                    <TableHead>{t("VPN.NotificationGroup")}</TableHead>
+                                    <TableHead>{t("Actions")}</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {policies.map((policy) => (
+                                    <TableRow key={policy.id}>
+                                        <TableCell>{policy.id}</TableCell>
+                                        <TableCell>{policy.name}</TableCell>
+                                        <TableCell>{serverName(policy.entry_server_id)}</TableCell>
+                                        <TableCell>{serverName(policy.exit_server_id)}</TableCell>
+                                        <TableCell>{modeLabel(t, policy.mode)}</TableCell>
+                                        <TableCell>{notifierName(policy.notification_group_id)}</TableCell>
+                                        <TableCell className="flex gap-2">
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="gap-1.5 whitespace-nowrap"
+                                                aria-label={`${t("VPN.EditPolicy")} ${policy.name}`}
+                                                onClick={() => handleEditPolicy(policy)}
+                                            >
+                                                <Pencil className="h-4 w-4" />
+                                                <span>{t("VPN.EditPolicy")}</span>
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="gap-1.5 whitespace-nowrap"
+                                                aria-label={`${t("VPN.CopyPolicy")} ${policy.name}`}
+                                                onClick={() => handleCopyPolicy(policy)}
+                                            >
+                                                <Copy className="h-4 w-4" />
+                                                <span>{t("VPN.CopyPolicy")}</span>
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="gap-1.5 whitespace-nowrap"
+                                                aria-label={`${t("VPN.StartSession")} ${policy.name}`}
+                                                onClick={() => void handleStartPolicy(policy.id)}
+                                            >
+                                                <Play className="h-4 w-4" />
+                                                <span>{t("VPN.StartSession")}</span>
+                                            </Button>
+                                            <AlertDialog>
+                                                <AlertDialogTrigger asChild>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="destructive"
+                                                        className="gap-1.5 whitespace-nowrap text-white"
+                                                        aria-label={`${t("VPN.DeletePolicy")} ${policy.name}`}
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                        <span>{t("VPN.DeletePolicy")}</span>
+                                                    </Button>
+                                                </AlertDialogTrigger>
+                                                <AlertDialogContent className="sm:max-w-lg">
+                                                    <AlertDialogHeader>
+                                                        <AlertDialogTitle>{t("ConfirmDeletion")}</AlertDialogTitle>
+                                                        <AlertDialogDescription>
+                                                            {t("Results.ThisOperationIsUnrecoverable")}
+                                                        </AlertDialogDescription>
+                                                    </AlertDialogHeader>
+                                                    <AlertDialogFooter>
+                                                        <AlertDialogCancel>{t("Close")}</AlertDialogCancel>
+                                                        <AlertDialogAction
+                                                            className={buttonVariants({
+                                                                variant: "destructive",
+                                                                className: "text-white",
+                                                            })}
+                                                            onClick={() => void handleDeletePolicy(policy.id)}
+                                                        >
+                                                            {t("Confirm")}
+                                                        </AlertDialogAction>
+                                                    </AlertDialogFooter>
+                                                </AlertDialogContent>
+                                            </AlertDialog>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </section>
+
                     <section className="rounded-md border p-4">
                         <div className="mb-4 flex items-center gap-2">
                             <ClipboardList className="h-4 w-4 text-muted-foreground" />
                             <h2 className="text-base font-semibold">{t("VPN.PolicyForm")}</h2>
                         </div>
-                        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
-                            <div className="relative overflow-hidden rounded-md border bg-zinc-950 p-4 text-zinc-50">
-                                <div className="pointer-events-none absolute inset-0 opacity-70 [background-image:radial-gradient(rgba(148,163,184,0.35)_1px,transparent_1px)] [background-size:18px_18px]" />
-                                <div className="relative mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                                    <div>
-                                        <h3 className="text-sm font-semibold">{t("VPN.Topology")}</h3>
-                                        <p className="mt-1 text-xs text-zinc-400">{t("VPN.TopologyHint")}</p>
-                                    </div>
-                                    <Badge variant="outline" className="border-zinc-700 bg-zinc-900/80 text-zinc-200">
-                                        {modeLabel(t, form.mode)}
-                                    </Badge>
-                                </div>
-                                <div className="relative grid items-stretch gap-3 lg:grid-cols-[minmax(0,1fr)_2.5rem_minmax(0,1fr)_2.5rem_minmax(0,1fr)_2.5rem_minmax(0,0.8fr)]">
-                                    <TopologyNode
-                                        icon={<Server className="h-5 w-5" />}
-                                        label={t("VPN.EntryServer")}
-                                        value={
-                                            form.entry_server_id
-                                                ? serverName(form.entry_server_id)
-                                                : t("VPN.SelectAgent")
+                        <div className="rounded-md border p-4">
+                            <h3 className="mb-4 text-sm font-semibold">{t("VPN.BasicSettings")}</h3>
+                            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                                <Field label={t("Name")} id="vpn-policy-name">
+                                    <Input
+                                        id="vpn-policy-name"
+                                        value={form.name}
+                                        onChange={(event) => setFormValue(setForm, "name", event.target.value)}
+                                        placeholder="GitHub Split"
+                                    />
+                                </Field>
+                                <Field label={t("VPN.EntryServer")} id="vpn-entry-server">
+                                    <Select
+                                        value={String(form.entry_server_id)}
+                                        onValueChange={(value) =>
+                                            setFormValue(setForm, "entry_server_id", Number(value))
                                         }
                                     >
-                                        <Select
-                                            value={String(form.entry_server_id)}
-                                            onValueChange={(value) =>
-                                                setFormValue(setForm, "entry_server_id", Number(value))
-                                            }
-                                        >
-                                            <SelectTrigger id="vpn-entry-server" className="bg-zinc-950/80 text-zinc-50">
-                                                <SelectValue placeholder={t("VPN.EntryServer")} />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="0" disabled>
-                                                    {t("VPN.SelectAgent")}
+                                        <SelectTrigger id="vpn-entry-server">
+                                            <SelectValue placeholder={t("VPN.EntryServer")} />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="0" disabled>
+                                                {t("VPN.SelectAgent")}
+                                            </SelectItem>
+                                            {topologyServers.map((server) => (
+                                                <SelectItem key={server.id} value={String(server.id)}>
+                                                    {server.name}
                                                 </SelectItem>
-                                                {topologyServers.map((server) => (
-                                                    <SelectItem key={server.id} value={String(server.id)}>
-                                                        {server.name}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </TopologyNode>
-                                    <TopologyConnector />
-                                    <TopologyNode
-                                        icon={<Network className="h-5 w-5" />}
-                                        label={t("VPN.FlowRelay")}
-                                        value="Dashboard Relay"
-                                    />
-                                    <TopologyConnector />
-                                    <TopologyNode
-                                        icon={<Server className="h-5 w-5" />}
-                                        label={t("VPN.ExitServer")}
-                                        value={
-                                            form.exit_server_id
-                                                ? serverName(form.exit_server_id)
-                                                : t("VPN.SelectAgent")
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </Field>
+                                <Field label={t("VPN.ExitServer")} id="vpn-exit-server">
+                                    <Select
+                                        value={String(form.exit_server_id)}
+                                        onValueChange={(value) =>
+                                            setFormValue(setForm, "exit_server_id", Number(value))
                                         }
                                     >
-                                        <Select
-                                            value={String(form.exit_server_id)}
-                                            onValueChange={(value) =>
-                                                setFormValue(setForm, "exit_server_id", Number(value))
-                                            }
-                                        >
-                                            <SelectTrigger id="vpn-exit-server" className="bg-zinc-950/80 text-zinc-50">
-                                                <SelectValue placeholder={t("VPN.ExitServer")} />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="0" disabled>
-                                                    {t("VPN.SelectAgent")}
+                                        <SelectTrigger id="vpn-exit-server">
+                                            <SelectValue placeholder={t("VPN.ExitServer")} />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="0" disabled>
+                                                {t("VPN.SelectAgent")}
+                                            </SelectItem>
+                                            {topologyServers.map((server) => (
+                                                <SelectItem key={server.id} value={String(server.id)}>
+                                                    {server.name}
                                                 </SelectItem>
-                                                {topologyServers.map((server) => (
-                                                    <SelectItem key={server.id} value={String(server.id)}>
-                                                        {server.name}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </TopologyNode>
-                                    <TopologyConnector />
-                                    <TopologyNode
-                                        icon={<Globe2 className="h-5 w-5" />}
-                                        label={t("VPN.FlowTarget")}
-                                        value="Internet"
-                                    />
-                                </div>
-                            </div>
-                            <div className="rounded-md border p-4">
-                                <h3 className="mb-4 text-sm font-semibold">{t("VPN.BasicSettings")}</h3>
-                                <div className="space-y-4">
-                                    <Field label={t("Name")} id="vpn-policy-name">
-                                        <Input
-                                            id="vpn-policy-name"
-                                            value={form.name}
-                                            onChange={(event) => setFormValue(setForm, "name", event.target.value)}
-                                            placeholder="GitHub Split"
-                                        />
-                                    </Field>
-                                    <Field label={t("VPN.Mode")} id="vpn-policy-mode">
-                                        <Select
-                                            value={form.mode}
-                                            onValueChange={(value) => {
-                                                setFormValue(setForm, "mode", value)
-                                                setTunRiskConfirmed(!isTunMode(value))
-                                            }}
-                                        >
-                                            <SelectTrigger id="vpn-policy-mode">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="system_proxy">{t("VPN.ModeSystemProxy")}</SelectItem>
-                                                <SelectItem value="tun_split">{t("VPN.ModeTunSplit")}</SelectItem>
-                                                <SelectItem value="tun_global">{t("VPN.ModeTunGlobal")}</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </Field>
-                                    <Field label={t("VPN.RuleMode")} id="vpn-rule-mode">
-                                        <Select
-                                            value={form.rule_mode}
-                                            onValueChange={(value) =>
-                                                setFormValue(setForm, "rule_mode", value)
-                                            }
-                                        >
-                                            <SelectTrigger id="vpn-rule-mode">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="global">{t("VPN.RuleModeGlobal")}</SelectItem>
-                                                <SelectItem value="domain">{t("VPN.RuleModeDomain")}</SelectItem>
-                                                <SelectItem value="ip">{t("VPN.RuleModeIP")}</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </Field>
-                                </div>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </Field>
+                                <Field label={t("VPN.Mode")} id="vpn-policy-mode">
+                                    <Select
+                                        value={form.mode}
+                                        onValueChange={(value) => {
+                                            setFormValue(setForm, "mode", value)
+                                            setTunRiskConfirmed(!isTunMode(value))
+                                        }}
+                                    >
+                                        <SelectTrigger id="vpn-policy-mode">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="system_proxy">{t("VPN.ModeSystemProxy")}</SelectItem>
+                                            <SelectItem value="tun_split">{t("VPN.ModeTunSplit")}</SelectItem>
+                                            <SelectItem value="tun_global">{t("VPN.ModeTunGlobal")}</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </Field>
+                                <Field label={t("VPN.RuleMode")} id="vpn-rule-mode">
+                                    <Select
+                                        value={form.rule_mode}
+                                        onValueChange={(value) =>
+                                            setFormValue(setForm, "rule_mode", value)
+                                        }
+                                    >
+                                        <SelectTrigger id="vpn-rule-mode">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="global">{t("VPN.RuleModeGlobal")}</SelectItem>
+                                            <SelectItem value="domain">{t("VPN.RuleModeDomain")}</SelectItem>
+                                            <SelectItem value="ip">{t("VPN.RuleModeIP")}</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </Field>
                             </div>
                         </div>
                         <details className="mt-4 rounded-md border bg-muted/20 p-4">
@@ -1017,98 +1098,6 @@ export default function VPNPage() {
                         </div>
                     </section>
 
-                    <section className="rounded-md border">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>ID</TableHead>
-                                    <TableHead>{t("Name")}</TableHead>
-                                    <TableHead>{t("VPN.EntryServer")}</TableHead>
-                                    <TableHead>{t("VPN.ExitServer")}</TableHead>
-                                    <TableHead>{t("VPN.Mode")}</TableHead>
-                                    <TableHead>{t("VPN.NotificationGroup")}</TableHead>
-                                    <TableHead>{t("Actions")}</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {policies.map((policy) => (
-                                    <TableRow key={policy.id}>
-                                        <TableCell>{policy.id}</TableCell>
-                                        <TableCell>{policy.name}</TableCell>
-                                        <TableCell>{serverName(policy.entry_server_id)}</TableCell>
-                                        <TableCell>{serverName(policy.exit_server_id)}</TableCell>
-                                        <TableCell>{modeLabel(t, policy.mode)}</TableCell>
-                                        <TableCell>{notifierName(policy.notification_group_id)}</TableCell>
-                                        <TableCell className="flex gap-2">
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                className="gap-1.5 whitespace-nowrap"
-                                                aria-label={`${t("VPN.EditPolicy")} ${policy.name}`}
-                                                onClick={() => handleEditPolicy(policy)}
-                                            >
-                                                <Pencil className="h-4 w-4" />
-                                                <span>{t("VPN.EditPolicy")}</span>
-                                            </Button>
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                className="gap-1.5 whitespace-nowrap"
-                                                aria-label={`${t("VPN.CopyPolicy")} ${policy.name}`}
-                                                onClick={() => handleCopyPolicy(policy)}
-                                            >
-                                                <Copy className="h-4 w-4" />
-                                                <span>{t("VPN.CopyPolicy")}</span>
-                                            </Button>
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                className="gap-1.5 whitespace-nowrap"
-                                                aria-label={`${t("VPN.StartSession")} ${policy.name}`}
-                                                onClick={() => void handleStartPolicy(policy.id)}
-                                            >
-                                                <Play className="h-4 w-4" />
-                                                <span>{t("VPN.StartSession")}</span>
-                                            </Button>
-                                            <AlertDialog>
-                                                <AlertDialogTrigger asChild>
-                                                    <Button
-                                                        size="sm"
-                                                        variant="destructive"
-                                                        className="gap-1.5 whitespace-nowrap text-white"
-                                                        aria-label={`${t("VPN.DeletePolicy")} ${policy.name}`}
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                        <span>{t("VPN.DeletePolicy")}</span>
-                                                    </Button>
-                                                </AlertDialogTrigger>
-                                                <AlertDialogContent className="sm:max-w-lg">
-                                                    <AlertDialogHeader>
-                                                        <AlertDialogTitle>{t("ConfirmDeletion")}</AlertDialogTitle>
-                                                        <AlertDialogDescription>
-                                                            {t("Results.ThisOperationIsUnrecoverable")}
-                                                        </AlertDialogDescription>
-                                                    </AlertDialogHeader>
-                                                    <AlertDialogFooter>
-                                                        <AlertDialogCancel>{t("Close")}</AlertDialogCancel>
-                                                        <AlertDialogAction
-                                                            className={buttonVariants({
-                                                                variant: "destructive",
-                                                                className: "text-white",
-                                                            })}
-                                                            onClick={() => void handleDeletePolicy(policy.id)}
-                                                        >
-                                                            {t("Confirm")}
-                                                        </AlertDialogAction>
-                                                    </AlertDialogFooter>
-                                                </AlertDialogContent>
-                                            </AlertDialog>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </section>
                 </TabsContent>
 
                 <TabsContent value="session" className="space-y-4">
@@ -1483,12 +1472,58 @@ function SessionDetailItem({
     )
 }
 
-function FlowStep({ label, value }: { label: string; value: string }) {
+function TopologyDiagram({
+    entry,
+    exit,
+    mode,
+    t,
+}: {
+    entry: string
+    exit: string
+    mode: string
+    t: (key: string) => string
+}) {
     return (
-        <div className="flex items-center justify-between gap-3 rounded-md border bg-muted/30 px-3 py-2">
-            <span className="text-muted-foreground">{label}</span>
-            <span className="break-all font-medium">{value}</span>
-        </div>
+        <section className="relative overflow-hidden rounded-md border bg-zinc-950 p-4 text-zinc-50">
+            <div className="pointer-events-none absolute inset-0 opacity-70 [background-image:radial-gradient(rgba(148,163,184,0.35)_1px,transparent_1px)] [background-size:18px_18px]" />
+            <div className="relative mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                    <div className="flex items-center gap-2">
+                        <Network className="h-4 w-4 text-zinc-400" />
+                        <h2 className="text-base font-semibold">{t("VPN.Topology")}</h2>
+                    </div>
+                    <p className="mt-1 text-xs text-zinc-400">{t("VPN.TopologyHint")}</p>
+                </div>
+                <Badge variant="outline" className="border-zinc-700 bg-zinc-900/80 text-zinc-200">
+                    {mode}
+                </Badge>
+            </div>
+            <div className="relative grid items-stretch gap-3 xl:grid-cols-[minmax(0,1fr)_2.5rem_minmax(0,1fr)_2.5rem_minmax(0,1fr)_2.5rem_minmax(0,0.8fr)]">
+                <TopologyNode
+                    icon={<Server className="h-5 w-5" />}
+                    label={t("VPN.EntryServer")}
+                    value={entry}
+                />
+                <TopologyConnector />
+                <TopologyNode
+                    icon={<Network className="h-5 w-5" />}
+                    label={t("VPN.FlowRelay")}
+                    value="Dashboard Relay"
+                />
+                <TopologyConnector />
+                <TopologyNode
+                    icon={<Server className="h-5 w-5" />}
+                    label={t("VPN.ExitServer")}
+                    value={exit}
+                />
+                <TopologyConnector />
+                <TopologyNode
+                    icon={<Globe2 className="h-5 w-5" />}
+                    label={t("VPN.FlowTarget")}
+                    value="Internet"
+                />
+            </div>
+        </section>
     )
 }
 
@@ -1522,12 +1557,12 @@ function TopologyNode({
 function TopologyConnector() {
     return (
         <div className="flex min-h-8 items-center justify-center text-zinc-400">
-            <div className="hidden w-full items-center lg:flex">
+            <div className="hidden w-full items-center xl:flex">
                 <div className="h-px flex-1 bg-zinc-600" />
                 <ArrowRight className="mx-1 h-4 w-4" />
                 <div className="h-px flex-1 bg-zinc-600" />
             </div>
-            <div className="h-8 w-px bg-zinc-600 lg:hidden" />
+            <div className="h-8 w-px bg-zinc-600 xl:hidden" />
         </div>
     )
 }
