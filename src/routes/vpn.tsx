@@ -62,7 +62,6 @@ import {
     Pencil,
     Network,
     Play,
-    Plus,
     RotateCw,
     Server,
     ShieldCheck,
@@ -405,13 +404,6 @@ export default function VPNPage() {
         setActiveTab("policy")
     }
 
-    function handleNewPolicy() {
-        setEditingPolicyID(null)
-        setForm(newInitialForm())
-        setTunRiskConfirmed(false)
-        setActiveTab("policy")
-    }
-
     async function handleStartPolicy(policyID: number) {
         try {
             const session = await startVPNSession(policyID)
@@ -473,31 +465,10 @@ export default function VPNPage() {
 
     return (
         <div className="px-3">
-            <div className="mt-6 mb-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <div className="mt-6 mb-4">
                 <div className="space-y-2">
                     <h1 className="text-3xl font-bold tracking-tight">{t("VPN.Title")}</h1>
                     <p className="max-w-3xl text-sm text-muted-foreground">{t("VPN.PageHint")}</p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                    <Button variant="outline" onClick={() => void mutateSessions()}>
-                        <RotateCw className="mr-2 h-4 w-4" />
-                        {t("VPN.Refresh")}
-                    </Button>
-                    <Button
-                        variant="outline"
-                        disabled={vpnCapableServers.length === 0}
-                        onClick={handleNewPolicy}
-                    >
-                        <Plus className="mr-2 h-4 w-4" />
-                        {t("VPN.NewPolicy")}
-                    </Button>
-                    <Button
-                        disabled={policies.length === 0 || vpnCapableServers.length === 0}
-                        onClick={() => policies[0] && void handleStartPolicy(policies[0].id)}
-                    >
-                        <Play className="mr-2 h-4 w-4" />
-                        {t("VPN.StartSession")}
-                    </Button>
                 </div>
             </div>
 
