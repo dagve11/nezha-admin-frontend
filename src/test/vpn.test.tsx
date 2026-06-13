@@ -834,23 +834,31 @@ test("Agent VPN session log stream adds readable context to raw log lines", asyn
     ).toBeTruthy()
 })
 
-test("Agent VPN session tab renders the planned session detail columns", () => {
+test("Agent VPN session tab keeps detailed fields in the detail dialog", () => {
     render(<VPNPage />)
 
     fireEvent.click(screen.getByRole("tab", { name: "VPN.Session" }))
 
-    expect(screen.getByRole("columnheader", { name: "VPN.PolicyName" })).toBeTruthy()
-    expect(screen.getByRole("columnheader", { name: "VPN.Mode" })).toBeTruthy()
-    expect(screen.getByRole("columnheader", { name: "VPN.ActiveConnections" })).toBeTruthy()
-    expect(screen.getByRole("columnheader", { name: "VPN.LocalProxy" })).toBeTruthy()
-    expect(screen.getByRole("columnheader", { name: "VPN.TunName" })).toBeTruthy()
-    expect(screen.getByRole("columnheader", { name: "VPN.StartedAt" })).toBeTruthy()
-    expect(screen.getByRole("columnheader", { name: "VPN.ExpiresAt" })).toBeTruthy()
-    expect(screen.getByRole("columnheader", { name: "VPN.LastError" })).toBeTruthy()
+    expect(screen.getByRole("columnheader", { name: "Session" })).toBeTruthy()
+    expect(screen.getByRole("columnheader", { name: "Status" })).toBeTruthy()
+    expect(screen.getByRole("columnheader", { name: "VPN.Traffic" })).toBeTruthy()
+    expect(screen.getByRole("columnheader", { name: "Actions" })).toBeTruthy()
+    expect(screen.queryByRole("columnheader", { name: "VPN.PolicyName" })).toBeNull()
+    expect(screen.queryByRole("columnheader", { name: "VPN.Mode" })).toBeNull()
+    expect(screen.queryByRole("columnheader", { name: "VPN.ActiveConnections" })).toBeNull()
+    expect(screen.queryByRole("columnheader", { name: "VPN.LocalProxy" })).toBeNull()
+    expect(screen.queryByRole("columnheader", { name: "VPN.TunName" })).toBeNull()
+    expect(screen.queryByRole("columnheader", { name: "VPN.StartedAt" })).toBeNull()
+    expect(screen.queryByRole("columnheader", { name: "VPN.ExpiresAt" })).toBeNull()
+    expect(screen.queryByRole("columnheader", { name: "VPN.LastError" })).toBeNull()
 
-    expect(screen.getByText("github split")).toBeTruthy()
-    expect(screen.getByText("VPN.ModeSystemProxy")).toBeTruthy()
-    expect(screen.getByText("127.0.0.1:1080")).toBeTruthy()
+    expect(screen.queryByText("global tunnel")).toBeNull()
+    expect(screen.queryByText("VPN.ModeTunGlobal")).toBeNull()
+    expect(screen.queryByText("nezha-vpn")).toBeNull()
+    expect(screen.queryByText("tun preflight failed")).toBeNull()
+
+    fireEvent.click(screen.getByRole("button", { name: "VPN.Detail vpn_session_2" }))
+
     expect(screen.getByText("global tunnel")).toBeTruthy()
     expect(screen.getByText("VPN.ModeTunGlobal")).toBeTruthy()
     expect(screen.getByText("nezha-vpn")).toBeTruthy()

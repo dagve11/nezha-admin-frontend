@@ -93,7 +93,10 @@ export function SessionTab({
             <Card>
                 <CardHeader>
                     <div className="grid gap-3 md:grid-cols-[1fr_1fr_1fr_auto]">
-                        <NativeField label={t("VPN.SessionStateFilter")} id="vpn-session-state-filter">
+                        <NativeField
+                            label={t("VPN.SessionStateFilter")}
+                            id="vpn-session-state-filter"
+                        >
                             <select
                                 id="vpn-session-state-filter"
                                 className="h-10 rounded-md border bg-background px-3 text-sm"
@@ -108,7 +111,10 @@ export function SessionTab({
                                 ))}
                             </select>
                         </NativeField>
-                        <NativeField label={t("VPN.SessionEntryFilter")} id="vpn-session-entry-filter">
+                        <NativeField
+                            label={t("VPN.SessionEntryFilter")}
+                            id="vpn-session-entry-filter"
+                        >
                             <select
                                 id="vpn-session-entry-filter"
                                 className="h-10 rounded-md border bg-background px-3 text-sm"
@@ -123,7 +129,10 @@ export function SessionTab({
                                 ))}
                             </select>
                         </NativeField>
-                        <NativeField label={t("VPN.SessionExitFilter")} id="vpn-session-exit-filter">
+                        <NativeField
+                            label={t("VPN.SessionExitFilter")}
+                            id="vpn-session-exit-filter"
+                        >
                             <select
                                 id="vpn-session-exit-filter"
                                 className="h-10 rounded-md border bg-background px-3 text-sm"
@@ -158,29 +167,20 @@ export function SessionTab({
                         <TableHeader>
                             <TableRow>
                                 <TableHead className="min-w-[12rem]">Session</TableHead>
-                                <TableHead>{t("VPN.PolicyName")}</TableHead>
                                 <TableHead>{t("Status")}</TableHead>
-                                <TableHead>{t("VPN.Mode")}</TableHead>
                                 <TableHead>{t("VPN.Traffic")}</TableHead>
-                                <TableHead>{t("VPN.ActiveConnections")}</TableHead>
-                                <TableHead>{t("VPN.LocalProxy")}</TableHead>
-                                <TableHead>{t("VPN.TunName")}</TableHead>
-                                <TableHead>{t("VPN.StartedAt")}</TableHead>
-                                <TableHead>{t("VPN.ExpiresAt")}</TableHead>
-                                <TableHead>{t("VPN.LastError")}</TableHead>
                                 <TableHead className="w-24 text-right">{t("Actions")}</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {filteredSessions.length === 0 && (
                                 <TableRow>
-                                    <TableCell colSpan={12} className="h-24 text-center">
+                                    <TableCell colSpan={4} className="h-24 text-center">
                                         {t("NoResults")}
                                     </TableCell>
                                 </TableRow>
                             )}
                             {filteredSessions.map((session) => {
-                                const policy = policies.find((p) => p.id === session.policy_id)
                                 const canStop = ["running", "starting", "stopping"].includes(
                                     session.state,
                                 )
@@ -199,9 +199,6 @@ export function SessionTab({
                                             {session.session_id}
                                         </TableCell>
                                         <TableCell>
-                                            {policy?.name || `#${session.policy_id}`}
-                                        </TableCell>
-                                        <TableCell>
                                             <Badge
                                                 variant={
                                                     session.state === "running"
@@ -212,35 +209,9 @@ export function SessionTab({
                                                 {session.state}
                                             </Badge>
                                         </TableCell>
-                                        <TableCell>{modeLabel(t, session.mode)}</TableCell>
                                         <TableCell>
                                             {formatBytes(session.upload_bytes)} /{" "}
                                             {formatBytes(session.download_bytes)}
-                                        </TableCell>
-                                        <TableCell>{session.active_connections ?? 0}</TableCell>
-                                        <TableCell>
-                                            {session.mode === "system_proxy"
-                                                ? session.local_socks ||
-                                                  session.local_http ||
-                                                  policy?.listen_socks ||
-                                                  policy?.listen_http ||
-                                                  "-"
-                                                : "-"}
-                                        </TableCell>
-                                        <TableCell>
-                                            {session.mode === "tun_split" ||
-                                            session.mode === "tun_global"
-                                                ? session.tun_name || policy?.tun_name || "-"
-                                                : "-"}
-                                        </TableCell>
-                                        <TableCell className="text-xs">
-                                            {session.started_at || "-"}
-                                        </TableCell>
-                                        <TableCell className="text-xs">
-                                            {session.expires_at || "-"}
-                                        </TableCell>
-                                        <TableCell className="max-w-[12rem] truncate text-xs text-destructive">
-                                            {session.last_error || "-"}
                                         </TableCell>
                                         <TableCell>
                                             <div className="flex justify-end gap-2">
@@ -260,9 +231,14 @@ export function SessionTab({
                                                             <MoreHorizontal className="h-4 w-4" />
                                                         </Button>
                                                     </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end" className="w-48">
+                                                    <DropdownMenuContent
+                                                        align="end"
+                                                        className="w-48"
+                                                    >
                                                         <DropdownMenuItem
-                                                            onClick={() => onViewLog(session.session_id)}
+                                                            onClick={() =>
+                                                                onViewLog(session.session_id)
+                                                            }
                                                             aria-label={`${t("VPN.ViewSessionLog")} ${session.session_id}`}
                                                         >
                                                             <FileText className="h-4 w-4" />
@@ -280,7 +256,9 @@ export function SessionTab({
                                                             disabled={!canStop}
                                                             className="text-destructive focus:text-destructive"
                                                             onSelect={(e) => e.preventDefault()}
-                                                            onClick={() => onStop(session.session_id)}
+                                                            onClick={() =>
+                                                                onStop(session.session_id)
+                                                            }
                                                             aria-label={`${t("VPN.StopSession")} ${session.session_id}`}
                                                         >
                                                             <Square className="h-4 w-4" />
@@ -288,7 +266,9 @@ export function SessionTab({
                                                         </DropdownMenuItem>
                                                         <DropdownMenuItem
                                                             disabled={!canRestart}
-                                                            onClick={() => onRestart(session.session_id)}
+                                                            onClick={() =>
+                                                                onRestart(session.session_id)
+                                                            }
                                                             aria-label={`${t("VPN.RestartSession")} ${session.session_id}`}
                                                         >
                                                             <Play className="h-4 w-4" />
@@ -367,9 +347,7 @@ function SessionDetailDialog({
                     <DetailItem
                         label={t("Status")}
                         value={
-                            <Badge
-                                variant={session.state === "running" ? "default" : "secondary"}
-                            >
+                            <Badge variant={session.state === "running" ? "default" : "secondary"}>
                                 {session.state}
                             </Badge>
                         }
@@ -478,4 +456,14 @@ function getSessionProxyAddress(
     )
 }
 
-export { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, buttonVariants }
+export {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    buttonVariants,
+}
