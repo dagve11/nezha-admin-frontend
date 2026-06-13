@@ -2,6 +2,7 @@ import { swrFetcher } from "@/api/api"
 import {
     createVPNPolicy,
     deleteVPNPolicy,
+    deleteVPNSession,
     refreshVPNSessionStatus,
     restartVPNSession,
     startVPNSession,
@@ -207,6 +208,15 @@ export default function VPNPage() {
         }
     }
 
+    async function handleDeleteSession(sessionID: string) {
+        try {
+            await deleteVPNSession(sessionID)
+            await mutateSessions()
+        } catch (error) {
+            toast(t("Error"), { description: errorMessage(error) })
+        }
+    }
+
     async function handleRestartSession(sessionID: string) {
         try {
             await restartVPNSession(sessionID)
@@ -343,8 +353,14 @@ export default function VPNPage() {
                                     })}
                                     onClick={() => {
                                         const sessionID = sessionAction?.sessionID
+                                        const actionType = sessionAction?.type
                                         setSessionAction(null)
-                                        if (sessionID) void handleStopSession(sessionID)
+                                        if (!sessionID) return
+                                        if (actionType === "delete") {
+                                            void handleDeleteSession(sessionID)
+                                        } else {
+                                            void handleStopSession(sessionID)
+                                        }
                                     }}
                                 >
                                     {t("Confirm")}

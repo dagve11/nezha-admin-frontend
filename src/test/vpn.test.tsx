@@ -12,6 +12,7 @@ const updateVPNPolicy = vi.fn()
 const deleteVPNPolicy = vi.fn()
 const startVPNSession = vi.fn()
 const stopVPNSession = vi.fn()
+const deleteVPNSession = vi.fn()
 const restartVPNSession = vi.fn()
 const refreshVPNSessionStatus = vi.fn()
 const toastMock = vi.fn()
@@ -50,6 +51,7 @@ vi.mock("@/api/vpn", () => ({
     deleteVPNPolicy: (...args: unknown[]) => deleteVPNPolicy(...args),
     startVPNSession: (...args: unknown[]) => startVPNSession(...args),
     stopVPNSession: (...args: unknown[]) => stopVPNSession(...args),
+    deleteVPNSession: (...args: unknown[]) => deleteVPNSession(...args),
     restartVPNSession: (...args: unknown[]) => restartVPNSession(...args),
     refreshVPNSessionStatus: (...args: unknown[]) => refreshVPNSessionStatus(...args),
 }))
@@ -253,6 +255,7 @@ beforeEach(() => {
     deleteVPNPolicy.mockReset()
     startVPNSession.mockReset()
     stopVPNSession.mockReset()
+    deleteVPNSession.mockReset()
     restartVPNSession.mockReset()
     refreshVPNSessionStatus.mockReset()
     toastMock.mockReset()
@@ -261,6 +264,7 @@ beforeEach(() => {
     deleteVPNPolicy.mockResolvedValue(undefined)
     startVPNSession.mockResolvedValue({ session_id: "vpn_session_2" })
     stopVPNSession.mockResolvedValue({ session_id: "vpn_session_1", state: "stopped" })
+    deleteVPNSession.mockResolvedValue(undefined)
     restartVPNSession.mockResolvedValue({ session_id: "vpn_session_3", state: "running" })
     refreshVPNSessionStatus.mockResolvedValue({ session_id: "vpn_session_1", state: "running" })
     MockVPNWebSocket.instances = []

@@ -32,6 +32,10 @@ export const stopVPNSession = async (sessionID: string): Promise<ModelAgentVPNSe
     return fetcher<ModelAgentVPNSession>(FetcherMethod.POST, `/api/v1/vpn/session/${sessionID}/stop`)
 }
 
+export const deleteVPNSession = async (sessionID: string): Promise<void> => {
+    return fetcher<void>(FetcherMethod.POST, `/api/v1/vpn/session/${sessionID}/delete`)
+}
+
 export const restartVPNSession = async (sessionID: string): Promise<ModelAgentVPNSession> => {
     return fetcher<ModelAgentVPNSession>(
         FetcherMethod.POST,
