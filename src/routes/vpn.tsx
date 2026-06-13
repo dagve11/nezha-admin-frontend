@@ -8,7 +8,6 @@ import {
     stopVPNSession,
     updateVPNPolicy,
 } from "@/api/vpn"
-import { AuditTab } from "@/components/vpn/audit-tab"
 import { OverviewTab } from "@/components/vpn/overview-tab"
 import { PolicyForm } from "@/components/vpn/policy-form"
 import { PolicyTab } from "@/components/vpn/policy-tab"
@@ -258,11 +257,10 @@ export default function VPNPage() {
             </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-                <TabsList className="grid h-auto w-full grid-cols-4">
+                <TabsList className="grid h-auto w-full grid-cols-3">
                     <TabsTrigger value="overview">{t("VPN.Overview")}</TabsTrigger>
                     <TabsTrigger value="policy">{t("VPN.Policy")}</TabsTrigger>
                     <TabsTrigger value="session">{t("VPN.Session")}</TabsTrigger>
-                    <TabsTrigger value="audit">{t("VPN.Audit")}</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="overview">
@@ -378,9 +376,6 @@ export default function VPNPage() {
                     </AlertDialog>
                 </TabsContent>
 
-                <TabsContent value="audit">
-                    <AuditTab servers={servers} />
-                </TabsContent>
             </Tabs>
         </div>
     )

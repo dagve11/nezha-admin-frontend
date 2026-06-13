@@ -17,7 +17,6 @@ const restartVPNSession = vi.fn()
 const refreshVPNSessionStatus = vi.fn()
 const writeClipboardText = vi.fn()
 const toastMock = vi.fn()
-let swrKeys: string[] = []
 const validSHA256 = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
 class MockVPNWebSocket {
@@ -45,41 +44,6 @@ class MockVPNWebSocket {
     disconnect() {
         this.onclose?.()
     }
-}
-
-type MockAuditRow = {
-    id: number
-    session_id: string
-    user_id: number
-    action: string
-    success: boolean
-    message: string
-    entry_server_id?: number
-    exit_server_id?: number
-    created_at: string
-}
-
-function filterAuditRowsForKey(rows: MockAuditRow[], key: string): MockAuditRow[] {
-    const params = new URLSearchParams(key.slice(key.indexOf("?") + 1))
-    return rows.filter((row) => {
-        const action = params.get("action")
-        if (action && !row.action.includes(action)) return false
-        const result = params.get("result")
-        if (result === "success" && !row.success) return false
-        if (result === "failure" && row.success) return false
-        const user = params.get("user")
-        if (user && String(row.user_id) !== user) return false
-        const entry = params.get("entry")
-        if (entry && String(row.entry_server_id ?? "") !== entry) return false
-        const exit = params.get("exit")
-        if (exit && String(row.exit_server_id ?? "") !== exit) return false
-        const createdAt = new Date(row.created_at).getTime()
-        const from = params.get("from")
-        if (from && createdAt < new Date(from).getTime()) return false
-        const to = params.get("to")
-        if (to && createdAt > new Date(to).getTime()) return false
-        return true
-    })
 }
 
 vi.mock("@/api/vpn", () => ({
@@ -148,49 +112,6 @@ vi.mock("sonner", () => ({
 
 vi.mock("swr", () => ({
     default: (key: string) => {
-        swrKeys.push(key)
-        const audits = [
-            {
-                id: 21,
-                session_id: "vpn_session_1",
-                user_id: 1,
-                action: "start_session",
-                success: true,
-                message: "session started",
-                created_at: "2026-06-08T13:22:24+08:00",
-            },
-            {
-                id: 22,
-                session_id: "vpn_session_2",
-                user_id: 2,
-                action: "stop_session",
-                success: false,
-                message: "session failed",
-                entry_server_id: 2,
-                exit_server_id: 1,
-                created_at: "2026-06-08T14:00:00+08:00",
-                detail: {
-                    agent_cleanup_ok: "system_proxy_restore",
-                    agent_cleanup_failed: "tun_restore",
-                    agent_cleanup_state_kept: "true",
-                    agent_cleanup_logs: "[cleanup] system_proxy_restore=ok; [cleanup] tun_restore=failed: route restore failed; [cleanup] state=kept-for-restore-retry path=/tmp/nezha-vpn/state.json",
-                },
-            },
-            {
-                id: 23,
-                session_id: "",
-                user_id: 1,
-                action: "delete_policy",
-                success: true,
-                message: "policy deleted",
-                entry_server_id: 1,
-                exit_server_id: 2,
-                created_at: "2026-06-08T15:00:00+08:00",
-                detail: {
-                    policy_name: "github split",
-                },
-            },
-        ]
         const dataByKey: Record<string, unknown> = {
             "/api/v1/vpn/policy": [
                 {
@@ -268,15 +189,9 @@ vi.mock("swr", () => ({
                     expires_at: "2026-06-08T15:00:00+08:00",
                 },
             ],
-            "/api/v1/vpn/audit": key.startsWith("/api/v1/vpn/audit?")
-                ? filterAuditRowsForKey(audits, key)
-                : audits,
         }
-        const normalizedKey = key.startsWith("/api/v1/vpn/audit?")
-            ? "/api/v1/vpn/audit"
-            : key
         return {
-            data: dataByKey[normalizedKey],
+            data: dataByKey[key],
             mutate: vi.fn(),
             error: undefined,
             isLoading: false,
@@ -342,7 +257,6 @@ beforeEach(() => {
     refreshVPNSessionStatus.mockReset()
     writeClipboardText.mockReset()
     toastMock.mockReset()
-    swrKeys = []
     createVPNPolicy.mockResolvedValue(8)
     updateVPNPolicy.mockResolvedValue(undefined)
     deleteVPNPolicy.mockResolvedValue(undefined)
@@ -361,14 +275,14 @@ beforeEach(() => {
     Reflect.deleteProperty(globalThis, "WebSocket")
 })
 
-test("Agent VPN page exposes the four planned dashboard tabs", () => {
+test("Agent VPN page exposes the planned dashboard tabs", () => {
     render(<VPNPage />)
 
     expect(screen.getByRole("heading", { name: "VPN.Title" })).toBeTruthy()
     expect(screen.getByRole("tab", { name: "VPN.Overview" })).toBeTruthy()
     expect(screen.getByRole("tab", { name: "VPN.Policy" })).toBeTruthy()
     expect(screen.getByRole("tab", { name: "VPN.Session" })).toBeTruthy()
-    expect(screen.getByRole("tab", { name: "VPN.Audit" })).toBeTruthy()
+    expect(screen.queryByRole("tab", { name: "VPN.Audit" })).toBeNull()
 })
 
 test("Agent VPN overview shows VPN-capable agent status", () => {
@@ -384,7 +298,7 @@ test("Agent VPN overview shows VPN-capable agent status", () => {
     expect(screen.getByText("Core not installed")).toBeTruthy()
 })
 
-test("Agent VPN page renders API policies, sessions, audits, and calls session actions", async () => {
+test("Agent VPN page renders API policies and sessions, and calls session actions", async () => {
     render(<VPNPage />)
 
     fireEvent.click(screen.getByRole("tab", { name: "VPN.Policy" }))
@@ -413,9 +327,6 @@ test("Agent VPN page renders API policies, sessions, audits, and calls session a
     await waitFor(() => {
         expect(refreshVPNSessionStatus).toHaveBeenCalledWith("vpn_session_1")
     })
-
-    fireEvent.click(screen.getByRole("tab", { name: "VPN.Audit" }))
-    expect(screen.getByText("session started")).toBeTruthy()
 })
 
 test("Agent VPN policy tab edits, deletes, and requires TUN risk confirmation", async () => {
@@ -932,65 +843,6 @@ test("Agent VPN session tab renders the planned session detail columns", () => {
     expect(screen.getByText("tun preflight failed")).toBeTruthy()
 })
 
-test("Agent VPN audit tab filters by action, result, server, user, and time", () => {
-    render(<VPNPage />)
-
-    fireEvent.click(screen.getByRole("tab", { name: "VPN.Audit" }))
-    expect(screen.getByText("session started")).toBeTruthy()
-    expect(screen.getByText("session failed")).toBeTruthy()
-
-    fireEvent.change(screen.getByLabelText("VPN.AuditActionFilter"), {
-        target: { value: "stop" },
-    })
-    fireEvent.change(screen.getByLabelText("VPN.AuditResultFilter"), {
-        target: { value: "failure" },
-    })
-    fireEvent.change(screen.getByLabelText("VPN.AuditUserFilter"), {
-        target: { value: "2" },
-    })
-    fireEvent.change(screen.getByLabelText("VPN.AuditEntryFilter"), {
-        target: { value: "2" },
-    })
-    fireEvent.change(screen.getByLabelText("VPN.AuditExitFilter"), {
-        target: { value: "1" },
-    })
-    fireEvent.change(screen.getByLabelText("VPN.AuditFromFilter"), {
-        target: { value: "2026-06-08T13:30" },
-    })
-    fireEvent.change(screen.getByLabelText("VPN.AuditToFilter"), {
-        target: { value: "2026-06-08T14:30" },
-    })
-
-    expect(screen.queryByText("session started")).toBeNull()
-    expect(screen.getByText("session failed")).toBeTruthy()
-    expect(screen.getByText("system_proxy_restore")).toBeTruthy()
-    expect(screen.getByText("tun_restore")).toBeTruthy()
-    expect(screen.getByText("state kept")).toBeTruthy()
-    expect(swrKeys.some((key) =>
-        key.includes("/api/v1/vpn/audit?") &&
-        key.includes("action=stop") &&
-        key.includes("result=failure") &&
-        key.includes("user=2") &&
-        key.includes("entry=2") &&
-        key.includes("exit=1") &&
-        key.includes("from=2026-06-08T13%3A30") &&
-        key.includes("to=2026-06-08T14%3A30"),
-    )).toBe(true)
-})
-
-test("Agent VPN audit action column uses locale labels instead of raw action ids", () => {
-    render(<VPNPage />)
-
-    fireEvent.click(screen.getByRole("tab", { name: "VPN.Audit" }))
-
-    expect(screen.getByText("VPN.ActionStartSession")).toBeTruthy()
-    expect(screen.getByText("VPN.ActionStopSession")).toBeTruthy()
-    expect(screen.getByText("VPN.ActionDeletePolicy")).toBeTruthy()
-    expect(screen.queryByText("start_session")).toBeNull()
-    expect(screen.queryByText("stop_session")).toBeNull()
-    expect(screen.queryByText("delete_policy")).toBeNull()
-})
-
 test("header exposes Agent VPN navigation entry", () => {
     render(
         <MemoryRouter initialEntries={["/dashboard"]}>
@@ -1002,13 +854,13 @@ test("header exposes Agent VPN navigation entry", () => {
     expect(links.some((link) => link.getAttribute("href") === "/dashboard/vpn")).toBe(true)
 })
 
-test("Agent VPN audit detail column has locale labels", () => {
+test("Agent VPN detail label is present in all locale files", () => {
     expect(zhCNTranslation.VPN.Detail).toBe("详情")
     expect(zhTWTranslation.VPN.Detail).toBe("詳情")
     expect(enTranslation.VPN.Detail).toBe("Detail")
 })
 
-test("Agent VPN audit action labels are present in all locale files", () => {
+test("Agent VPN action labels are present in all locale files", () => {
     const expectedActionLabels = [
         "ActionCreatePolicy",
         "ActionUpdatePolicy",
