@@ -61,7 +61,7 @@ const initialForm: ModelAgentVPNPolicyForm = {
     idle_timeout_seconds: 0,
     notification_group_id: 0,
     auto_restart: true,
-    set_system_proxy: false,
+    set_system_proxy: true,
     tun_health_url: "",
     tun_health_timeout_seconds: 10,
     egress_probe_url: "",
@@ -239,7 +239,11 @@ export default function VPNPage() {
         key: K,
         value: ModelAgentVPNPolicyForm[K],
     ) {
-        setForm((current) => ({ ...current, [key]: value }))
+        setForm((current) => ({
+            ...current,
+            [key]: value,
+            ...(key === "mode" && value === "system_proxy" ? { set_system_proxy: true } : {}),
+        }))
     }
 
     function handleSessionFilterChange(key: string, value: string) {
