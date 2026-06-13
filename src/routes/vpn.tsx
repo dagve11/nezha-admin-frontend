@@ -1,8 +1,10 @@
 import { swrFetcher } from "@/api/api"
 import {
+    cleanupVPNPolicyCore,
     createVPNPolicy,
     deleteVPNPolicy,
     deleteVPNSession,
+    prepareVPNPolicyCore,
     refreshVPNSessionStatus,
     restartVPNSession,
     startVPNSession,
@@ -100,17 +102,9 @@ export default function VPNPage() {
         () => new Map(servers.map((server) => [server.id, server.name])),
         [servers],
     )
-    const notifierNameByID = useMemo(
-        () => new Map(notifierGroup.map((item) => [item.group.id, item.group.name])),
-        [notifierGroup],
-    )
     const serverName = useCallback(
         (id?: number) => serverNameByID.get(id ?? 0) ?? `#${id || "-"}`,
         [serverNameByID],
-    )
-    const notifierName = useCallback(
-        (id?: number) => notifierNameByID.get(id ?? 0) ?? (id ? `#${id}` : "-"),
-        [notifierNameByID],
     )
 
     const { data: policies = [], mutate: mutatePolicies } = useSWR<ModelAgentVPNPolicy[]>(
@@ -178,22 +172,29 @@ export default function VPNPage() {
         setPolicyFormOpen(true)
     }
 
-    function handleCopyPolicy(policy: ModelAgentVPNPolicy) {
-        setEditingPolicyID(null)
-        setForm({
-            ...policyToForm(policy),
-            name: `${policy.name} copy`,
-        })
-        setTunRiskConfirmed(policy.mode !== "tun_split" && policy.mode !== "tun_global")
-        setActiveTab("policy")
-        setPolicyFormOpen(true)
-    }
-
     async function handleStartPolicy(policyID: number) {
         try {
             await startVPNSession(policyID)
             setActiveTab("session")
             await mutateSessions()
+        } catch (error) {
+            toast(t("Error"), { description: errorMessage(error) })
+        }
+    }
+
+    async function handlePreparePolicyCore(policyID: number) {
+        try {
+            await prepareVPNPolicyCore(policyID)
+            toast(t("Success"), { description: t("VPN.CorePrepareSent") })
+        } catch (error) {
+            toast(t("Error"), { description: errorMessage(error) })
+        }
+    }
+
+    async function handleCleanupPolicyCore(policyID: number) {
+        try {
+            await cleanupVPNPolicyCore(policyID)
+            toast(t("Success"), { description: t("VPN.CoreCleanupSent") })
         } catch (error) {
             toast(t("Error"), { description: errorMessage(error) })
         }
@@ -273,12 +274,13 @@ export default function VPNPage() {
                 <TabsContent value="policy" className="space-y-4">
                     <PolicyTab
                         policies={policies}
+                        servers={servers}
                         serverName={serverName}
-                        notifierName={notifierName}
                         onNew={handleNewPolicy}
                         onEdit={handleEditPolicy}
-                        onCopy={handleCopyPolicy}
                         onStart={(id) => void handleStartPolicy(id)}
+                        onPrepareCore={(id) => void handlePreparePolicyCore(id)}
+                        onCleanupCore={(id) => void handleCleanupPolicyCore(id)}
                         onDelete={(id) => void handleDeletePolicy(id)}
                     />
                     <Dialog open={policyFormOpen} onOpenChange={setPolicyFormOpen}>

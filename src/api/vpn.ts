@@ -22,6 +22,14 @@ export const deleteVPNPolicy = async (ids: number[]): Promise<void> => {
     return fetcher<void>(FetcherMethod.POST, "/api/v1/batch-delete/vpn/policy", ids)
 }
 
+export const prepareVPNPolicyCore = async (id: number): Promise<void> => {
+    return fetcher<void>(FetcherMethod.POST, `/api/v1/vpn/policy/${id}/core/prepare`)
+}
+
+export const cleanupVPNPolicyCore = async (id: number): Promise<void> => {
+    return fetcher<void>(FetcherMethod.POST, `/api/v1/vpn/policy/${id}/core/cleanup`)
+}
+
 export const startVPNSession = async (policyID: number): Promise<ModelAgentVPNSession> => {
     return fetcher<ModelAgentVPNSession>(FetcherMethod.POST, "/api/v1/vpn/session/start", {
         policy_id: policyID,

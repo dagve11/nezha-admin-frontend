@@ -26,32 +26,35 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
-import { ModelAgentVPNPolicy } from "@/types"
-import { ClipboardList, Copy, MoreHorizontal, Pencil, Play, Plus, Trash2 } from "lucide-react"
+import { ModelAgentVPNPolicy, ServerIdentifierType } from "@/types"
+import { ClipboardList, Download, MoreHorizontal, Pencil, Play, Plus, Trash2 } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
 interface PolicyTabProps {
     policies: ModelAgentVPNPolicy[]
+    servers: ServerIdentifierType[]
     serverName: (id?: number) => string
-    notifierName: (id?: number) => string
     onNew: () => void
     onEdit: (policy: ModelAgentVPNPolicy) => void
-    onCopy: (policy: ModelAgentVPNPolicy) => void
     onStart: (policyID: number) => void
+    onPrepareCore: (policyID: number) => void
+    onCleanupCore: (policyID: number) => void
     onDelete: (policyID: number) => void
 }
 
 export function PolicyTab({
     policies,
+    servers,
     serverName,
-    notifierName,
     onNew,
     onEdit,
-    onCopy,
     onStart,
+    onPrepareCore,
+    onCleanupCore,
     onDelete,
 }: PolicyTabProps) {
     const { t } = useTranslation()
+    const serverByID = new Map(servers.map((server) => [server.id, server]))
 
     return (
         <Card>
@@ -71,33 +74,37 @@ export function PolicyTab({
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>ID</TableHead>
                             <TableHead>{t("Name")}</TableHead>
                             <TableHead>{t("VPN.EntryServer")}</TableHead>
                             <TableHead>{t("VPN.ExitServer")}</TableHead>
                             <TableHead>{t("VPN.Mode")}</TableHead>
-                            <TableHead>{t("VPN.NotificationGroup")}</TableHead>
+                            <TableHead>{t("VPN.CoreStatus")}</TableHead>
                             <TableHead className="w-16 text-right">{t("Actions")}</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {policies.length === 0 && (
                             <TableRow>
-                                <TableCell colSpan={7} className="h-24 text-center">
+                                <TableCell colSpan={6} className="h-24 text-center">
                                     {t("NoResults")}
                                 </TableCell>
                             </TableRow>
                         )}
                         {policies.map((policy) => (
                             <TableRow key={policy.id}>
-                                <TableCell>{policy.id}</TableCell>
                                 <TableCell className="font-medium">{policy.name}</TableCell>
                                 <TableCell>{serverName(policy.entry_server_id)}</TableCell>
                                 <TableCell>{serverName(policy.exit_server_id)}</TableCell>
                                 <TableCell>
                                     <Badge variant="outline">{modeLabel(t, policy.mode)}</Badge>
                                 </TableCell>
-                                <TableCell>{notifierName(policy.notification_group_id)}</TableCell>
+                                <TableCell>
+                                    <CoreStatus
+                                        entry={serverByID.get(policy.entry_server_id)}
+                                        exit={serverByID.get(policy.exit_server_id)}
+                                        t={t}
+                                    />
+                                </TableCell>
                                 <TableCell>
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
@@ -118,18 +125,25 @@ export function PolicyTab({
                                                 <span>{t("VPN.EditPolicy")}</span>
                                             </DropdownMenuItem>
                                             <DropdownMenuItem
-                                                onClick={() => onCopy(policy)}
-                                                aria-label={`${t("VPN.CopyPolicy")} ${policy.name}`}
-                                            >
-                                                <Copy className="h-4 w-4" />
-                                                <span>{t("VPN.CopyPolicy")}</span>
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem
                                                 onClick={() => onStart(policy.id)}
                                                 aria-label={`${t("VPN.StartSession")} ${policy.name}`}
                                             >
                                                 <Play className="h-4 w-4" />
                                                 <span>{t("VPN.StartSession")}</span>
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                                onClick={() => onPrepareCore(policy.id)}
+                                                aria-label={`${t("VPN.PrepareCore")} ${policy.name}`}
+                                            >
+                                                <Download className="h-4 w-4" />
+                                                <span>{t("VPN.PrepareCore")}</span>
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                                onClick={() => onCleanupCore(policy.id)}
+                                                aria-label={`${t("VPN.CleanupCore")} ${policy.name}`}
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                                <span>{t("VPN.CleanupCore")}</span>
                                             </DropdownMenuItem>
                                             <AlertDialog>
                                                 <AlertDialogTrigger asChild>
@@ -173,6 +187,45 @@ export function PolicyTab({
                 </Table>
             </CardContent>
         </Card>
+    )
+}
+
+function CoreStatus({
+    entry,
+    exit,
+    t,
+}: {
+    entry?: ServerIdentifierType
+    exit?: ServerIdentifierType
+    t: (key: string) => string
+}) {
+    return (
+        <div className="flex flex-col gap-1">
+            <CoreStatusLine label={t("VPN.EntryServer")} server={entry} t={t} />
+            <CoreStatusLine label={t("VPN.ExitServer")} server={exit} t={t} />
+        </div>
+    )
+}
+
+function CoreStatusLine({
+    label,
+    server,
+    t,
+}: {
+    label: string
+    server?: ServerIdentifierType
+    t: (key: string) => string
+}) {
+    const version = server?.host?.vpn_core_version?.trim()
+    const lastError = server?.host?.vpn_last_error?.trim()
+    const text = version || lastError || t("VPN.CoreMissing")
+    const variant = version ? "secondary" : lastError ? "destructive" : "outline"
+
+    return (
+        <div className="flex items-center gap-2 text-xs">
+            <span className="w-16 shrink-0 text-muted-foreground">{label}</span>
+            <Badge variant={variant}>{text}</Badge>
+        </div>
     )
 }
 
