@@ -8,6 +8,14 @@ import {
     stopVPNSession,
     updateVPNPolicy,
 } from "@/api/vpn"
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { OverviewTab } from "@/components/vpn/overview-tab"
 import { PolicyForm } from "@/components/vpn/policy-form"
 import { PolicyTab } from "@/components/vpn/policy-tab"
@@ -20,8 +28,8 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
-    buttonVariants,
     SessionTab,
+    buttonVariants,
 } from "@/components/vpn/session-tab"
 import {
     copyTextToClipboard,
@@ -29,7 +37,6 @@ import {
     policyToForm,
     validatePolicyFormClient,
 } from "@/components/vpn/utils"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useNotification } from "@/hooks/useNotfication"
 import { useServer } from "@/hooks/useServer"
 import { ModelAgentVPNPolicy, ModelAgentVPNPolicyForm, ModelAgentVPNSession } from "@/types"
@@ -81,6 +88,7 @@ export default function VPNPage() {
     const [form, setForm] = useState<ModelAgentVPNPolicyForm>(() => newInitialForm())
     const [editingPolicyID, setEditingPolicyID] = useState<number | null>(null)
     const [tunRiskConfirmed, setTunRiskConfirmed] = useState(false)
+    const [policyFormOpen, setPolicyFormOpen] = useState(false)
     const [activeTab, setActiveTab] = useState("overview")
     const [sessionFilters, setSessionFilters] = useState({
         state: "all",
@@ -116,17 +124,17 @@ export default function VPNPage() {
         swrFetcher,
     )
 
-    async function handleSavePolicy() {
+    async function handleSavePolicy(): Promise<boolean> {
         if ((form.mode === "tun_split" || form.mode === "tun_global") && !tunRiskConfirmed) {
             toast(t("Error"), { description: t("VPN.TunRiskRequired") })
-            return
+            return false
         }
         try {
             const payload = normalizePolicyForm(form)
             const validationError = validatePolicyFormClient(payload)
             if (validationError) {
                 toast(t("Error"), { description: t(validationError) })
-                return
+                return false
             }
             if (editingPolicyID) {
                 await updateVPNPolicy(editingPolicyID, payload)
@@ -135,8 +143,10 @@ export default function VPNPage() {
             }
             toast(t("Success"))
             await mutatePolicies()
+            return true
         } catch (error) {
             toast(t("Error"), { description: errorMessage(error) })
+            return false
         }
     }
 
@@ -159,6 +169,7 @@ export default function VPNPage() {
         setForm(newInitialForm())
         setTunRiskConfirmed(false)
         setActiveTab("policy")
+        setPolicyFormOpen(true)
     }
 
     function handleEditPolicy(policy: ModelAgentVPNPolicy) {
@@ -166,6 +177,7 @@ export default function VPNPage() {
         setForm(policyToForm(policy))
         setTunRiskConfirmed(policy.mode !== "tun_split" && policy.mode !== "tun_global")
         setActiveTab("policy")
+        setPolicyFormOpen(true)
     }
 
     function handleCopyPolicy(policy: ModelAgentVPNPolicy) {
@@ -176,6 +188,7 @@ export default function VPNPage() {
         })
         setTunRiskConfirmed(policy.mode !== "tun_split" && policy.mode !== "tun_global")
         setActiveTab("policy")
+        setPolicyFormOpen(true)
     }
 
     async function handleStartPolicy(policyID: number) {
@@ -264,11 +277,7 @@ export default function VPNPage() {
                 </TabsList>
 
                 <TabsContent value="overview">
-                    <OverviewTab
-                        servers={servers}
-                        sessions={sessions}
-                        serverName={serverName}
-                    />
+                    <OverviewTab servers={servers} sessions={sessions} serverName={serverName} />
                 </TabsContent>
 
                 <TabsContent value="policy" className="space-y-4">
@@ -282,19 +291,39 @@ export default function VPNPage() {
                         onStart={(id) => void handleStartPolicy(id)}
                         onDelete={(id) => void handleDeletePolicy(id)}
                     />
-                    <PolicyForm
-                        form={form}
-                        editingPolicyID={editingPolicyID}
-                        tunRiskConfirmed={tunRiskConfirmed}
-                        servers={servers}
-                        notifierGroups={notifierGroup}
-                        onFormChange={handleFormChange}
-                        onTunRiskChange={setTunRiskConfirmed}
-                        onSave={() => void handleSavePolicy()}
-                        onStart={() => {
-                            if (editingPolicyID !== null) void handleStartPolicy(editingPolicyID)
-                        }}
-                    />
+                    <Dialog open={policyFormOpen} onOpenChange={setPolicyFormOpen}>
+                        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-5xl">
+                            <DialogHeader>
+                                <DialogTitle>{t("VPN.PolicyForm")}</DialogTitle>
+                                <DialogDescription>
+                                    {editingPolicyID
+                                        ? `${t("VPN.EditPolicy")} #${editingPolicyID}`
+                                        : t("VPN.NewPolicy")}
+                                </DialogDescription>
+                            </DialogHeader>
+                            <PolicyForm
+                                form={form}
+                                editingPolicyID={editingPolicyID}
+                                tunRiskConfirmed={tunRiskConfirmed}
+                                servers={servers}
+                                notifierGroups={notifierGroup}
+                                onFormChange={handleFormChange}
+                                onTunRiskChange={setTunRiskConfirmed}
+                                onCancel={() => setPolicyFormOpen(false)}
+                                onSave={() => {
+                                    void handleSavePolicy().then((saved) => {
+                                        if (saved) setPolicyFormOpen(false)
+                                    })
+                                }}
+                                onStart={() => {
+                                    if (editingPolicyID !== null) {
+                                        setPolicyFormOpen(false)
+                                        void handleStartPolicy(editingPolicyID)
+                                    }
+                                }}
+                            />
+                        </DialogContent>
+                    </Dialog>
                 </TabsContent>
 
                 <TabsContent value="session">
@@ -375,7 +404,6 @@ export default function VPNPage() {
                         </AlertDialogContent>
                     </AlertDialog>
                 </TabsContent>
-
             </Tabs>
         </div>
     )

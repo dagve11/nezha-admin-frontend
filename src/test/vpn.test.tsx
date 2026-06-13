@@ -1,12 +1,11 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
-import { MemoryRouter } from "react-router-dom"
-import { beforeEach, expect, test, vi } from "vitest"
-
 import Header from "@/components/header"
 import enTranslation from "@/locales/en/translation.json"
 import zhCNTranslation from "@/locales/zh-CN/translation.json"
 import zhTWTranslation from "@/locales/zh-TW/translation.json"
 import VPNPage from "@/routes/vpn"
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { MemoryRouter } from "react-router-dom"
+import { beforeEach, expect, test, vi } from "vitest"
 
 const createVPNPolicy = vi.fn()
 const updateVPNPolicy = vi.fn()
@@ -225,7 +224,9 @@ vi.mock("@/hooks/useAuth", () => ({
 }))
 
 vi.mock("@/hooks/useMainStore", () => ({
-    useMainStore: (selector?: (store: { profile: { id: number; role: number; username: string } }) => unknown) => {
+    useMainStore: (
+        selector?: (store: { profile: { id: number; role: number; username: string } }) => unknown,
+    ) => {
         const store = { profile: { id: 1, role: 0, username: "admin" } }
         return selector ? selector(store) : store
     },
@@ -541,6 +542,7 @@ test("Agent VPN policy form validates URLs and SHA256 before saving", async () =
     )
 
     toastMock.mockClear()
+    fireEvent.click(screen.getByText("Close"))
     fireEvent.click(screen.getByRole("button", { name: "VPN.EditPolicy global tunnel" }))
     fireEvent.change(screen.getByLabelText("VPN.TunHealthURL"), {
         target: { value: "file:///tmp/health" },
@@ -584,7 +586,7 @@ test("Agent VPN policy form start button starts the edited policy", async () => 
     fireEvent.click(screen.getByRole("tab", { name: "VPN.Policy" }))
     fireEvent.click(screen.getByRole("button", { name: "VPN.EditPolicy global tunnel" }))
 
-    const formStartButton = screen.getAllByRole("button", { name: "VPN.StartSession" })[1]
+    const formStartButton = screen.getByRole("button", { name: "VPN.StartSession" })
     fireEvent.click(formStartButton)
 
     await waitFor(() => {
@@ -601,10 +603,10 @@ test("Agent VPN new policy button resets the form into create mode", () => {
 
     expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("global tunnel")
     expect(
-        (screen.getAllByRole("button", { name: "VPN.StartSession" })[1] as HTMLButtonElement)
-            .disabled,
+        (screen.getByRole("button", { name: "VPN.StartSession" }) as HTMLButtonElement).disabled,
     ).toBe(false)
 
+    fireEvent.click(screen.getByText("Close"))
     fireEvent.click(screen.getByRole("button", { name: "VPN.NewPolicy" }))
 
     expect(screen.getByRole("tab", { name: "VPN.Policy" }).getAttribute("data-state")).toBe(
@@ -612,8 +614,7 @@ test("Agent VPN new policy button resets the form into create mode", () => {
     )
     expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("")
     expect(
-        (screen.getAllByRole("button", { name: "VPN.StartSession" })[1] as HTMLButtonElement)
-            .disabled,
+        (screen.getByRole("button", { name: "VPN.StartSession" }) as HTMLButtonElement).disabled,
     ).toBe(true)
 })
 
@@ -664,12 +665,18 @@ test("Agent VPN session actions are gated by session state", () => {
             .disabled,
     ).toBe(false)
     expect(
-        (screen.getByRole("button", { name: "VPN.RestartSession vpn_session_1" }) as HTMLButtonElement)
-            .disabled,
+        (
+            screen.getByRole("button", {
+                name: "VPN.RestartSession vpn_session_1",
+            }) as HTMLButtonElement
+        ).disabled,
     ).toBe(false)
     expect(
-        (screen.getByRole("button", { name: "VPN.RefreshSession vpn_session_1" }) as HTMLButtonElement)
-            .disabled,
+        (
+            screen.getByRole("button", {
+                name: "VPN.RefreshSession vpn_session_1",
+            }) as HTMLButtonElement
+        ).disabled,
     ).toBe(false)
 
     expect(
@@ -677,12 +684,18 @@ test("Agent VPN session actions are gated by session state", () => {
             .disabled,
     ).toBe(true)
     expect(
-        (screen.getByRole("button", { name: "VPN.RestartSession vpn_session_2" }) as HTMLButtonElement)
-            .disabled,
+        (
+            screen.getByRole("button", {
+                name: "VPN.RestartSession vpn_session_2",
+            }) as HTMLButtonElement
+        ).disabled,
     ).toBe(false)
     expect(
-        (screen.getByRole("button", { name: "VPN.RefreshSession vpn_session_2" }) as HTMLButtonElement)
-            .disabled,
+        (
+            screen.getByRole("button", {
+                name: "VPN.RefreshSession vpn_session_2",
+            }) as HTMLButtonElement
+        ).disabled,
     ).toBe(false)
 })
 
@@ -814,7 +827,11 @@ test("Agent VPN session log stream adds readable context to raw log lines", asyn
         })
     })
 
-    expect(screen.getByText(/\[\d{2}:\d{2}:\d{2}\] \[vpn_session_1\] \[entry:running\/exit:running\] \[entry-cn -> exit-jp\] sidecar accepted connection/)).toBeTruthy()
+    expect(
+        screen.getByText(
+            /\[\d{2}:\d{2}:\d{2}\] \[vpn_session_1\] \[entry:running\/exit:running\] \[entry-cn -> exit-jp\] sidecar accepted connection/,
+        ),
+    ).toBeTruthy()
 })
 
 test("Agent VPN session tab renders the planned session detail columns", () => {
