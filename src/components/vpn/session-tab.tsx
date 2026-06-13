@@ -384,7 +384,7 @@ function SessionLogDialog({
                     const nextLines = frame.logs.map((line) =>
                         formatSessionLogLine(line, contextSession, serverName),
                     )
-                    setLogs((current) => [...current, ...nextLines].slice(-1000))
+                    setLogs(nextLines.slice(-1000))
                     setStatus("")
                 } catch {
                     setLogs((current) => [...current, String(event.data)].slice(-1000))
