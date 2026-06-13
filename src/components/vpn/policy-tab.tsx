@@ -199,34 +199,46 @@ function CoreStatus({
     exit?: ServerIdentifierType
     t: (key: string) => string
 }) {
+    const entryStatus = nodeCoreStatus(entry, t)
+    const exitStatus = nodeCoreStatus(exit, t)
+    const status = policyCoreStatus(entryStatus, exitStatus)
+    const title = `${t("VPN.EntryServer")} ${entryStatus.label}\n${t("VPN.ExitServer")} ${exitStatus.label}`
+
     return (
-        <div className="flex flex-col gap-1">
-            <CoreStatusLine label={t("VPN.EntryServer")} server={entry} t={t} />
-            <CoreStatusLine label={t("VPN.ExitServer")} server={exit} t={t} />
-        </div>
+        <span
+            className={`inline-flex h-3 w-3 rounded-full ${coreStatusClassName(status)}`}
+            title={title}
+            aria-label={title}
+        />
     )
 }
 
-function CoreStatusLine({
-    label,
-    server,
-    t,
-}: {
+type CoreNodeStatus = {
+    state: "ready" | "warning" | "error"
     label: string
-    server?: ServerIdentifierType
-    t: (key: string) => string
-}) {
+}
+
+function nodeCoreStatus(
+    server: ServerIdentifierType | undefined,
+    t: (key: string) => string,
+): CoreNodeStatus {
     const version = server?.host?.vpn_core_version?.trim()
     const lastError = server?.host?.vpn_last_error?.trim()
-    const text = version || lastError || t("VPN.CoreMissing")
-    const variant = version ? "secondary" : lastError ? "destructive" : "outline"
+    if (lastError) return { state: "error", label: t("VPN.CoreError") }
+    if (version) return { state: "ready", label: t("VPN.CoreReady") }
+    return { state: "warning", label: t("VPN.CoreMissing") }
+}
 
-    return (
-        <div className="flex items-center gap-2 text-xs">
-            <span className="w-16 shrink-0 text-muted-foreground">{label}</span>
-            <Badge variant={variant}>{text}</Badge>
-        </div>
-    )
+function policyCoreStatus(entry: CoreNodeStatus, exit: CoreNodeStatus): CoreNodeStatus["state"] {
+    if (entry.state === "error" || exit.state === "error") return "error"
+    if (entry.state === "ready" && exit.state === "ready") return "ready"
+    return "warning"
+}
+
+function coreStatusClassName(status: CoreNodeStatus["state"]) {
+    if (status === "ready") return "bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.18)]"
+    if (status === "error") return "bg-red-500 shadow-[0_0_0_3px_rgba(239,68,68,0.18)]"
+    return "bg-amber-400 shadow-[0_0_0_3px_rgba(251,191,36,0.22)]"
 }
 
 function modeLabel(t: (key: string) => string, mode: string): string {
