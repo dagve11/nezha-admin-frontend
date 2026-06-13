@@ -35,7 +35,8 @@ import {
     TableRow,
 } from "@/components/ui/table"
 import { ModelAgentVPNPolicy, ModelAgentVPNSession, ServerIdentifierType } from "@/types"
-import { Copy, Eye, FileText, MoreHorizontal, Play, RotateCw, Square } from "lucide-react"
+import { Eye, FileText, MoreHorizontal, Play, RotateCw, Square, Trash2 } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 
 interface SessionTabProps {
@@ -46,10 +47,9 @@ interface SessionTabProps {
     serverName: (id?: number) => string
     onFilterChange: (key: string, value: string) => void
     onRefresh: () => void
-    onViewLog: (sessionID: string) => void
-    onCopyProxy: (session: ModelAgentVPNSession) => void
     onStop: (sessionID: string) => void
-    onRestart: (sessionID: string) => void
+    onStart: (sessionID: string) => void
+    onDelete: (sessionID: string) => void
     onRefreshStatus: (sessionID: string) => void
 }
 
@@ -73,13 +73,13 @@ export function SessionTab({
     serverName,
     onFilterChange,
     onRefresh,
-    onViewLog,
-    onCopyProxy,
     onStop,
-    onRestart,
+    onStart,
+    onDelete,
     onRefreshStatus,
 }: SessionTabProps) {
     const { t } = useTranslation()
+    const [logSession, setLogSession] = useState<ModelAgentVPNSession | null>(null)
 
     const filteredSessions = sessions.filter(
         (session) =>
@@ -181,17 +181,30 @@ export function SessionTab({
                                 </TableRow>
                             )}
                             {filteredSessions.map((session) => {
-                                const canStop = ["running", "starting", "stopping"].includes(
-                                    session.state,
-                                )
-                                const canRestart = [
+                                const isActiveSession = [
                                     "running",
+                                    "starting",
+                                    "stopping",
+                                ].includes(session.state)
+                                const canStart = [
+                                    "stopped",
+                                    "failed",
+                                    "lost",
+                                    "unknown",
+                                    "expired",
+                                    "limited",
+                                ].includes(session.state)
+                                const canDelete = [
+                                    "running",
+                                    "starting",
+                                    "stopping",
                                     "failed",
                                     "lost",
                                     "unknown",
                                     "stopped",
+                                    "expired",
+                                    "limited",
                                 ].includes(session.state)
-                                const proxyAddr = getSessionProxyAddress(session, policies)
 
                                 return (
                                     <TableRow key={session.session_id}>
@@ -236,43 +249,37 @@ export function SessionTab({
                                                         className="w-48"
                                                     >
                                                         <DropdownMenuItem
-                                                            onClick={() =>
-                                                                onViewLog(session.session_id)
+                                                            disabled={
+                                                                isActiveSession ? false : !canStart
                                                             }
+                                                            onClick={() =>
+                                                                isActiveSession
+                                                                    ? onStop(session.session_id)
+                                                                    : onStart(session.session_id)
+                                                            }
+                                                            aria-label={`${
+                                                                isActiveSession
+                                                                    ? t("VPN.StopSession")
+                                                                    : t("VPN.StartSession")
+                                                            } ${session.session_id}`}
+                                                        >
+                                                            {isActiveSession ? (
+                                                                <Square className="h-4 w-4" />
+                                                            ) : (
+                                                                <Play className="h-4 w-4" />
+                                                            )}
+                                                            <span>
+                                                                {isActiveSession
+                                                                    ? t("VPN.StopSession")
+                                                                    : t("VPN.StartSession")}
+                                                            </span>
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem
+                                                            onClick={() => setLogSession(session)}
                                                             aria-label={`${t("VPN.ViewSessionLog")} ${session.session_id}`}
                                                         >
                                                             <FileText className="h-4 w-4" />
                                                             <span>{t("VPN.ViewSessionLog")}</span>
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuItem
-                                                            disabled={!proxyAddr}
-                                                            onClick={() => onCopyProxy(session)}
-                                                            aria-label={`${t("VPN.CopyProxy")} ${session.session_id}`}
-                                                        >
-                                                            <Copy className="h-4 w-4" />
-                                                            <span>{t("VPN.CopyProxy")}</span>
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuItem
-                                                            disabled={!canStop}
-                                                            className="text-destructive focus:text-destructive"
-                                                            onSelect={(e) => e.preventDefault()}
-                                                            onClick={() =>
-                                                                onStop(session.session_id)
-                                                            }
-                                                            aria-label={`${t("VPN.StopSession")} ${session.session_id}`}
-                                                        >
-                                                            <Square className="h-4 w-4" />
-                                                            <span>{t("VPN.StopSession")}</span>
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuItem
-                                                            disabled={!canRestart}
-                                                            onClick={() =>
-                                                                onRestart(session.session_id)
-                                                            }
-                                                            aria-label={`${t("VPN.RestartSession")} ${session.session_id}`}
-                                                        >
-                                                            <Play className="h-4 w-4" />
-                                                            <span>{t("VPN.RestartSession")}</span>
                                                         </DropdownMenuItem>
                                                         <DropdownMenuItem
                                                             onClick={() =>
@@ -282,6 +289,17 @@ export function SessionTab({
                                                         >
                                                             <RotateCw className="h-4 w-4" />
                                                             <span>{t("VPN.RefreshSession")}</span>
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem
+                                                            disabled={!canDelete}
+                                                            className="text-destructive focus:text-destructive"
+                                                            onClick={() =>
+                                                                onDelete(session.session_id)
+                                                            }
+                                                            aria-label={`${t("VPN.DeleteSession")} ${session.session_id}`}
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                            <span>{t("VPN.DeleteSession")}</span>
                                                         </DropdownMenuItem>
                                                     </DropdownMenuContent>
                                                 </DropdownMenu>
@@ -294,7 +312,126 @@ export function SessionTab({
                     </Table>
                 </CardContent>
             </Card>
+            <SessionLogDialog
+                session={logSession}
+                serverName={serverName}
+                open={Boolean(logSession)}
+                onOpenChange={(open) => {
+                    if (!open) setLogSession(null)
+                }}
+                t={t}
+            />
         </div>
+    )
+}
+
+function SessionLogDialog({
+    session,
+    serverName,
+    open,
+    onOpenChange,
+    t,
+}: {
+    session: ModelAgentVPNSession | null
+    serverName: (id?: number) => string
+    open: boolean
+    onOpenChange: (open: boolean) => void
+    t: (key: string) => string
+}) {
+    const [logs, setLogs] = useState<string[]>([])
+    const [status, setStatus] = useState("")
+    const retryTimerRef = useRef<number | undefined>(undefined)
+    const socketRef = useRef<WebSocket | null>(null)
+
+    useEffect(() => {
+        if (!open || !session) return
+
+        let closed = false
+        let retryCount = 0
+        setLogs([])
+        setStatus(t("VPN.LogConnecting"))
+
+        const connect = () => {
+            if (closed) return
+            if (typeof WebSocket === "undefined") {
+                setStatus(t("VPN.LogUnavailable"))
+                return
+            }
+
+            const protocol = window.location.protocol === "https:" ? "wss:" : "ws:"
+            const socket = new WebSocket(
+                `${protocol}//${window.location.host}/api/v1/ws/vpn/session/${encodeURIComponent(
+                    session.session_id,
+                )}`,
+            )
+            socketRef.current = socket
+            setStatus(retryCount > 0 ? t("VPN.LogReconnecting") : t("VPN.LogConnecting"))
+
+            socket.onmessage = (event) => {
+                try {
+                    const frame = JSON.parse(event.data) as {
+                        session?: ModelAgentVPNSession
+                        logs?: string[]
+                    }
+                    if (
+                        frame.session?.session_id &&
+                        frame.session.session_id !== session.session_id
+                    ) {
+                        return
+                    }
+                    if (!frame.logs?.length) return
+                    const contextSession = { ...session, ...frame.session }
+                    const nextLines = frame.logs.map((line) =>
+                        formatSessionLogLine(line, contextSession, serverName),
+                    )
+                    setLogs((current) => [...current, ...nextLines].slice(-1000))
+                    setStatus("")
+                } catch {
+                    setLogs((current) => [...current, String(event.data)].slice(-1000))
+                    setStatus("")
+                }
+            }
+
+            socket.onerror = () => {
+                socket.close()
+            }
+            socket.onclose = () => {
+                if (closed) return
+                retryCount += 1
+                setStatus(t("VPN.LogReconnecting"))
+                retryTimerRef.current = window.setTimeout(connect, 1000)
+            }
+        }
+
+        connect()
+
+        return () => {
+            closed = true
+            window.clearTimeout(retryTimerRef.current)
+            socketRef.current?.close()
+            socketRef.current = null
+        }
+    }, [open, session, serverName, t])
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
+                <DialogHeader>
+                    <DialogTitle>{t("VPN.SessionLog")}</DialogTitle>
+                    <DialogDescription className="break-all font-mono text-xs">
+                        {session?.session_id || "-"}
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="rounded-md border bg-muted/20">
+                    <div className="border-b px-3 py-2 text-xs text-muted-foreground">
+                        {status || `${logs.length} lines`}
+                    </div>
+                    <pre className="max-h-[60vh] overflow-auto whitespace-pre-wrap p-3 font-mono text-xs leading-relaxed">
+                        {logs.length > 0 ? logs.join("\n") : t("VPN.LogIdle")}
+                    </pre>
+                </div>
+            </DialogContent>
+        </Dialog>
     )
 }
 
@@ -427,6 +564,18 @@ function NativeField({
     )
 }
 
+function formatSessionLogLine(
+    line: string,
+    session: ModelAgentVPNSession,
+    serverName: (id?: number) => string,
+): string {
+    const timestamp = new Date().toLocaleTimeString("en-US", { hour12: false })
+    const entryState = session.entry_state || "-"
+    const exitState = session.exit_state || "-"
+    const route = `${serverName(session.entry_server_id)} -> ${serverName(session.exit_server_id)}`
+    return `[${timestamp}] [${session.session_id}] [entry:${entryState}/exit:${exitState}] [${route}] ${line}`
+}
+
 function formatBytes(value?: number): string {
     const bytes = value ?? 0
     if (bytes < 1024) return `${bytes} B`
@@ -439,21 +588,6 @@ function modeLabel(t: (key: string) => string, mode: string): string {
     if (mode === "tun_split") return t("VPN.ModeTunSplit")
     if (mode === "tun_global") return t("VPN.ModeTunGlobal")
     return t("VPN.ModeSystemProxy")
-}
-
-function getSessionProxyAddress(
-    session: ModelAgentVPNSession,
-    policies: ModelAgentVPNPolicy[],
-): string {
-    if (session.mode !== "system_proxy") return ""
-    const policy = policies.find((p) => p.id === session.policy_id)
-    return (
-        session.local_socks ||
-        session.local_http ||
-        policy?.listen_socks ||
-        policy?.listen_http ||
-        ""
-    )
 }
 
 export {

@@ -31,12 +31,7 @@ import {
     SessionTab,
     buttonVariants,
 } from "@/components/vpn/session-tab"
-import {
-    copyTextToClipboard,
-    normalizePolicyForm,
-    policyToForm,
-    validatePolicyFormClient,
-} from "@/components/vpn/utils"
+import { normalizePolicyForm, policyToForm, validatePolicyFormClient } from "@/components/vpn/utils"
 import { useNotification } from "@/hooks/useNotfication"
 import { useServer } from "@/hooks/useServer"
 import { ModelAgentVPNPolicy, ModelAgentVPNPolicyForm, ModelAgentVPNSession } from "@/types"
@@ -95,8 +90,10 @@ export default function VPNPage() {
         entry: "all",
         exit: "all",
     })
-    const [stopSessionID, setStopSessionID] = useState("")
-    const [restartSessionID, setRestartSessionID] = useState("")
+    const [sessionAction, setSessionAction] = useState<{
+        sessionID: string
+        type: "stop" | "delete"
+    } | null>(null)
 
     const serverNameByID = useMemo(
         () => new Map(servers.map((server) => [server.id, server.name])),
@@ -228,27 +225,6 @@ export default function VPNPage() {
         }
     }
 
-    function handleViewSessionLog() {
-        setActiveTab("overview")
-    }
-
-    async function handleCopySessionProxy(session: ModelAgentVPNSession) {
-        const policy = policies.find((p) => p.id === session.policy_id)
-        const proxy =
-            session.local_socks ||
-            session.local_http ||
-            policy?.listen_socks ||
-            policy?.listen_http ||
-            ""
-        if (!proxy) return
-        try {
-            await copyTextToClipboard(proxy)
-            toast(t("CopiedToClipboard"))
-        } catch (error) {
-            toast(t("Error"), { description: errorMessage(error) })
-        }
-    }
-
     function handleFormChange<K extends keyof ModelAgentVPNPolicyForm>(
         key: K,
         value: ModelAgentVPNPolicyForm[K],
@@ -335,22 +311,25 @@ export default function VPNPage() {
                         serverName={serverName}
                         onFilterChange={handleSessionFilterChange}
                         onRefresh={() => void mutateSessions()}
-                        onViewLog={handleViewSessionLog}
-                        onCopyProxy={(session) => void handleCopySessionProxy(session)}
-                        onStop={(id) => setStopSessionID(id)}
-                        onRestart={(id) => setRestartSessionID(id)}
+                        onStop={(id) => setSessionAction({ sessionID: id, type: "stop" })}
+                        onStart={(id) => void handleRestartSession(id)}
+                        onDelete={(id) => setSessionAction({ sessionID: id, type: "delete" })}
                         onRefreshStatus={(id) => void handleRefreshSession(id)}
                     />
 
                     <AlertDialog
-                        open={Boolean(stopSessionID)}
+                        open={Boolean(sessionAction)}
                         onOpenChange={(open) => {
-                            if (!open) setStopSessionID("")
+                            if (!open) setSessionAction(null)
                         }}
                     >
                         <AlertDialogContent className="sm:max-w-lg">
                             <AlertDialogHeader>
-                                <AlertDialogTitle>{t("VPN.ConfirmStopSession")}</AlertDialogTitle>
+                                <AlertDialogTitle>
+                                    {sessionAction?.type === "delete"
+                                        ? t("VPN.ConfirmDeleteSession")
+                                        : t("VPN.ConfirmStopSession")}
+                                </AlertDialogTitle>
                                 <AlertDialogDescription>
                                     {t("Results.ThisOperationIsUnrecoverable")}
                                 </AlertDialogDescription>
@@ -363,39 +342,9 @@ export default function VPNPage() {
                                         className: "text-white",
                                     })}
                                     onClick={() => {
-                                        const sessionID = stopSessionID
-                                        setStopSessionID("")
+                                        const sessionID = sessionAction?.sessionID
+                                        setSessionAction(null)
                                         if (sessionID) void handleStopSession(sessionID)
-                                    }}
-                                >
-                                    {t("Confirm")}
-                                </AlertDialogAction>
-                            </AlertDialogFooter>
-                        </AlertDialogContent>
-                    </AlertDialog>
-
-                    <AlertDialog
-                        open={Boolean(restartSessionID)}
-                        onOpenChange={(open) => {
-                            if (!open) setRestartSessionID("")
-                        }}
-                    >
-                        <AlertDialogContent className="sm:max-w-lg">
-                            <AlertDialogHeader>
-                                <AlertDialogTitle>
-                                    {t("VPN.ConfirmRestartSession")}
-                                </AlertDialogTitle>
-                                <AlertDialogDescription>
-                                    {t("Results.ThisOperationIsUnrecoverable")}
-                                </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                                <AlertDialogCancel>{t("Close")}</AlertDialogCancel>
-                                <AlertDialogAction
-                                    onClick={() => {
-                                        const sessionID = restartSessionID
-                                        setRestartSessionID("")
-                                        if (sessionID) void handleRestartSession(sessionID)
                                     }}
                                 >
                                     {t("Confirm")}

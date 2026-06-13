@@ -14,7 +14,6 @@ const startVPNSession = vi.fn()
 const stopVPNSession = vi.fn()
 const restartVPNSession = vi.fn()
 const refreshVPNSessionStatus = vi.fn()
-const writeClipboardText = vi.fn()
 const toastMock = vi.fn()
 const validSHA256 = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
@@ -256,7 +255,6 @@ beforeEach(() => {
     stopVPNSession.mockReset()
     restartVPNSession.mockReset()
     refreshVPNSessionStatus.mockReset()
-    writeClipboardText.mockReset()
     toastMock.mockReset()
     createVPNPolicy.mockResolvedValue(8)
     updateVPNPolicy.mockResolvedValue(undefined)
@@ -265,13 +263,6 @@ beforeEach(() => {
     stopVPNSession.mockResolvedValue({ session_id: "vpn_session_1", state: "stopped" })
     restartVPNSession.mockResolvedValue({ session_id: "vpn_session_3", state: "running" })
     refreshVPNSessionStatus.mockResolvedValue({ session_id: "vpn_session_1", state: "running" })
-    writeClipboardText.mockResolvedValue(undefined)
-    Object.defineProperty(navigator, "clipboard", {
-        configurable: true,
-        value: {
-            writeText: writeClipboardText,
-        },
-    })
     MockVPNWebSocket.instances = []
     Reflect.deleteProperty(globalThis, "WebSocket")
 })
@@ -618,40 +609,26 @@ test("Agent VPN new policy button resets the form into create mode", () => {
     ).toBe(true)
 })
 
-test("Agent VPN start selects the new session and reconnects the log stream", async () => {
-    vi.stubGlobal("WebSocket", MockVPNWebSocket)
-
+test("Agent VPN start selects the new session", async () => {
     render(<VPNPage />)
-
-    await waitFor(() => {
-        expect(MockVPNWebSocket.instances.length).toBe(1)
-    })
-    expect(MockVPNWebSocket.instances[0].url).toContain("/api/v1/ws/vpn/session/vpn_session_1")
 
     fireEvent.click(screen.getByRole("tab", { name: "VPN.Policy" }))
     fireEvent.click(screen.getByRole("button", { name: "VPN.StartSession github split" }))
 
     await waitFor(() => {
         expect(startVPNSession).toHaveBeenCalledWith(7)
-        expect(MockVPNWebSocket.instances.length).toBe(2)
     })
-    expect(MockVPNWebSocket.instances[0].closed).toBe(true)
-    expect(MockVPNWebSocket.instances[1].url).toContain("/api/v1/ws/vpn/session/vpn_session_2")
     expect(screen.getAllByText("vpn_session_2").length).toBeGreaterThan(0)
 })
 
-test("Agent VPN session tab confirms before restarting sessions", async () => {
+test("Agent VPN session tab starts inactive sessions from the primary action", async () => {
     render(<VPNPage />)
 
     fireEvent.click(screen.getByRole("tab", { name: "VPN.Session" }))
-    fireEvent.click(screen.getByRole("button", { name: "VPN.RestartSession vpn_session_1" }))
-    expect(restartVPNSession).not.toHaveBeenCalled()
-    expect(screen.getByText("VPN.ConfirmRestartSession")).toBeTruthy()
-
-    fireEvent.click(screen.getByRole("button", { name: "Confirm" }))
+    fireEvent.click(screen.getByRole("button", { name: "VPN.StartSession vpn_session_2" }))
 
     await waitFor(() => {
-        expect(restartVPNSession).toHaveBeenCalledWith("vpn_session_1")
+        expect(restartVPNSession).toHaveBeenCalledWith("vpn_session_2")
     })
 })
 
@@ -667,26 +644,15 @@ test("Agent VPN session actions are gated by session state", () => {
     expect(
         (
             screen.getByRole("button", {
-                name: "VPN.RestartSession vpn_session_1",
-            }) as HTMLButtonElement
-        ).disabled,
-    ).toBe(false)
-    expect(
-        (
-            screen.getByRole("button", {
                 name: "VPN.RefreshSession vpn_session_1",
             }) as HTMLButtonElement
         ).disabled,
     ).toBe(false)
 
     expect(
-        (screen.getByRole("button", { name: "VPN.StopSession vpn_session_2" }) as HTMLButtonElement)
-            .disabled,
-    ).toBe(true)
-    expect(
         (
             screen.getByRole("button", {
-                name: "VPN.RestartSession vpn_session_2",
+                name: "VPN.StartSession vpn_session_2",
             }) as HTMLButtonElement
         ).disabled,
     ).toBe(false)
@@ -694,6 +660,13 @@ test("Agent VPN session actions are gated by session state", () => {
         (
             screen.getByRole("button", {
                 name: "VPN.RefreshSession vpn_session_2",
+            }) as HTMLButtonElement
+        ).disabled,
+    ).toBe(false)
+    expect(
+        (
+            screen.getByRole("button", {
+                name: "VPN.DeleteSession vpn_session_2",
             }) as HTMLButtonElement
         ).disabled,
     ).toBe(false)
@@ -741,38 +714,46 @@ test("Agent VPN table action buttons include visible text labels", () => {
     fireEvent.click(screen.getByRole("tab", { name: "VPN.Session" }))
     const stopButton = screen.getByRole("button", { name: "VPN.StopSession vpn_session_1" })
     expect(stopButton.textContent).toContain("VPN.StopSession")
-    const restartButton = screen.getByRole("button", { name: "VPN.RestartSession vpn_session_1" })
-    expect(restartButton.textContent).toContain("VPN.RestartSession")
+    const startButton = screen.getByRole("button", { name: "VPN.StartSession vpn_session_2" })
+    expect(startButton.textContent).toContain("VPN.StartSession")
     const refreshButton = screen.getByRole("button", { name: "VPN.RefreshSession vpn_session_1" })
     expect(refreshButton.textContent).toContain("VPN.RefreshSession")
     const logButton = screen.getByRole("button", { name: "VPN.ViewSessionLog vpn_session_1" })
     expect(logButton.textContent).toContain("VPN.ViewSessionLog")
-    const copyButton = screen.getByRole("button", { name: "VPN.CopyProxy vpn_session_1" })
-    expect(copyButton.textContent).toContain("VPN.CopyProxy")
+    const deleteButton = screen.getByRole("button", { name: "VPN.DeleteSession vpn_session_1" })
+    expect(deleteButton.textContent).toContain("VPN.DeleteSession")
 })
 
-test("Agent VPN session tab views logs and copies the running system proxy address", async () => {
+test("Agent VPN session tab opens a per-session log dialog", async () => {
+    vi.stubGlobal("WebSocket", MockVPNWebSocket)
+
     render(<VPNPage />)
 
     fireEvent.click(screen.getByRole("tab", { name: "VPN.Session" }))
     fireEvent.click(screen.getByRole("button", { name: "VPN.ViewSessionLog vpn_session_2" }))
-    expect(screen.getAllByText("vpn_session_2").length).toBeGreaterThan(1)
 
-    fireEvent.click(screen.getByRole("button", { name: "VPN.CopyProxy vpn_session_1" }))
     await waitFor(() => {
-        expect(writeClipboardText).toHaveBeenCalledWith("127.0.0.1:1080")
+        expect(MockVPNWebSocket.instances.length).toBe(1)
+    })
+    expect(MockVPNWebSocket.instances[0].url).toContain("/api/v1/ws/vpn/session/vpn_session_2")
+
+    act(() => {
+        MockVPNWebSocket.instances[0].sendFrame({
+            session: { session_id: "vpn_session_2", entry_state: "failed", exit_state: "running" },
+            logs: ["session failed"],
+        })
     })
 
-    expect(
-        (screen.getByRole("button", { name: "VPN.CopyProxy vpn_session_2" }) as HTMLButtonElement)
-            .disabled,
-    ).toBe(true)
+    expect(screen.getByText(/\[vpn_session_2\].*session failed/)).toBeTruthy()
 })
 
 test("Agent VPN session log stream appends, caps logs, and reconnects", async () => {
     vi.stubGlobal("WebSocket", MockVPNWebSocket)
 
     render(<VPNPage />)
+
+    fireEvent.click(screen.getByRole("tab", { name: "VPN.Session" }))
+    fireEvent.click(screen.getByRole("button", { name: "VPN.ViewSessionLog vpn_session_1" }))
 
     await waitFor(() => {
         expect(MockVPNWebSocket.instances.length).toBe(1)
@@ -795,7 +776,7 @@ test("Agent VPN session log stream appends, caps logs, and reconnects", async ()
         act(() => {
             MockVPNWebSocket.instances[0].disconnect()
         })
-        expect(screen.getByText(/reconnecting/)).toBeTruthy()
+        expect(screen.getByText("VPN.LogReconnecting")).toBeTruthy()
 
         await act(async () => {
             vi.advanceTimersByTime(1000)
@@ -811,6 +792,9 @@ test("Agent VPN session log stream adds readable context to raw log lines", asyn
     vi.stubGlobal("WebSocket", MockVPNWebSocket)
 
     render(<VPNPage />)
+
+    fireEvent.click(screen.getByRole("tab", { name: "VPN.Session" }))
+    fireEvent.click(screen.getByRole("button", { name: "VPN.ViewSessionLog vpn_session_1" }))
 
     await waitFor(() => {
         expect(MockVPNWebSocket.instances.length).toBe(1)
@@ -905,6 +889,9 @@ test("Agent VPN action labels are present in all locale files", () => {
     expect(zhCNTranslation.VPN.ConfirmStopSession).toBeTruthy()
     expect(zhTWTranslation.VPN.ConfirmStopSession).toBeTruthy()
     expect(enTranslation.VPN.ConfirmStopSession).toBeTruthy()
+    expect(zhCNTranslation.VPN.ConfirmDeleteSession).toBeTruthy()
+    expect(zhTWTranslation.VPN.ConfirmDeleteSession).toBeTruthy()
+    expect(enTranslation.VPN.ConfirmDeleteSession).toBeTruthy()
     expect(zhCNTranslation.VPN.ConfirmRestartSession).toBeTruthy()
     expect(zhTWTranslation.VPN.ConfirmRestartSession).toBeTruthy()
     expect(enTranslation.VPN.ConfirmRestartSession).toBeTruthy()
@@ -920,6 +907,12 @@ test("Agent VPN action labels are present in all locale files", () => {
     expect(zhCNTranslation.VPN.SessionExitFilter).toBeTruthy()
     expect(zhTWTranslation.VPN.SessionExitFilter).toBeTruthy()
     expect(enTranslation.VPN.SessionExitFilter).toBeTruthy()
+    expect(zhCNTranslation.VPN.LogConnecting).toBeTruthy()
+    expect(zhTWTranslation.VPN.LogConnecting).toBeTruthy()
+    expect(enTranslation.VPN.LogConnecting).toBeTruthy()
+    expect(zhCNTranslation.VPN.LogReconnecting).toBeTruthy()
+    expect(zhTWTranslation.VPN.LogReconnecting).toBeTruthy()
+    expect(enTranslation.VPN.LogReconnecting).toBeTruthy()
     expect(zhCNTranslation.VPN.TunName).toBeTruthy()
     expect(zhTWTranslation.VPN.TunName).toBeTruthy()
     expect(enTranslation.VPN.TunName).toBeTruthy()
