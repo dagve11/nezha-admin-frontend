@@ -236,7 +236,7 @@
         "ModeTunGlobal": "TUN 全局",
         "RuleMode": "規則模式",
         "RuleModeGlobal": "全局",
-        "RuleModeDomain": "網域",
+        "RuleModeDomain": "規則集/網域",
         "RuleModeIP": "CIDR",
         "EntryServer": "入口節點",
         "ExitServer": "出口節點",

@@ -238,7 +238,7 @@
         "ModeTunGlobal": "TUN global",
         "RuleMode": "Rule mode",
         "RuleModeGlobal": "Global",
-        "RuleModeDomain": "Domain",
+        "RuleModeDomain": "Rule set / domain",
         "RuleModeIP": "CIDR",
         "EntryServer": "Entry node",
         "ExitServer": "Exit node",
