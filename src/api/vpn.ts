@@ -1,6 +1,7 @@
 import {
     ModelAgentVPNPolicy,
     ModelAgentVPNPolicyForm,
+    ModelAgentVPNPolicyStatusCheck,
     ModelAgentVPNAuditLog,
     ModelAgentVPNSession,
 } from "@/types"
@@ -28,6 +29,15 @@ export const prepareVPNPolicyCore = async (id: number): Promise<void> => {
 
 export const cleanupVPNPolicyCore = async (id: number): Promise<void> => {
     return fetcher<void>(FetcherMethod.POST, `/api/v1/vpn/policy/${id}/core/cleanup`)
+}
+
+export const checkVPNPolicyStatus = async (
+    id: number,
+): Promise<ModelAgentVPNPolicyStatusCheck> => {
+    return fetcher<ModelAgentVPNPolicyStatusCheck>(
+        FetcherMethod.POST,
+        `/api/v1/vpn/policy/${id}/status`,
+    )
 }
 
 export const startVPNSession = async (policyID: number): Promise<ModelAgentVPNSession> => {
@@ -60,4 +70,9 @@ export const refreshVPNSessionStatus = async (
     )
 }
 
-export type { ModelAgentVPNPolicy, ModelAgentVPNAuditLog, ModelAgentVPNSession }
+export type {
+    ModelAgentVPNPolicy,
+    ModelAgentVPNPolicyStatusCheck,
+    ModelAgentVPNAuditLog,
+    ModelAgentVPNSession,
+}

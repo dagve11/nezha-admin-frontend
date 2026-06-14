@@ -1,5 +1,6 @@
 import { swrFetcher } from "@/api/api"
 import {
+    checkVPNPolicyStatus,
     cleanupVPNPolicyCore,
     createVPNPolicy,
     deleteVPNPolicy,
@@ -11,6 +12,7 @@ import {
     stopVPNSession,
     updateVPNPolicy,
 } from "@/api/vpn"
+import { Badge } from "@/components/ui/badge"
 import {
     Dialog,
     DialogContent,
@@ -37,7 +39,12 @@ import {
 import { normalizePolicyForm, policyToForm, validatePolicyFormClient } from "@/components/vpn/utils"
 import { useNotification } from "@/hooks/useNotfication"
 import { useServer } from "@/hooks/useServer"
-import { ModelAgentVPNPolicy, ModelAgentVPNPolicyForm, ModelAgentVPNSession } from "@/types"
+import {
+    ModelAgentVPNPolicy,
+    ModelAgentVPNPolicyForm,
+    ModelAgentVPNPolicyStatusCheck,
+    ModelAgentVPNSession,
+} from "@/types"
 import { useCallback, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
@@ -87,6 +94,10 @@ export default function VPNPage() {
     const [editingPolicyID, setEditingPolicyID] = useState<number | null>(null)
     const [tunRiskConfirmed, setTunRiskConfirmed] = useState(false)
     const [policyFormOpen, setPolicyFormOpen] = useState(false)
+    const [policyStatusOpen, setPolicyStatusOpen] = useState(false)
+    const [policyStatusChecking, setPolicyStatusChecking] = useState(false)
+    const [policyStatusResult, setPolicyStatusResult] =
+        useState<ModelAgentVPNPolicyStatusCheck | null>(null)
     const [activeTab, setActiveTab] = useState("overview")
     const [sessionFilters, setSessionFilters] = useState({
         state: "all",
@@ -200,6 +211,21 @@ export default function VPNPage() {
         }
     }
 
+    async function handleCheckPolicyStatus(policyID: number) {
+        setPolicyStatusOpen(true)
+        setPolicyStatusChecking(true)
+        setPolicyStatusResult(null)
+        try {
+            const result = await checkVPNPolicyStatus(policyID)
+            setPolicyStatusResult(result)
+        } catch (error) {
+            setPolicyStatusOpen(false)
+            toast(t("Error"), { description: errorMessage(error) })
+        } finally {
+            setPolicyStatusChecking(false)
+        }
+    }
+
     async function handleStopSession(sessionID: string) {
         try {
             await stopVPNSession(sessionID)
@@ -281,8 +307,25 @@ export default function VPNPage() {
                         onStart={(id) => void handleStartPolicy(id)}
                         onPrepareCore={(id) => void handlePreparePolicyCore(id)}
                         onCleanupCore={(id) => void handleCleanupPolicyCore(id)}
+                        onCheckStatus={(id) => void handleCheckPolicyStatus(id)}
                         onDelete={(id) => void handleDeletePolicy(id)}
                     />
+                    <Dialog open={policyStatusOpen} onOpenChange={setPolicyStatusOpen}>
+                        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+                            <DialogHeader>
+                                <DialogTitle>{t("VPN.PolicyStatusTitle")}</DialogTitle>
+                                <DialogDescription>{t("VPN.PolicyStatusHint")}</DialogDescription>
+                            </DialogHeader>
+                            {policyStatusChecking && (
+                                <div className="rounded-md border bg-muted/30 p-4 text-sm text-muted-foreground">
+                                    {t("VPN.PolicyStatusChecking")}
+                                </div>
+                            )}
+                            {!policyStatusChecking && policyStatusResult && (
+                                <PolicyStatusResult result={policyStatusResult} t={t} />
+                            )}
+                        </DialogContent>
+                    </Dialog>
                     <Dialog open={policyFormOpen} onOpenChange={setPolicyFormOpen}>
                         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-5xl">
                             <DialogHeader>
@@ -382,4 +425,139 @@ export default function VPNPage() {
 
 function errorMessage(error: unknown): string {
     return error instanceof Error ? error.message : String(error)
+}
+
+function PolicyStatusResult({
+    result,
+    t,
+}: {
+    result: ModelAgentVPNPolicyStatusCheck
+    t: (key: string) => string
+}) {
+    return (
+        <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/30 px-3 py-2 text-sm">
+                <span className="font-medium">{result.policy_name || `#${result.policy_id}`}</span>
+                <div className="flex flex-wrap items-center gap-2 text-muted-foreground">
+                    <span>{formatVPNStatusTime(result.checked_at)}</span>
+                    {result.timed_out && (
+                        <Badge variant="outline" className="border-amber-300 text-amber-700">
+                            {t("VPN.StatusTimedOut")}
+                        </Badge>
+                    )}
+                </div>
+            </div>
+            <div className="grid gap-3">
+                {result.nodes.map((node) => (
+                    <div key={`${node.role}-${node.server_id}`} className="rounded-md border p-4">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                                <div className="font-medium">
+                                    {roleLabel(t, node.role)} · {node.server_name || `#${node.server_id}`}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                    {node.responded ? t("VPN.StatusResponded") : t("VPN.StatusNoResponse")}
+                                </div>
+                            </div>
+                            <Badge variant={node.online ? "default" : "secondary"}>
+                                {node.online ? t("VPN.Online") : t("VPN.Offline")}
+                            </Badge>
+                        </div>
+                        <div className="mt-4 grid gap-3 md:grid-cols-2">
+                            <PolicyStatusLine
+                                label={t("VPN.CoreStatus")}
+                                pathLabel={t("VPN.CorePath")}
+                                status={node.core_status}
+                                path={node.core_path}
+                                version={node.core_version}
+                                t={t}
+                            />
+                            <PolicyStatusLine
+                                label={t("VPN.RuleSetStatus")}
+                                pathLabel={t("VPN.RuleSetPath")}
+                                status={node.rules_status}
+                                path={node.rules_path}
+                                version={node.rules_version}
+                                t={t}
+                            />
+                        </div>
+                        {node.last_error && (
+                            <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">
+                                {node.last_error}
+                            </div>
+                        )}
+                        {node.logs && node.logs.length > 0 && (
+                            <pre className="mt-3 max-h-48 overflow-auto rounded-md bg-black p-3 text-xs leading-5 text-green-100">
+                                {node.logs.join("\n")}
+                            </pre>
+                        )}
+                    </div>
+                ))}
+            </div>
+        </div>
+    )
+}
+
+function PolicyStatusLine({
+    label,
+    pathLabel,
+    status,
+    path,
+    version,
+    t,
+}: {
+    label: string
+    pathLabel: string
+    status: string
+    path?: string
+    version?: string
+    t: (key: string) => string
+}) {
+    return (
+        <div className="rounded-md border bg-muted/20 p-3 text-sm">
+            <div className="flex items-center justify-between gap-2">
+                <span className="font-medium">{label}</span>
+                <Badge variant="outline" className={statusBadgeClassName(status)}>
+                    {statusLabel(t, status)}
+                </Badge>
+            </div>
+            <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+                <div className="break-all">
+                    {pathLabel}: {path || "-"}
+                </div>
+                {version && (
+                    <div className="break-all">
+                        {t("VPN.Version")}: {version}
+                    </div>
+                )}
+            </div>
+        </div>
+    )
+}
+
+function roleLabel(t: (key: string) => string, role: string): string {
+    if (role === "entry") return t("VPN.EntryServer")
+    if (role === "exit") return t("VPN.ExitServer")
+    return role
+}
+
+function statusLabel(t: (key: string) => string, status: string): string {
+    if (status === "ready") return t("VPN.StatusReady")
+    if (status === "missing") return t("VPN.StatusMissing")
+    if (status === "error") return t("VPN.StatusError")
+    return t("VPN.StatusUnknown")
+}
+
+function statusBadgeClassName(status: string): string {
+    if (status === "ready") return "border-emerald-300 text-emerald-700"
+    if (status === "missing") return "border-amber-300 text-amber-700"
+    if (status === "error") return "border-red-300 text-red-700"
+    return "border-zinc-300 text-zinc-600"
+}
+
+function formatVPNStatusTime(value?: string): string {
+    if (!value) return "-"
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return value
+    return date.toLocaleString()
 }

@@ -27,7 +27,16 @@ import {
     TableRow,
 } from "@/components/ui/table"
 import { ModelAgentVPNPolicy, ServerIdentifierType } from "@/types"
-import { ClipboardList, Download, MoreHorizontal, Pencil, Play, Plus, Trash2 } from "lucide-react"
+import {
+    ClipboardList,
+    Download,
+    MoreHorizontal,
+    Pencil,
+    Play,
+    Plus,
+    RefreshCw,
+    Trash2,
+} from "lucide-react"
 import { useTranslation } from "react-i18next"
 
 interface PolicyTabProps {
@@ -39,6 +48,7 @@ interface PolicyTabProps {
     onStart: (policyID: number) => void
     onPrepareCore: (policyID: number) => void
     onCleanupCore: (policyID: number) => void
+    onCheckStatus: (policyID: number) => void
     onDelete: (policyID: number) => void
 }
 
@@ -51,6 +61,7 @@ export function PolicyTab({
     onStart,
     onPrepareCore,
     onCleanupCore,
+    onCheckStatus,
     onDelete,
 }: PolicyTabProps) {
     const { t } = useTranslation()
@@ -130,6 +141,13 @@ export function PolicyTab({
                                             >
                                                 <Play className="h-4 w-4" />
                                                 <span>{t("VPN.StartSession")}</span>
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                                onClick={() => onCheckStatus(policy.id)}
+                                                aria-label={`${t("VPN.CheckStatus")} ${policy.name}`}
+                                            >
+                                                <RefreshCw className="h-4 w-4" />
+                                                <span>{t("VPN.CheckStatus")}</span>
                                             </DropdownMenuItem>
                                             <DropdownMenuItem
                                                 onClick={() => onPrepareCore(policy.id)}

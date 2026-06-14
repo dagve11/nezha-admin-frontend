@@ -80,6 +80,32 @@ export interface ModelAgentVPNSession {
     stopped_at?: string
 }
 
+export interface ModelAgentVPNPolicyStatusCheck {
+    policy_id: number
+    policy_name: string
+    check_id: string
+    checked_at: string
+    timed_out?: boolean
+    nodes: ModelAgentVPNPolicyNodeStatus[]
+}
+
+export interface ModelAgentVPNPolicyNodeStatus {
+    role: string
+    server_id: number
+    server_name: string
+    online: boolean
+    responded: boolean
+    state: string
+    core_status: string
+    core_path?: string
+    core_version?: string
+    rules_status: string
+    rules_path?: string
+    rules_version?: string
+    last_error?: string
+    logs?: string[]
+}
+
 export interface ModelAgentVPNAuditLog {
     id: number
     session_id?: string
