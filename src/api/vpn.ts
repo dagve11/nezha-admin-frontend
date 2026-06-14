@@ -31,6 +31,14 @@ export const cleanupVPNPolicyCore = async (id: number): Promise<void> => {
     return fetcher<void>(FetcherMethod.POST, `/api/v1/vpn/policy/${id}/core/cleanup`)
 }
 
+export const prepareVPNPolicyRules = async (id: number): Promise<void> => {
+    return fetcher<void>(FetcherMethod.POST, `/api/v1/vpn/policy/${id}/rules/prepare`)
+}
+
+export const cleanupVPNPolicyRules = async (id: number): Promise<void> => {
+    return fetcher<void>(FetcherMethod.POST, `/api/v1/vpn/policy/${id}/rules/cleanup`)
+}
+
 export const checkVPNPolicyStatus = async (
     id: number,
 ): Promise<ModelAgentVPNPolicyStatusCheck> => {

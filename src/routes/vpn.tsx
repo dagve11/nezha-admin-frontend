@@ -2,10 +2,12 @@ import { swrFetcher } from "@/api/api"
 import {
     checkVPNPolicyStatus,
     cleanupVPNPolicyCore,
+    cleanupVPNPolicyRules,
     createVPNPolicy,
     deleteVPNPolicy,
     deleteVPNSession,
     prepareVPNPolicyCore,
+    prepareVPNPolicyRules,
     refreshVPNSessionStatus,
     restartVPNSession,
     startVPNSession,
@@ -211,6 +213,24 @@ export default function VPNPage() {
         }
     }
 
+    async function handlePreparePolicyRules(policyID: number) {
+        try {
+            await prepareVPNPolicyRules(policyID)
+            toast(t("Success"), { description: t("VPN.RulesPrepareSent") })
+        } catch (error) {
+            toast(t("Error"), { description: errorMessage(error) })
+        }
+    }
+
+    async function handleCleanupPolicyRules(policyID: number) {
+        try {
+            await cleanupVPNPolicyRules(policyID)
+            toast(t("Success"), { description: t("VPN.RulesCleanupSent") })
+        } catch (error) {
+            toast(t("Error"), { description: errorMessage(error) })
+        }
+    }
+
     async function handleCheckPolicyStatus(policyID: number) {
         setPolicyStatusOpen(true)
         setPolicyStatusChecking(true)
@@ -307,6 +327,8 @@ export default function VPNPage() {
                         onStart={(id) => void handleStartPolicy(id)}
                         onPrepareCore={(id) => void handlePreparePolicyCore(id)}
                         onCleanupCore={(id) => void handleCleanupPolicyCore(id)}
+                        onPrepareRules={(id) => void handlePreparePolicyRules(id)}
+                        onCleanupRules={(id) => void handleCleanupPolicyRules(id)}
                         onCheckStatus={(id) => void handleCheckPolicyStatus(id)}
                         onDelete={(id) => void handleDeletePolicy(id)}
                     />

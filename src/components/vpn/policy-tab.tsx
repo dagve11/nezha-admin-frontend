@@ -30,6 +30,8 @@ import { ModelAgentVPNPolicy, ServerIdentifierType } from "@/types"
 import {
     ClipboardList,
     Download,
+    FileDown,
+    FileX,
     MoreHorizontal,
     Pencil,
     Play,
@@ -48,6 +50,8 @@ interface PolicyTabProps {
     onStart: (policyID: number) => void
     onPrepareCore: (policyID: number) => void
     onCleanupCore: (policyID: number) => void
+    onPrepareRules: (policyID: number) => void
+    onCleanupRules: (policyID: number) => void
     onCheckStatus: (policyID: number) => void
     onDelete: (policyID: number) => void
 }
@@ -61,6 +65,8 @@ export function PolicyTab({
     onStart,
     onPrepareCore,
     onCleanupCore,
+    onPrepareRules,
+    onCleanupRules,
     onCheckStatus,
     onDelete,
 }: PolicyTabProps) {
@@ -162,6 +168,20 @@ export function PolicyTab({
                                             >
                                                 <Trash2 className="h-4 w-4" />
                                                 <span>{t("VPN.CleanupCore")}</span>
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                                onClick={() => onPrepareRules(policy.id)}
+                                                aria-label={`${t("VPN.PrepareRules")} ${policy.name}`}
+                                            >
+                                                <FileDown className="h-4 w-4" />
+                                                <span>{t("VPN.PrepareRules")}</span>
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                                onClick={() => onCleanupRules(policy.id)}
+                                                aria-label={`${t("VPN.CleanupRules")} ${policy.name}`}
+                                            >
+                                                <FileX className="h-4 w-4" />
+                                                <span>{t("VPN.CleanupRules")}</span>
                                             </DropdownMenuItem>
                                             <AlertDialog>
                                                 <AlertDialogTrigger asChild>
