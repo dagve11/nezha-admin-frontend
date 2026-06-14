@@ -26,6 +26,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
 import {
     Table,
     TableBody,
@@ -34,8 +35,25 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
-import { ModelAgentVPNPolicy, ModelAgentVPNSession, ServerIdentifierType } from "@/types"
-import { Eye, FileText, MoreHorizontal, Play, RotateCw, Square, Trash2 } from "lucide-react"
+import {
+    ModelAgentVPNPolicy,
+    ModelAgentVPNSession,
+    ModelAgentVPNSessionControlForm,
+    ServerIdentifierType,
+} from "@/types"
+import {
+    Eye,
+    FileText,
+    Globe2,
+    MoreHorizontal,
+    Network,
+    Play,
+    RotateCw,
+    SlidersHorizontal,
+    Square,
+    Trash2,
+} from "lucide-react"
+import type { ReactNode } from "react"
 import { useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 
@@ -51,6 +69,7 @@ interface SessionTabProps {
     onStart: (sessionID: string) => void
     onDelete: (sessionID: string) => void
     onRefreshStatus: (sessionID: string) => void
+    onControl: (sessionID: string, form: ModelAgentVPNSessionControlForm) => void
 }
 
 const vpnSessionStates = [
@@ -77,9 +96,11 @@ export function SessionTab({
     onStart,
     onDelete,
     onRefreshStatus,
+    onControl,
 }: SessionTabProps) {
     const { t } = useTranslation()
     const [logSession, setLogSession] = useState<ModelAgentVPNSession | null>(null)
+    const [controlSession, setControlSession] = useState<ModelAgentVPNSession | null>(null)
 
     const filteredSessions = sessions.filter(
         (session) =>
@@ -283,6 +304,15 @@ export function SessionTab({
                                                         </DropdownMenuItem>
                                                         <DropdownMenuItem
                                                             onClick={() =>
+                                                                setControlSession(session)
+                                                            }
+                                                            aria-label={`${t("VPN.SessionControl")} ${session.session_id}`}
+                                                        >
+                                                            <SlidersHorizontal className="h-4 w-4" />
+                                                            <span>{t("VPN.SessionControl")}</span>
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem
+                                                            onClick={() =>
                                                                 onRefreshStatus(session.session_id)
                                                             }
                                                             aria-label={`${t("VPN.RefreshSession")} ${session.session_id}`}
@@ -321,7 +351,140 @@ export function SessionTab({
                 }}
                 t={t}
             />
+            <SessionControlDialog
+                session={controlSession}
+                policies={policies}
+                open={Boolean(controlSession)}
+                onOpenChange={(open) => {
+                    if (!open) setControlSession(null)
+                }}
+                onControl={onControl}
+                t={t}
+            />
         </div>
+    )
+}
+
+function SessionControlDialog({
+    session,
+    policies,
+    open,
+    onOpenChange,
+    onControl,
+    t,
+}: {
+    session: ModelAgentVPNSession | null
+    policies: ModelAgentVPNPolicy[]
+    open: boolean
+    onOpenChange: (open: boolean) => void
+    onControl: (sessionID: string, form: ModelAgentVPNSessionControlForm) => void
+    t: (key: string) => string
+}) {
+    const policy = session ? policies.find((p) => p.id === session.policy_id) : undefined
+    const [ruleMode, setRuleMode] = useState("domain")
+    const [virtualNIC, setVirtualNIC] = useState(false)
+    const [setSystemProxy, setSetSystemProxy] = useState(false)
+
+    useEffect(() => {
+        if (!open || !session) return
+        const nextRuleMode = session.rule_mode || policy?.rule_mode || "domain"
+        setRuleMode(nextRuleMode)
+        setVirtualNIC(isVPNTunMode(session.mode || policy?.mode || "system_proxy"))
+        setSetSystemProxy(Boolean(session.set_system_proxy ?? policy?.set_system_proxy ?? false))
+    }, [open, session, policy])
+
+    if (!session) return null
+
+    const handleVirtualNICChange = (checked: boolean) => {
+        setVirtualNIC(checked)
+        if (checked) setSetSystemProxy(false)
+    }
+
+    const handleApply = () => {
+        const mode = virtualNIC
+            ? ruleMode === "global"
+                ? "tun_global"
+                : "tun_split"
+            : "system_proxy"
+        onControl(session.session_id, {
+            mode,
+            rule_mode: ruleMode,
+            set_system_proxy: !virtualNIC && setSystemProxy,
+        })
+        onOpenChange(false)
+    }
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+                <DialogHeader>
+                    <DialogTitle>{t("VPN.SessionControl")}</DialogTitle>
+                    <DialogDescription className="break-all font-mono text-xs">
+                        {session.session_id}
+                    </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4">
+                    <div className="grid grid-cols-3 gap-2 rounded-md border bg-muted/20 p-1">
+                        {["domain", "global", "direct"].map((mode) => (
+                            <Button
+                                key={mode}
+                                type="button"
+                                variant={ruleMode === mode ? "default" : "ghost"}
+                                className="h-10"
+                                onClick={() => setRuleMode(mode)}
+                            >
+                                {ruleModeLabel(t, mode)}
+                            </Button>
+                        ))}
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="rounded-md border bg-muted/20 p-4">
+                            <div className="mb-4 flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-2 font-medium">
+                                    <Globe2 className="h-5 w-5" />
+                                    <span>{t("VPN.SystemProxyControl")}</span>
+                                </div>
+                                <Switch
+                                    checked={!virtualNIC && setSystemProxy}
+                                    onCheckedChange={(checked) => {
+                                        setVirtualNIC(false)
+                                        setSetSystemProxy(checked)
+                                    }}
+                                />
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                                {session.local_http || policy?.listen_http || "-"}
+                            </div>
+                        </div>
+
+                        <div className="rounded-md border bg-muted/20 p-4">
+                            <div className="mb-4 flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-2 font-medium">
+                                    <Network className="h-5 w-5" />
+                                    <span>{t("VPN.VirtualNIC")}</span>
+                                </div>
+                                <Switch
+                                    checked={virtualNIC}
+                                    onCheckedChange={handleVirtualNICChange}
+                                />
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                                {session.tun_name || policy?.tun_name || "nezha-vpn"}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex justify-end gap-2">
+                        <Button variant="outline" onClick={() => onOpenChange(false)}>
+                            {t("Cancel")}
+                        </Button>
+                        <Button onClick={handleApply}>{t("VPN.ApplySessionControl")}</Button>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
     )
 }
 
@@ -482,6 +645,18 @@ function SessionDetailDialog({
                     />
                     <DetailItem label={t("VPN.Mode")} value={modeLabel(t, session.mode)} />
                     <DetailItem
+                        label={t("VPN.RuleMode")}
+                        value={ruleModeLabel(t, session.rule_mode || policy?.rule_mode || "")}
+                    />
+                    <DetailItem
+                        label={t("VPN.SystemProxyControl")}
+                        value={
+                            session.set_system_proxy ?? policy?.set_system_proxy
+                                ? t("VPN.ControlEnabled")
+                                : t("VPN.ControlDisabled")
+                        }
+                    />
+                    <DetailItem
                         label={t("Status")}
                         value={
                             <Badge variant={session.state === "running" ? "default" : "secondary"}>
@@ -537,7 +712,7 @@ function DetailItem({
 }: {
     className?: string
     label: string
-    value: React.ReactNode
+    value: ReactNode
 }) {
     return (
         <div className={`space-y-1 rounded-md border bg-muted/20 p-3 ${className ?? ""}`}>
@@ -552,7 +727,7 @@ function NativeField({
     id,
     label,
 }: {
-    children: React.ReactNode
+    children: ReactNode
     id: string
     label: string
 }) {
@@ -588,6 +763,17 @@ function modeLabel(t: (key: string) => string, mode: string): string {
     if (mode === "tun_split") return t("VPN.ModeTunSplit")
     if (mode === "tun_global") return t("VPN.ModeTunGlobal")
     return t("VPN.ModeSystemProxy")
+}
+
+function ruleModeLabel(t: (key: string) => string, mode: string): string {
+    if (mode === "global") return t("VPN.RuleModeGlobal")
+    if (mode === "direct") return t("VPN.RuleModeDirect")
+    if (mode === "ip") return t("VPN.RuleModeIP")
+    return t("VPN.RuleModeDomain")
+}
+
+function isVPNTunMode(mode: string): boolean {
+    return mode === "tun_split" || mode === "tun_global"
 }
 
 export {

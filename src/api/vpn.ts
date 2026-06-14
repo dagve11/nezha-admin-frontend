@@ -3,6 +3,7 @@ import {
     ModelAgentVPNPolicyForm,
     ModelAgentVPNPolicyStatusCheck,
     ModelAgentVPNAuditLog,
+    ModelAgentVPNSessionControlForm,
     ModelAgentVPNSession,
 } from "@/types"
 
@@ -75,6 +76,17 @@ export const refreshVPNSessionStatus = async (
     return fetcher<ModelAgentVPNSession>(
         FetcherMethod.POST,
         `/api/v1/vpn/session/${sessionID}/status`,
+    )
+}
+
+export const controlVPNSession = async (
+    sessionID: string,
+    data: ModelAgentVPNSessionControlForm,
+): Promise<ModelAgentVPNSession> => {
+    return fetcher<ModelAgentVPNSession>(
+        FetcherMethod.POST,
+        `/api/v1/vpn/session/${sessionID}/control`,
+        data,
     )
 }
 

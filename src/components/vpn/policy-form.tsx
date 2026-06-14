@@ -142,6 +142,7 @@ export function PolicyForm({
                                 <SelectItem value="global">{t("VPN.RuleModeGlobal")}</SelectItem>
                                 <SelectItem value="domain">{t("VPN.RuleModeDomain")}</SelectItem>
                                 <SelectItem value="ip">{t("VPN.RuleModeIP")}</SelectItem>
+                                <SelectItem value="direct">{t("VPN.RuleModeDirect")}</SelectItem>
                             </SelectContent>
                         </Select>
                     </Field>

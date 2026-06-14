@@ -3,6 +3,7 @@ import {
     checkVPNPolicyStatus,
     cleanupVPNPolicyCore,
     cleanupVPNPolicyRules,
+    controlVPNSession,
     createVPNPolicy,
     deleteVPNPolicy,
     deleteVPNSession,
@@ -45,6 +46,7 @@ import {
     ModelAgentVPNPolicy,
     ModelAgentVPNPolicyForm,
     ModelAgentVPNPolicyStatusCheck,
+    ModelAgentVPNSessionControlForm,
     ModelAgentVPNSession,
 } from "@/types"
 import { useCallback, useMemo, useState } from "react"
@@ -282,6 +284,18 @@ export default function VPNPage() {
         }
     }
 
+    async function handleControlSession(
+        sessionID: string,
+        form: ModelAgentVPNSessionControlForm,
+    ) {
+        try {
+            await controlVPNSession(sessionID, form)
+            await mutateSessions()
+        } catch (error) {
+            toast(t("Error"), { description: errorMessage(error) })
+        }
+    }
+
     function handleFormChange<K extends keyof ModelAgentVPNPolicyForm>(
         key: K,
         value: ModelAgentVPNPolicyForm[K],
@@ -396,6 +410,7 @@ export default function VPNPage() {
                         onStart={(id) => void handleRestartSession(id)}
                         onDelete={(id) => setSessionAction({ sessionID: id, type: "delete" })}
                         onRefreshStatus={(id) => void handleRefreshSession(id)}
+                        onControl={(id, form) => void handleControlSession(id, form)}
                     />
 
                     <AlertDialog

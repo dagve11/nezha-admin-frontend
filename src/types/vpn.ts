@@ -64,6 +64,7 @@ export interface ModelAgentVPNSession {
     exit_server_id: number
     session_id: string
     mode: string
+    rule_mode?: string
     relay_mode?: string
     state: string
     entry_state?: string
@@ -71,6 +72,7 @@ export interface ModelAgentVPNSession {
     local_http?: string
     local_socks?: string
     tun_name?: string
+    set_system_proxy?: boolean
     upload_bytes?: number
     download_bytes?: number
     active_connections?: number
@@ -78,6 +80,12 @@ export interface ModelAgentVPNSession {
     started_at?: string
     expires_at?: string
     stopped_at?: string
+}
+
+export interface ModelAgentVPNSessionControlForm {
+    mode: string
+    rule_mode: string
+    set_system_proxy: boolean
 }
 
 export interface ModelAgentVPNPolicyStatusCheck {
