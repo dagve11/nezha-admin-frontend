@@ -333,7 +333,7 @@ export default function VPNPage() {
                         onDelete={(id) => void handleDeletePolicy(id)}
                     />
                     <Dialog open={policyStatusOpen} onOpenChange={setPolicyStatusOpen}>
-                        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+                        <DialogContent className="max-h-[90vh] w-[calc(100vw-2rem)] overflow-x-hidden overflow-y-auto sm:max-w-2xl">
                             <DialogHeader>
                                 <DialogTitle>{t("VPN.PolicyStatusTitle")}</DialogTitle>
                                 <DialogDescription>{t("VPN.PolicyStatusHint")}</DialogDescription>
@@ -458,9 +458,11 @@ function PolicyStatusResult({
 }) {
     return (
         <div className="space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/30 px-3 py-2 text-sm">
-                <span className="font-medium">{result.policy_name || `#${result.policy_id}`}</span>
-                <div className="flex flex-wrap items-center gap-2 text-muted-foreground">
+            <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/30 px-3 py-2 text-sm">
+                <span className="min-w-0 break-words font-medium">
+                    {result.policy_name || `#${result.policy_id}`}
+                </span>
+                <div className="flex min-w-0 flex-wrap items-center gap-2 text-muted-foreground">
                     <span>{formatVPNStatusTime(result.checked_at)}</span>
                     {result.timed_out && (
                         <Badge variant="outline" className="border-amber-300 text-amber-700">
@@ -471,10 +473,10 @@ function PolicyStatusResult({
             </div>
             <div className="grid gap-3">
                 {result.nodes.map((node) => (
-                    <div key={`${node.role}-${node.server_id}`} className="rounded-md border p-4">
+                    <div key={`${node.role}-${node.server_id}`} className="min-w-0 rounded-md border p-4">
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div>
-                                <div className="font-medium">
+                            <div className="min-w-0">
+                                <div className="break-words font-medium">
                                     {roleLabel(t, node.role)} · {node.server_name || `#${node.server_id}`}
                                 </div>
                                 <div className="text-xs text-muted-foreground">
@@ -488,30 +490,21 @@ function PolicyStatusResult({
                         <div className="mt-4 grid gap-3 md:grid-cols-2">
                             <PolicyStatusLine
                                 label={t("VPN.CoreStatus")}
-                                pathLabel={t("VPN.CorePath")}
                                 status={node.core_status}
-                                path={node.core_path}
                                 version={node.core_version}
                                 t={t}
                             />
                             <PolicyStatusLine
                                 label={t("VPN.RuleSetStatus")}
-                                pathLabel={t("VPN.RuleSetPath")}
                                 status={node.rules_status}
-                                path={node.rules_path}
                                 version={node.rules_version}
                                 t={t}
                             />
                         </div>
                         {node.last_error && (
-                            <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">
-                                {node.last_error}
+                            <div className="mt-3 min-w-0 break-words rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">
+                                {sanitizeVPNStatusText(node.last_error)}
                             </div>
-                        )}
-                        {node.logs && node.logs.length > 0 && (
-                            <pre className="mt-3 max-h-48 overflow-auto rounded-md bg-black p-3 text-xs leading-5 text-green-100">
-                                {node.logs.join("\n")}
-                            </pre>
                         )}
                     </div>
                 ))}
@@ -522,33 +515,26 @@ function PolicyStatusResult({
 
 function PolicyStatusLine({
     label,
-    pathLabel,
     status,
-    path,
     version,
     t,
 }: {
     label: string
-    pathLabel: string
     status: string
-    path?: string
     version?: string
     t: (key: string) => string
 }) {
     return (
-        <div className="rounded-md border bg-muted/20 p-3 text-sm">
+        <div className="min-w-0 rounded-md border bg-muted/20 p-3 text-sm">
             <div className="flex items-center justify-between gap-2">
-                <span className="font-medium">{label}</span>
+                <span className="min-w-0 break-words font-medium">{label}</span>
                 <Badge variant="outline" className={statusBadgeClassName(status)}>
                     {statusLabel(t, status)}
                 </Badge>
             </div>
             <div className="mt-2 space-y-1 text-xs text-muted-foreground">
-                <div className="break-all">
-                    {pathLabel}: {path || "-"}
-                </div>
                 {version && (
-                    <div className="break-all">
+                    <div className="break-words">
                         {t("VPN.Version")}: {version}
                     </div>
                 )}
@@ -582,4 +568,12 @@ function formatVPNStatusTime(value?: string): string {
     const date = new Date(value)
     if (Number.isNaN(date.getTime())) return value
     return date.toLocaleString()
+}
+
+function sanitizeVPNStatusText(value: string): string {
+    return value
+        .replace(/path=[^\s,;]+/g, "path=[hidden]")
+        .replace(/source=[^\s,;]+/g, "source=[hidden]")
+        .replace(/[A-Za-z]:\\[^\s,;]+/g, "[path]")
+        .replace(/\/(?:tmp|var|opt|home|root|usr|mnt)\/[^\s,;]+/g, "[path]")
 }
