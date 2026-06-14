@@ -244,6 +244,8 @@
         "SessionControl": "Console",
         "SystemProxyControl": "System proxy",
         "VirtualNIC": "Virtual NIC",
+        "ProxyCleared": "Proxy cleared",
+        "ClearSessionProxy": "Clear proxy",
         "ApplySessionControl": "Apply",
         "ControlEnabled": "Enabled",
         "ControlDisabled": "Disabled",

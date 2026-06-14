@@ -414,11 +414,27 @@ function SessionControlDialog({
         onOpenChange(false)
     }
 
+    const handleClearProxy = () => {
+        onControl(session.session_id, {
+            mode: "system_proxy",
+            rule_mode: ruleMode,
+            set_system_proxy: false,
+        })
+        onOpenChange(false)
+    }
+
+    const proxyCleared = !virtualNIC && !setSystemProxy
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
                 <DialogHeader>
-                    <DialogTitle>{t("VPN.SessionControl")}</DialogTitle>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <DialogTitle>{t("VPN.SessionControl")}</DialogTitle>
+                        {proxyCleared && (
+                            <Badge variant="secondary">{t("VPN.ProxyCleared")}</Badge>
+                        )}
+                    </div>
                     <DialogDescription className="break-all font-mono text-xs">
                         {session.session_id}
                     </DialogDescription>
@@ -476,7 +492,10 @@ function SessionControlDialog({
                         </div>
                     </div>
 
-                    <div className="flex justify-end gap-2">
+                    <div className="flex flex-wrap justify-end gap-2">
+                        <Button variant="outline" onClick={handleClearProxy}>
+                            {t("VPN.ClearSessionProxy")}
+                        </Button>
                         <Button variant="outline" onClick={() => onOpenChange(false)}>
                             {t("Cancel")}
                         </Button>
@@ -643,7 +662,7 @@ function SessionDetailDialog({
                         label={t("VPN.ExitServer")}
                         value={serverName(session.exit_server_id)}
                     />
-                    <DetailItem label={t("VPN.Mode")} value={modeLabel(t, session.mode)} />
+                    <DetailItem label={t("VPN.Mode")} value={sessionModeLabel(t, session, policy)} />
                     <DetailItem
                         label={t("VPN.RuleMode")}
                         value={ruleModeLabel(t, session.rule_mode || policy?.rule_mode || "")}
@@ -675,7 +694,8 @@ function SessionDetailDialog({
                     <DetailItem
                         label={t("VPN.LocalProxy")}
                         value={
-                            session.mode === "system_proxy"
+                            session.mode === "system_proxy" &&
+                            sessionSystemProxyApplied(session, policy)
                                 ? session.local_socks ||
                                   session.local_http ||
                                   policy?.listen_socks ||
@@ -765,6 +785,17 @@ function modeLabel(t: (key: string) => string, mode: string): string {
     return t("VPN.ModeSystemProxy")
 }
 
+function sessionModeLabel(
+    t: (key: string) => string,
+    session: ModelAgentVPNSession,
+    policy?: ModelAgentVPNPolicy,
+): string {
+    if (session.mode === "system_proxy" && !sessionSystemProxyApplied(session, policy)) {
+        return t("VPN.ProxyCleared")
+    }
+    return modeLabel(t, session.mode)
+}
+
 function ruleModeLabel(t: (key: string) => string, mode: string): string {
     if (mode === "global") return t("VPN.RuleModeGlobal")
     if (mode === "direct") return t("VPN.RuleModeDirect")
@@ -774,6 +805,13 @@ function ruleModeLabel(t: (key: string) => string, mode: string): string {
 
 function isVPNTunMode(mode: string): boolean {
     return mode === "tun_split" || mode === "tun_global"
+}
+
+function sessionSystemProxyApplied(
+    session: ModelAgentVPNSession,
+    policy?: ModelAgentVPNPolicy,
+): boolean {
+    return Boolean(session.set_system_proxy ?? policy?.set_system_proxy ?? false)
 }
 
 export {

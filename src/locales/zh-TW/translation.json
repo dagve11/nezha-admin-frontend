@@ -242,6 +242,8 @@
         "SessionControl": "控制台",
         "SystemProxyControl": "系統代理",
         "VirtualNIC": "虛擬網卡",
+        "ProxyCleared": "代理已清除",
+        "ClearSessionProxy": "清除代理",
         "ApplySessionControl": "套用控制",
         "ControlEnabled": "啟用",
         "ControlDisabled": "停用",
