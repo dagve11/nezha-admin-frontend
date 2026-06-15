@@ -429,6 +429,12 @@ function SessionControlDialog({
     }
 
     const proxyCleared = !virtualNIC && !setSystemProxy
+    const actualMode = session.mode_status || session.mode || policy?.mode || "system_proxy"
+    const actualRuleMode = session.rule_mode_status || session.rule_mode || policy?.rule_mode || ""
+    const tunName = session.tun_interface || session.tun_name || policy?.tun_name || "nezha-vpn"
+    const systemProxyStatus =
+        session.system_proxy_status ||
+        (session.system_proxy_applied === true ? "applied" : session.system_proxy_applied === false ? "disabled" : "unknown")
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -446,6 +452,57 @@ function SessionControlDialog({
                 </DialogHeader>
 
                 <div className="space-y-4">
+                    <div className="grid gap-2 rounded-md border bg-muted/20 p-3 sm:grid-cols-2">
+                        <ControlStatusItem
+                            label={t("VPN.RuntimeStatus")}
+                            value={runtimeStatusLabel(t, session.runtime_status)}
+                        />
+                        <ControlStatusItem label={t("VPN.Mode")} value={modeLabel(t, actualMode)} />
+                        <ControlStatusItem
+                            label={t("VPN.RuleMode")}
+                            value={ruleModeLabel(t, actualRuleMode)}
+                        />
+                        <ControlStatusItem
+                            label={t("VPN.CoreStatus")}
+                            value={genericStatusLabel(t, session.core_status)}
+                        />
+                        <ControlStatusItem
+                            label={t("VPN.RuleSetStatus")}
+                            value={genericStatusLabel(t, session.rules_status)}
+                        />
+                        <ControlStatusItem
+                            label={t("VPN.SystemProxyControl")}
+                            value={systemProxyStatusLabel(t, systemProxyStatus)}
+                        />
+                        <ControlStatusItem
+                            label={t("VPN.LocalHTTP")}
+                            value={session.local_http || policy?.listen_http || "-"}
+                        />
+                        <ControlStatusItem
+                            label={t("VPN.LocalSocks")}
+                            value={session.local_socks || policy?.listen_socks || "-"}
+                        />
+                        <ControlStatusItem
+                            label={t("VPN.VirtualNIC")}
+                            value={tunStatusLabel(t, session.tun_status)}
+                        />
+                        <ControlStatusItem label={t("VPN.TunName")} value={tunName} />
+                        {session.system_proxy_current && (
+                            <ControlStatusItem
+                                className="sm:col-span-2"
+                                label={t("VPN.Current")}
+                                value={session.system_proxy_current}
+                            />
+                        )}
+                        {session.system_proxy_expected && (
+                            <ControlStatusItem
+                                className="sm:col-span-2"
+                                label={t("VPN.Expected")}
+                                value={session.system_proxy_expected}
+                            />
+                        )}
+                    </div>
+
                     <div className="grid grid-cols-3 gap-2 rounded-md border bg-muted/20 p-1">
                         {["domain", "global", "direct"].map((mode) => (
                             <Button
@@ -747,6 +804,23 @@ function DetailItem({
     )
 }
 
+function ControlStatusItem({
+    className,
+    label,
+    value,
+}: {
+    className?: string
+    label: string
+    value: ReactNode
+}) {
+    return (
+        <div className={`min-w-0 space-y-1 ${className ?? ""}`}>
+            <div className="text-xs text-muted-foreground">{label}</div>
+            <div className="break-all text-sm font-medium">{value || "-"}</div>
+        </div>
+    )
+}
+
 function NativeField({
     children,
     id,
@@ -805,7 +879,40 @@ function ruleModeLabel(t: (key: string) => string, mode: string): string {
     if (mode === "global") return t("VPN.RuleModeGlobal")
     if (mode === "direct") return t("VPN.RuleModeDirect")
     if (mode === "ip") return t("VPN.RuleModeIP")
+    if (mode === "custom") return t("VPN.StatusCustom")
+    if (mode === "unknown") return t("VPN.StatusUnknown")
     return t("VPN.RuleModeDomain")
+}
+
+function genericStatusLabel(t: (key: string) => string, status?: string): string {
+    if (status === "ready") return t("VPN.StatusReady")
+    if (status === "missing") return t("VPN.StatusMissing")
+    if (status === "error") return t("VPN.StatusError")
+    if (status === "custom") return t("VPN.StatusCustom")
+    return t("VPN.StatusUnknown")
+}
+
+function runtimeStatusLabel(t: (key: string) => string, status?: string): string {
+    if (status === "available") return t("VPN.RuntimeAvailable")
+    if (status === "inactive") return t("VPN.RuntimeInactive")
+    if (status === "unavailable") return t("VPN.RuntimeUnavailable")
+    return t("VPN.StatusUnknown")
+}
+
+function systemProxyStatusLabel(t: (key: string) => string, status?: string): string {
+    if (status === "applied") return t("VPN.SystemProxyApplied")
+    if (status === "disabled") return t("VPN.SystemProxyDisabled")
+    if (status === "overridden") return t("VPN.SystemProxyOverridden")
+    if (status === "cleared") return t("VPN.SystemProxyCleared")
+    if (status === "inactive") return t("VPN.SystemProxyInactive")
+    return t("VPN.SystemProxyUnknown")
+}
+
+function tunStatusLabel(t: (key: string) => string, status?: string): string {
+    if (status === "present") return t("VPN.TunPresent")
+    if (status === "missing") return t("VPN.TunMissing")
+    if (status === "inactive") return t("VPN.TunInactive")
+    return t("VPN.TunUnknown")
 }
 
 function isVPNTunMode(mode: string): boolean {

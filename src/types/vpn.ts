@@ -69,11 +69,25 @@ export interface ModelAgentVPNSession {
     state: string
     entry_state?: string
     exit_state?: string
+    runtime_status?: string
+    mode_status?: string
+    rule_mode_status?: string
+    core_status?: string
+    core_path?: string
+    core_version?: string
+    rules_status?: string
+    rules_path?: string
+    rules_version?: string
     local_http?: string
     local_socks?: string
     tun_name?: string
     set_system_proxy?: boolean
     system_proxy_applied?: boolean
+    system_proxy_status?: string
+    system_proxy_current?: string
+    system_proxy_expected?: string
+    tun_status?: string
+    tun_interface?: string
     upload_bytes?: number
     download_bytes?: number
     active_connections?: number
@@ -121,6 +135,9 @@ export interface ModelVPNControlResult {
     role: string
     state: string
     check_id?: string
+    runtime_status?: string
+    mode_status?: string
+    rule_mode_status?: string
     core_version?: string
     core_status?: string
     core_path?: string
@@ -131,6 +148,11 @@ export interface ModelVPNControlResult {
     local_socks?: string
     tun_name?: string
     system_proxy_applied?: boolean
+    system_proxy_status?: string
+    system_proxy_current?: string
+    system_proxy_expected?: string
+    tun_status?: string
+    tun_interface?: string
     upload_bytes?: number
     download_bytes?: number
     active_conns?: number

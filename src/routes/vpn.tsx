@@ -310,6 +310,9 @@ export default function VPNPage() {
         try {
             await refreshVPNSessionStatus(sessionID)
             await mutateSessions()
+            window.setTimeout(() => {
+                void mutateSessions()
+            }, 900)
         } catch (error) {
             toast(t("Error"), { description: errorMessage(error) })
         }
