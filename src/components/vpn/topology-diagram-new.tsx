@@ -18,6 +18,13 @@ interface NodePosition {
     isOnline: boolean
 }
 
+interface ActiveConnection {
+    id: string
+    entryNode: NodePosition
+    exitNode: NodePosition
+    isDirect: boolean
+}
+
 // Deterministic pseudo-random number from a seed.
 function seededRandom(seed: number): number {
     const value = Math.sin(seed) * 43758.5453
@@ -41,8 +48,7 @@ function generateNodePositions(
         const seed = server.id * 12.9898 + index * 78.233
         const angleJitter = (seededRandom(seed) - 0.5) * slice * 0.7
         const angle = index * slice - Math.PI / 2 + angleJitter
-        const actualRadius =
-            baseRadius + (seededRandom(seed * 1.7 + 3.1) - 0.5) * baseRadius * 0.55
+        const actualRadius = baseRadius + (seededRandom(seed * 1.7 + 3.1) - 0.5) * baseRadius * 0.55
 
         return {
             id: server.id,
@@ -123,10 +129,13 @@ export function TopologyDiagramNew({ servers, sessions, serverName, t }: Topolog
                     id: session.session_id,
                     entryNode,
                     exitNode,
+                    isDirect: session.relay_mode === "direct",
                 }
             })
-            .filter((conn): conn is NonNullable<typeof conn> => conn !== null)
+            .filter((conn): conn is ActiveConnection => conn !== null)
     }, [sessions, nodePositions])
+
+    const hasDashboardRelayConnections = activeConnections.some((conn) => !conn.isDirect)
 
     useEffect(() => {
         const viewport = viewportRef.current
@@ -315,88 +324,99 @@ export function TopologyDiagramNew({ servers, sessions, serverName, t }: Topolog
                         viewBox={`0 0 ${canvasSize.width} ${canvasSize.height}`}
                     >
                         {activeConnections.map((conn, index) => {
-                            const entryPath = generatePath(
-                                conn.entryNode.x,
-                                conn.entryNode.y,
-                                dashboardNode.x,
-                                dashboardNode.y,
-                            )
-                            const exitPath = generatePath(
-                                dashboardNode.x,
-                                dashboardNode.y,
-                                conn.exitNode.x,
-                                conn.exitNode.y,
-                            )
+                            const paths = conn.isDirect
+                                ? [
+                                      generatePath(
+                                          conn.entryNode.x,
+                                          conn.entryNode.y,
+                                          conn.exitNode.x,
+                                          conn.exitNode.y,
+                                      ),
+                                  ]
+                                : [
+                                      generatePath(
+                                          conn.entryNode.x,
+                                          conn.entryNode.y,
+                                          dashboardNode.x,
+                                          dashboardNode.y,
+                                      ),
+                                      generatePath(
+                                          dashboardNode.x,
+                                          dashboardNode.y,
+                                          conn.exitNode.x,
+                                          conn.exitNode.y,
+                                      ),
+                                  ]
 
                             return (
                                 <g key={conn.id}>
-                                    {/* Static link base */}
-                                    <path d={entryPath} stroke="rgb(63 63 70)" strokeWidth="1" />
-                                    <path d={exitPath} stroke="rgb(63 63 70)" strokeWidth="1" />
+                                    {paths.map((path, pathIndex) => {
+                                        const pathID = `motion-path-${index}-${pathIndex}`
+                                        return (
+                                            <g key={pathID}>
+                                                {/* Static link base */}
+                                                <path
+                                                    d={path}
+                                                    stroke="rgb(63 63 70)"
+                                                    strokeWidth="1"
+                                                />
 
-                                    {/* Animated active links */}
-                                    <path
-                                        d={entryPath}
-                                        stroke="rgb(52 211 153)"
-                                        strokeWidth="1.5"
-                                        strokeLinecap="round"
-                                        strokeDasharray="4 10"
-                                        opacity="0.8"
-                                    >
-                                        <animate
-                                            attributeName="stroke-dashoffset"
-                                            values="28;0"
-                                            dur="1.2s"
-                                            begin={`${index * 0.2}s`}
-                                            repeatCount="indefinite"
-                                        />
-                                    </path>
-                                    <path
-                                        d={exitPath}
-                                        stroke="rgb(52 211 153)"
-                                        strokeWidth="1.5"
-                                        strokeLinecap="round"
-                                        strokeDasharray="4 10"
-                                        opacity="0.8"
-                                    >
-                                        <animate
-                                            attributeName="stroke-dashoffset"
-                                            values="28;0"
-                                            dur="1.2s"
-                                            begin={`${index * 0.2 + 0.15}s`}
-                                            repeatCount="indefinite"
-                                        />
-                                    </path>
+                                                {/* Animated active link */}
+                                                <path
+                                                    d={path}
+                                                    stroke={
+                                                        conn.isDirect
+                                                            ? "rgb(96 165 250)"
+                                                            : "rgb(52 211 153)"
+                                                    }
+                                                    strokeWidth={conn.isDirect ? "2" : "1.5"}
+                                                    strokeLinecap="round"
+                                                    strokeDasharray="4 10"
+                                                    opacity="0.85"
+                                                >
+                                                    <animate
+                                                        attributeName="stroke-dashoffset"
+                                                        values="28;0"
+                                                        dur={conn.isDirect ? "1s" : "1.2s"}
+                                                        begin={`${index * 0.2 + pathIndex * 0.15}s`}
+                                                        repeatCount="indefinite"
+                                                    />
+                                                </path>
 
-                                    {/* Flow particles */}
-                                    <circle r="2.5" fill="rgb(110 231 183)">
-                                        <animateMotion
-                                            dur="2.4s"
-                                            begin={`${index * 0.3}s`}
-                                            repeatCount="indefinite"
-                                        >
-                                            <mpath href={`#motion-path-entry-${index}`} />
-                                        </animateMotion>
-                                    </circle>
-                                    <path id={`motion-path-entry-${index}`} d={entryPath} opacity="0" />
-
-                                    <circle r="2.5" fill="rgb(110 231 183)">
-                                        <animateMotion
-                                            dur="2.4s"
-                                            begin={`${index * 0.3 + 0.4}s`}
-                                            repeatCount="indefinite"
-                                        >
-                                            <mpath href={`#motion-path-exit-${index}`} />
-                                        </animateMotion>
-                                    </circle>
-                                    <path id={`motion-path-exit-${index}`} d={exitPath} opacity="0" />
+                                                {/* Flow particle */}
+                                                <circle
+                                                    r={conn.isDirect ? "3" : "2.5"}
+                                                    fill={
+                                                        conn.isDirect
+                                                            ? "rgb(147 197 253)"
+                                                            : "rgb(110 231 183)"
+                                                    }
+                                                >
+                                                    <animateMotion
+                                                        dur={conn.isDirect ? "1.8s" : "2.4s"}
+                                                        begin={`${index * 0.3 + pathIndex * 0.4}s`}
+                                                        repeatCount="indefinite"
+                                                    >
+                                                        <mpath href={`#${pathID}`} />
+                                                    </animateMotion>
+                                                </circle>
+                                                <path id={pathID} d={path} opacity="0" />
+                                            </g>
+                                        )
+                                    })}
                                 </g>
                             )
                         })}
                     </svg>
 
                     {/* Relay hub node */}
-                    <HubNode x={dashboardNode.x} y={dashboardNode.y} label={t("VPN.FlowRelay")} />
+                    {hasDashboardRelayConnections && (
+                        <HubNode
+                            x={dashboardNode.x}
+                            y={dashboardNode.y}
+                            label={t("VPN.FlowRelay")}
+                        />
+                    )}
 
                     {/* Server nodes */}
                     {nodePositions.map((node) => (
