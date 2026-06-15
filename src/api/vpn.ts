@@ -51,7 +51,7 @@ export const checkVPNPolicyStatus = async (
 }
 
 export const getVPNAgentDebugResults = async (
-    limit = 200,
+    limit = 30,
 ): Promise<ModelAgentVPNDebugResult[]> => {
     return fetcher<ModelAgentVPNDebugResult[]>(FetcherMethod.GET, "/api/v1/vpn/debug/agent-results", {
         limit,

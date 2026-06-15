@@ -146,7 +146,7 @@ export default function VPNPage() {
         mutate: mutateDebugResults,
         isLoading: debugLoading,
     } = useSWR<ModelAgentVPNDebugResult[]>(
-        vpnDebugEnabled ? "/api/v1/vpn/debug/agent-results?limit=200" : null,
+        vpnDebugEnabled ? "/api/v1/vpn/debug/agent-results?limit=30" : null,
         swrFetcher,
         {
             refreshInterval: vpnDebugEnabled && activeTab === "debug" ? 2000 : 0,
