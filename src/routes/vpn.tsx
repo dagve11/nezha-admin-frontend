@@ -54,8 +54,8 @@ import {
     ModelAgentVPNPolicy,
     ModelAgentVPNPolicyForm,
     ModelAgentVPNPolicyStatusCheck,
-    ModelAgentVPNSessionControlForm,
     ModelAgentVPNSession,
+    ModelAgentVPNSessionControlForm,
 } from "@/types"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
@@ -68,6 +68,7 @@ const initialForm: ModelAgentVPNPolicyForm = {
     exit_server_id: 0,
     mode: "system_proxy",
     rule_mode: "domain",
+    relay_mode: "auto",
     domains: [],
     cidrs: [],
     direct_cidrs: [],
@@ -318,10 +319,7 @@ export default function VPNPage() {
         }
     }
 
-    async function handleControlSession(
-        sessionID: string,
-        form: ModelAgentVPNSessionControlForm,
-    ) {
+    async function handleControlSession(sessionID: string, form: ModelAgentVPNSessionControlForm) {
         try {
             await controlVPNSession(sessionID, form)
             await mutateSessions()
@@ -542,14 +540,20 @@ function PolicyStatusResult({
             </div>
             <div className="grid gap-3">
                 {result.nodes.map((node) => (
-                    <div key={`${node.role}-${node.server_id}`} className="min-w-0 rounded-md border p-4">
+                    <div
+                        key={`${node.role}-${node.server_id}`}
+                        className="min-w-0 rounded-md border p-4"
+                    >
                         <div className="flex flex-wrap items-center justify-between gap-2">
                             <div className="min-w-0">
                                 <div className="break-words font-medium">
-                                    {roleLabel(t, node.role)} · {node.server_name || `#${node.server_id}`}
+                                    {roleLabel(t, node.role)} ·{" "}
+                                    {node.server_name || `#${node.server_id}`}
                                 </div>
                                 <div className="text-xs text-muted-foreground">
-                                    {node.responded ? t("VPN.StatusResponded") : t("VPN.StatusNoResponse")}
+                                    {node.responded
+                                        ? t("VPN.StatusResponded")
+                                        : t("VPN.StatusNoResponse")}
                                 </div>
                             </div>
                             <Badge variant={node.online ? "default" : "secondary"}>

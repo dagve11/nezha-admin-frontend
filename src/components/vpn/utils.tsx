@@ -43,6 +43,7 @@ export function normalizePolicyForm(form: ModelAgentVPNPolicyForm): ModelAgentVP
     return {
         ...form,
         name: form.name.trim() || "Agent VPN",
+        relay_mode: form.relay_mode || "auto",
         domains: form.domains.filter(Boolean),
         cidrs: form.cidrs.filter(Boolean),
         direct_cidrs: form.direct_cidrs.filter(Boolean),
@@ -67,6 +68,7 @@ export function policyToForm(policy: ModelAgentVPNPolicy): ModelAgentVPNPolicyFo
         exit_server_id: policy.exit_server_id,
         mode: policy.mode,
         rule_mode: policy.rule_mode,
+        relay_mode: policy.relay_mode ?? "auto",
         domains: policy.domains ?? [],
         cidrs: policy.cidrs ?? [],
         direct_cidrs: policy.direct_cidrs ?? [],
@@ -160,14 +162,16 @@ function isValidSHA256(value: string): boolean {
 
 function isValidDomain(value: string): boolean {
     if (!value || value.trim() !== value || value.length > 253) return false
-    return value.split(".").every(
-        (label) =>
-            label.length > 0 &&
-            label.length <= 63 &&
-            !label.startsWith("-") &&
-            !label.endsWith("-") &&
-            /^[A-Za-z0-9-]+$/.test(label),
-    )
+    return value
+        .split(".")
+        .every(
+            (label) =>
+                label.length > 0 &&
+                label.length <= 63 &&
+                !label.startsWith("-") &&
+                !label.endsWith("-") &&
+                /^[A-Za-z0-9-]+$/.test(label),
+        )
 }
 
 export async function copyTextToClipboard(value: string) {

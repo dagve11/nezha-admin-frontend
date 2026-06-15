@@ -147,6 +147,23 @@ export function PolicyForm({
                             </SelectContent>
                         </Select>
                     </Field>
+                    <Field label={t("VPN.RelayMode")} id="vpn-relay-mode">
+                        <Select
+                            value={form.relay_mode}
+                            onValueChange={(value) => onFormChange("relay_mode", value)}
+                        >
+                            <SelectTrigger id="vpn-relay-mode">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="auto">{t("VPN.RelayModeAuto")}</SelectItem>
+                                <SelectItem value="direct">{t("VPN.RelayModeDirect")}</SelectItem>
+                                <SelectItem value="dashboard">
+                                    {t("VPN.RelayModeDashboard")}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </Field>
                 </div>
             </div>
 
