@@ -135,8 +135,6 @@ export function TopologyDiagramNew({ servers, sessions, serverName, t }: Topolog
             .filter((conn): conn is ActiveConnection => conn !== null)
     }, [sessions, nodePositions])
 
-    const hasDashboardRelayConnections = activeConnections.some((conn) => !conn.isDirect)
-
     useEffect(() => {
         const viewport = viewportRef.current
         if (!viewport) return
@@ -410,13 +408,7 @@ export function TopologyDiagramNew({ servers, sessions, serverName, t }: Topolog
                     </svg>
 
                     {/* Relay hub node */}
-                    {hasDashboardRelayConnections && (
-                        <HubNode
-                            x={dashboardNode.x}
-                            y={dashboardNode.y}
-                            label={t("VPN.FlowRelay")}
-                        />
-                    )}
+                    <HubNode x={dashboardNode.x} y={dashboardNode.y} label={t("VPN.FlowRelay")} />
 
                     {/* Server nodes */}
                     {nodePositions.map((node) => (
