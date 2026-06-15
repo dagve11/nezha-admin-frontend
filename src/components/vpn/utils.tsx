@@ -1,5 +1,8 @@
 import { ModelAgentVPNPolicy, ModelAgentVPNPolicyForm } from "@/types"
 
+export const VPN_EXPIRES_SECONDS_PER_DAY = 24 * 60 * 60
+export const DEFAULT_VPN_EXPIRES_SECONDS = VPN_EXPIRES_SECONDS_PER_DAY
+
 export function validatePolicyFormClient(form: ModelAgentVPNPolicyForm): string | null {
     if (form.entry_server_id === 0 || form.exit_server_id === 0)
         return "VPN.ValidationServerRequired"
@@ -71,7 +74,7 @@ export function policyToForm(policy: ModelAgentVPNPolicy): ModelAgentVPNPolicyFo
         listen_socks: policy.listen_socks ?? "",
         tun_name: policy.tun_name ?? "nezha-vpn",
         dns_server: policy.dns_server ?? "https://1.1.1.1/dns-query",
-        expires_seconds: policy.expires_seconds ?? 3600,
+        expires_seconds: policy.expires_seconds ?? DEFAULT_VPN_EXPIRES_SECONDS,
         max_upload_bytes: policy.max_upload_bytes ?? 0,
         max_download_bytes: policy.max_download_bytes ?? 0,
         max_connections: policy.max_connections ?? 128,

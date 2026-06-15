@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
+import { VPN_EXPIRES_SECONDS_PER_DAY } from "@/components/vpn/utils"
 import { ModelAgentVPNPolicyForm, ServerIdentifierType } from "@/types"
 import { Play } from "lucide-react"
 import { useTranslation } from "react-i18next"
@@ -221,9 +222,14 @@ export function PolicyForm({
                             <Input
                                 id="vpn-expires"
                                 type="number"
-                                value={form.expires_seconds}
+                                min={1}
+                                step={1}
+                                value={expiresSecondsToDays(form.expires_seconds)}
                                 onChange={(e) =>
-                                    onFormChange("expires_seconds", Number(e.target.value))
+                                    onFormChange(
+                                        "expires_seconds",
+                                        expiresDaysToSeconds(Number(e.target.value)),
+                                    )
                                 }
                             />
                         </Field>
@@ -444,4 +450,15 @@ function splitLines(value: string): string[] {
         .split(/\r?\n/)
         .map((item) => item.trim())
         .filter(Boolean)
+}
+
+function expiresSecondsToDays(seconds: number): number {
+    if (!Number.isFinite(seconds) || seconds <= 0) return 0
+    const days = seconds / VPN_EXPIRES_SECONDS_PER_DAY
+    return Number.isInteger(days) ? days : Number(days.toFixed(2))
+}
+
+function expiresDaysToSeconds(days: number): number {
+    if (!Number.isFinite(days) || days <= 0) return 0
+    return Math.round(days * VPN_EXPIRES_SECONDS_PER_DAY)
 }

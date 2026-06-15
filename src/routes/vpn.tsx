@@ -40,7 +40,12 @@ import {
     SessionTab,
     buttonVariants,
 } from "@/components/vpn/session-tab"
-import { normalizePolicyForm, policyToForm, validatePolicyFormClient } from "@/components/vpn/utils"
+import {
+    DEFAULT_VPN_EXPIRES_SECONDS,
+    normalizePolicyForm,
+    policyToForm,
+    validatePolicyFormClient,
+} from "@/components/vpn/utils"
 import { useNotification } from "@/hooks/useNotfication"
 import { useServer } from "@/hooks/useServer"
 import useSetting from "@/hooks/useSetting"
@@ -70,7 +75,7 @@ const initialForm: ModelAgentVPNPolicyForm = {
     listen_socks: "127.0.0.1:1080",
     tun_name: "nezha-vpn",
     dns_server: "https://1.1.1.1/dns-query",
-    expires_seconds: 3600,
+    expires_seconds: DEFAULT_VPN_EXPIRES_SECONDS,
     max_upload_bytes: 0,
     max_download_bytes: 0,
     max_connections: 128,
