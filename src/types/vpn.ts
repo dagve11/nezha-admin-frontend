@@ -6,6 +6,9 @@ export interface ModelAgentVPNPolicy {
     mode: string
     rule_mode: string
     relay_mode?: string
+    exit_nat_enabled?: boolean
+    exit_nat_host?: string
+    exit_nat_port?: number
     domains?: string[]
     cidrs?: string[]
     direct_cidrs?: string[]
@@ -36,6 +39,9 @@ export interface ModelAgentVPNPolicyForm {
     mode: string
     rule_mode: string
     relay_mode: string
+    exit_nat_enabled: boolean
+    exit_nat_host: string
+    exit_nat_port: number
     domains: string[]
     cidrs: string[]
     direct_cidrs: string[]

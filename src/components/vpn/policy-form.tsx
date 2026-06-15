@@ -234,6 +234,47 @@ export function PolicyForm({
                         </Field>
                     </div>
 
+                    <div className="grid gap-4 rounded-md border bg-muted/30 p-3 md:grid-cols-[12rem_1fr_10rem]">
+                        <div className="flex items-center justify-between md:col-span-3">
+                            <Label htmlFor="vpn-exit-nat-enabled">{t("VPN.ExitNAT")}</Label>
+                            <Switch
+                                id="vpn-exit-nat-enabled"
+                                checked={form.exit_nat_enabled}
+                                onCheckedChange={(checked) =>
+                                    onFormChange("exit_nat_enabled", checked)
+                                }
+                            />
+                        </div>
+                        {form.exit_nat_enabled && (
+                            <>
+                                <Field label={t("VPN.ExitNATHost")} id="vpn-exit-nat-host">
+                                    <Input
+                                        id="vpn-exit-nat-host"
+                                        value={form.exit_nat_host}
+                                        onChange={(e) =>
+                                            onFormChange("exit_nat_host", e.target.value)
+                                        }
+                                        placeholder="203.0.113.10"
+                                    />
+                                </Field>
+                                <Field label={t("VPN.ExitNATPort")} id="vpn-exit-nat-port">
+                                    <Input
+                                        id="vpn-exit-nat-port"
+                                        type="number"
+                                        min={1}
+                                        max={65535}
+                                        step={1}
+                                        value={form.exit_nat_port || ""}
+                                        onChange={(e) =>
+                                            onFormChange("exit_nat_port", Number(e.target.value))
+                                        }
+                                        placeholder="39090"
+                                    />
+                                </Field>
+                            </>
+                        )}
+                    </div>
+
                     <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
                         <Field label={t("VPN.Expires")} id="vpn-expires">
                             <Input

@@ -35,6 +35,15 @@ export function validatePolicyFormClient(form: ModelAgentVPNPolicyForm): string 
     if (!isValidSHA256(form.core_sha256)) {
         return "VPN.ValidationSHA256Invalid"
     }
+    if (
+        form.exit_nat_enabled &&
+        (!isValidNATHost(form.exit_nat_host) ||
+            !Number.isInteger(form.exit_nat_port) ||
+            form.exit_nat_port <= 0 ||
+            form.exit_nat_port > 65535)
+    ) {
+        return "VPN.ValidationExitNATInvalid"
+    }
     if (form.expires_seconds <= 0) return "VPN.ValidationExpiresRequired"
     return null
 }
@@ -44,6 +53,8 @@ export function normalizePolicyForm(form: ModelAgentVPNPolicyForm): ModelAgentVP
         ...form,
         name: form.name.trim() || "Agent VPN",
         relay_mode: form.relay_mode || "auto",
+        exit_nat_host: form.exit_nat_host.trim(),
+        exit_nat_port: form.exit_nat_enabled ? Math.max(Number(form.exit_nat_port) || 0, 0) : 0,
         domains: form.domains.filter(Boolean),
         cidrs: form.cidrs.filter(Boolean),
         direct_cidrs: form.direct_cidrs.filter(Boolean),
@@ -69,6 +80,9 @@ export function policyToForm(policy: ModelAgentVPNPolicy): ModelAgentVPNPolicyFo
         mode: policy.mode,
         rule_mode: policy.rule_mode,
         relay_mode: policy.relay_mode ?? "auto",
+        exit_nat_enabled: policy.exit_nat_enabled ?? false,
+        exit_nat_host: policy.exit_nat_host ?? "",
+        exit_nat_port: policy.exit_nat_port ?? 0,
         domains: policy.domains ?? [],
         cidrs: policy.cidrs ?? [],
         direct_cidrs: policy.direct_cidrs ?? [],
@@ -116,6 +130,16 @@ function parseListenAddress(value: string): { host: string; port: number } | nul
 
 function isLoopbackHost(host: string): boolean {
     return host === "localhost" || host === "127.0.0.1" || host === "::1"
+}
+
+function isValidNATHost(value: string): boolean {
+    const host = value.trim()
+    if (!host) return false
+    if (host.includes("://") || /[\s/?#@]/.test(host)) return false
+    if (/^[^:[\]]+:\d+$/.test(host)) return false
+    const unwrapped = host.replace(/^\[|\]$/g, "")
+    if (unwrapped.includes(":")) return isIPv6Address(unwrapped)
+    return isValidDomain(unwrapped) || isIPv4Address(unwrapped)
 }
 
 function isValidCIDR(value: string): boolean {
