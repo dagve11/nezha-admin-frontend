@@ -73,6 +73,7 @@ export interface ModelAgentVPNSession {
     local_socks?: string
     tun_name?: string
     set_system_proxy?: boolean
+    system_proxy_applied?: boolean
     upload_bytes?: number
     download_bytes?: number
     active_connections?: number
@@ -129,6 +130,7 @@ export interface ModelVPNControlResult {
     local_http?: string
     local_socks?: string
     tun_name?: string
+    system_proxy_applied?: boolean
     upload_bytes?: number
     download_bytes?: number
     active_conns?: number

@@ -395,7 +395,7 @@ function SessionControlDialog({
         const nextRuleMode = session.rule_mode || policy?.rule_mode || "domain"
         setRuleMode(nextRuleMode)
         setVirtualNIC(isVPNTunMode(session.mode || policy?.mode || "system_proxy"))
-        setSetSystemProxy(Boolean(session.set_system_proxy ?? policy?.set_system_proxy ?? false))
+        setSetSystemProxy(sessionSystemProxyApplied(session, policy))
     }, [open, session, policy])
 
     if (!session) return null
@@ -675,7 +675,7 @@ function SessionDetailDialog({
                     <DetailItem
                         label={t("VPN.SystemProxyControl")}
                         value={
-                            session.set_system_proxy ?? policy?.set_system_proxy
+                            sessionSystemProxyApplied(session, policy)
                                 ? t("VPN.ControlEnabled")
                                 : t("VPN.ControlDisabled")
                         }
@@ -816,6 +816,9 @@ function sessionSystemProxyApplied(
     session: ModelAgentVPNSession,
     policy?: ModelAgentVPNPolicy,
 ): boolean {
+    if (session.system_proxy_applied !== undefined) {
+        return session.system_proxy_applied
+    }
     return Boolean(session.set_system_proxy ?? policy?.set_system_proxy ?? false)
 }
 
