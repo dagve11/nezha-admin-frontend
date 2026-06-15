@@ -750,7 +750,7 @@ test("Agent VPN session tab opens a per-session log dialog", async () => {
         })
     })
 
-    expect(screen.getByText(/\[vpn_session_2\].*session failed/)).toBeTruthy()
+    expect(screen.getByText(/session failed/)).toBeTruthy()
 })
 
 test("Agent VPN session log stream appends, caps logs, and reconnects", async () => {
@@ -794,7 +794,7 @@ test("Agent VPN session log stream appends, caps logs, and reconnects", async ()
     }
 })
 
-test("Agent VPN session log stream adds readable context to raw log lines", async () => {
+test("Agent VPN session log stream displays server-provided log lines", async () => {
     vi.stubGlobal("WebSocket", MockVPNWebSocket)
 
     render(<VPNPage />)
@@ -813,15 +813,11 @@ test("Agent VPN session log stream adds readable context to raw log lines", asyn
                 entry_state: "running",
                 exit_state: "running",
             },
-            logs: ["sidecar accepted connection"],
+            logs: ["[08:00:01] sidecar accepted connection"],
         })
     })
 
-    expect(
-        screen.getByText(
-            /\[\d{2}:\d{2}:\d{2}\] \[vpn_session_1\] \[entry:running\/exit:running\] \[entry-cn -> exit-jp\] sidecar accepted connection/,
-        ),
-    ).toBeTruthy()
+    expect(screen.getByText("[08:00:01] sidecar accepted connection")).toBeTruthy()
 })
 
 test("Agent VPN session tab keeps detailed fields in the detail dialog", () => {

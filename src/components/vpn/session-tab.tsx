@@ -349,7 +349,6 @@ export function SessionTab({
             </Card>
             <SessionLogDialog
                 session={logSession}
-                serverName={serverName}
                 open={Boolean(logSession)}
                 onOpenChange={(open) => {
                     if (!open) setLogSession(null)
@@ -571,13 +570,11 @@ function SessionControlDialog({
 
 function SessionLogDialog({
     session,
-    serverName,
     open,
     onOpenChange,
     t,
 }: {
     session: ModelAgentVPNSession | null
-    serverName: (id?: number) => string
     open: boolean
     onOpenChange: (open: boolean) => void
     t: (key: string) => string
@@ -624,10 +621,7 @@ function SessionLogDialog({
                         return
                     }
                     if (!frame.logs?.length) return
-                    const contextSession = { ...session, ...frame.session }
-                    const nextLines = frame.logs.map((line) =>
-                        formatSessionLogLine(line, contextSession, serverName),
-                    )
+                    const nextLines = frame.logs.map((line) => String(line))
                     setLogs(nextLines.slice(-1000))
                     setStatus("")
                 } catch {
@@ -655,7 +649,7 @@ function SessionLogDialog({
             socketRef.current?.close()
             socketRef.current = null
         }
-    }, [open, session, serverName, t])
+    }, [open, session, t])
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -836,18 +830,6 @@ function NativeField({
             <div className="flex flex-col">{children}</div>
         </div>
     )
-}
-
-function formatSessionLogLine(
-    line: string,
-    session: ModelAgentVPNSession,
-    serverName: (id?: number) => string,
-): string {
-    const timestamp = new Date().toLocaleTimeString("en-US", { hour12: false })
-    const entryState = session.entry_state || "-"
-    const exitState = session.exit_state || "-"
-    const route = `${serverName(session.entry_server_id)} -> ${serverName(session.exit_server_id)}`
-    return `[${timestamp}] [${session.session_id}] [entry:${entryState}/exit:${exitState}] [${route}] ${line}`
 }
 
 function formatBytes(value?: number): string {
