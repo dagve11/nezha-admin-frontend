@@ -100,7 +100,7 @@ export function SessionTab({
 }: SessionTabProps) {
     const { t } = useTranslation()
     const [logSession, setLogSession] = useState<ModelAgentVPNSession | null>(null)
-    const [controlSession, setControlSession] = useState<ModelAgentVPNSession | null>(null)
+    const [controlSessionID, setControlSessionID] = useState<string | null>(null)
 
     const filteredSessions = sessions.filter(
         (session) =>
@@ -108,6 +108,8 @@ export function SessionTab({
             (filters.entry === "all" || String(session.entry_server_id) === filters.entry) &&
             (filters.exit === "all" || String(session.exit_server_id) === filters.exit),
     )
+    const controlSession =
+        sessions.find((session) => session.session_id === controlSessionID) ?? null
 
     return (
         <div className="space-y-4">
@@ -303,9 +305,12 @@ export function SessionTab({
                                                             <span>{t("VPN.ViewSessionLog")}</span>
                                                         </DropdownMenuItem>
                                                         <DropdownMenuItem
-                                                            onClick={() =>
-                                                                setControlSession(session)
-                                                            }
+                                                            onClick={() => {
+                                                                setControlSessionID(
+                                                                    session.session_id,
+                                                                )
+                                                                onRefreshStatus(session.session_id)
+                                                            }}
                                                             aria-label={`${t("VPN.SessionControl")} ${session.session_id}`}
                                                         >
                                                             <SlidersHorizontal className="h-4 w-4" />
@@ -354,9 +359,9 @@ export function SessionTab({
             <SessionControlDialog
                 session={controlSession}
                 policies={policies}
-                open={Boolean(controlSession)}
+                open={Boolean(controlSessionID)}
                 onOpenChange={(open) => {
-                    if (!open) setControlSession(null)
+                    if (!open) setControlSessionID(null)
                 }}
                 onControl={onControl}
                 t={t}
