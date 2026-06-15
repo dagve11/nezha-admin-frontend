@@ -168,6 +168,7 @@
         "StartSession": "Start session",
         "StopSession": "Stop session",
         "ConfirmStopSession": "Confirm stop session",
+        "StopSessionDescription": "Stopping a session closes the current proxy process and clears proxy state. You can start it again later.",
         "DeleteSession": "Delete session",
         "ConfirmDeleteSession": "Confirm delete session",
         "RestartSession": "Restart session",

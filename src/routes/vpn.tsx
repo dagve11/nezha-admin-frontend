@@ -460,7 +460,9 @@ export default function VPNPage() {
                                         : t("VPN.ConfirmStopSession")}
                                 </AlertDialogTitle>
                                 <AlertDialogDescription>
-                                    {t("Results.ThisOperationIsUnrecoverable")}
+                                    {sessionAction?.type === "delete"
+                                        ? t("Results.ThisOperationIsUnrecoverable")
+                                        : t("VPN.StopSessionDescription")}
                                 </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>

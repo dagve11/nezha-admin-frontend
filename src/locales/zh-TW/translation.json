@@ -166,6 +166,7 @@
         "StartSession": "啟動會話",
         "StopSession": "停止會話",
         "ConfirmStopSession": "確認停止會話",
+        "StopSessionDescription": "停止會話會關閉目前代理程序並清理代理狀態，之後可以重新啟動。",
         "DeleteSession": "刪除會話",
         "ConfirmDeleteSession": "確認刪除會話",
         "RestartSession": "重啟會話",

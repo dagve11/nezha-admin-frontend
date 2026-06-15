@@ -168,6 +168,7 @@
         "StartSession": "启动会话",
         "StopSession": "停止会话",
         "ConfirmStopSession": "确认停止会话",
+        "StopSessionDescription": "停止会话会关闭当前代理进程并清理代理状态，之后可以重新启动。",
         "DeleteSession": "删除会话",
         "ConfirmDeleteSession": "确认删除会话",
         "RestartSession": "重启会话",
