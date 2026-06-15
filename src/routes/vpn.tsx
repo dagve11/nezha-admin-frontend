@@ -43,6 +43,7 @@ import {
 import { normalizePolicyForm, policyToForm, validatePolicyFormClient } from "@/components/vpn/utils"
 import { useNotification } from "@/hooks/useNotfication"
 import { useServer } from "@/hooks/useServer"
+import useSetting from "@/hooks/useSetting"
 import {
     ModelAgentVPNDebugResult,
     ModelAgentVPNPolicy,
@@ -51,7 +52,7 @@ import {
     ModelAgentVPNSessionControlForm,
     ModelAgentVPNSession,
 } from "@/types"
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import useSWR from "swr"
@@ -96,6 +97,7 @@ export default function VPNPage() {
     const { t } = useTranslation()
     const { servers = [] } = useServer()
     const { notifierGroup = [] } = useNotification()
+    const { data: settingData } = useSetting()
     const [form, setForm] = useState<ModelAgentVPNPolicyForm>(() => newInitialForm())
     const [editingPolicyID, setEditingPolicyID] = useState<number | null>(null)
     const [tunRiskConfirmed, setTunRiskConfirmed] = useState(false)
@@ -114,6 +116,13 @@ export default function VPNPage() {
         sessionID: string
         type: "stop" | "delete"
     } | null>(null)
+    const vpnDebugEnabled = Boolean(settingData?.config?.vpn_debug)
+
+    useEffect(() => {
+        if (!vpnDebugEnabled && activeTab === "debug") {
+            setActiveTab("overview")
+        }
+    }, [activeTab, vpnDebugEnabled])
 
     const serverNameByID = useMemo(
         () => new Map(servers.map((server) => [server.id, server.name])),
@@ -136,9 +145,13 @@ export default function VPNPage() {
         data: debugResults = [],
         mutate: mutateDebugResults,
         isLoading: debugLoading,
-    } = useSWR<ModelAgentVPNDebugResult[]>("/api/v1/vpn/debug/agent-results?limit=200", swrFetcher, {
-        refreshInterval: activeTab === "debug" ? 2000 : 0,
-    })
+    } = useSWR<ModelAgentVPNDebugResult[]>(
+        vpnDebugEnabled ? "/api/v1/vpn/debug/agent-results?limit=200" : null,
+        swrFetcher,
+        {
+            refreshInterval: vpnDebugEnabled && activeTab === "debug" ? 2000 : 0,
+        },
+    )
 
     async function handleSavePolicy(): Promise<boolean> {
         if ((form.mode === "tun_split" || form.mode === "tun_global") && !tunRiskConfirmed) {
@@ -334,11 +347,17 @@ export default function VPNPage() {
             </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-                <TabsList className="grid h-auto w-full grid-cols-2 md:grid-cols-4">
+                <TabsList
+                    className={
+                        vpnDebugEnabled
+                            ? "grid h-auto w-full grid-cols-2 md:grid-cols-4"
+                            : "grid h-auto w-full grid-cols-3"
+                    }
+                >
                     <TabsTrigger value="overview">{t("VPN.Overview")}</TabsTrigger>
                     <TabsTrigger value="policy">{t("VPN.Policy")}</TabsTrigger>
                     <TabsTrigger value="session">{t("VPN.Session")}</TabsTrigger>
-                    <TabsTrigger value="debug">{t("VPN.Debug")}</TabsTrigger>
+                    {vpnDebugEnabled && <TabsTrigger value="debug">{t("VPN.Debug")}</TabsTrigger>}
                 </TabsList>
 
                 <TabsContent value="overview">
@@ -470,14 +489,16 @@ export default function VPNPage() {
                     </AlertDialog>
                 </TabsContent>
 
-                <TabsContent value="debug">
-                    <DebugTab
-                        results={debugResults}
-                        loading={debugLoading}
-                        serverName={serverName}
-                        onRefresh={() => void mutateDebugResults()}
-                    />
-                </TabsContent>
+                {vpnDebugEnabled && (
+                    <TabsContent value="debug">
+                        <DebugTab
+                            results={debugResults}
+                            loading={debugLoading}
+                            serverName={serverName}
+                            onRefresh={() => void mutateDebugResults()}
+                        />
+                    </TabsContent>
+                )}
             </Tabs>
         </div>
     )

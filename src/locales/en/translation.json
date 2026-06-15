@@ -157,6 +157,7 @@
         "Session": "Sessions",
         "Audit": "Audit",
         "Debug": "Debug",
+        "DebugSwitch": "Agent VPN debug",
         "DebugEmpty": "No Agent returns",
         "ReportedAt": "Reported at",
         "CheckID": "Check ID",

@@ -155,6 +155,7 @@
         "Session": "會話",
         "Audit": "審計",
         "Debug": "調試",
+        "DebugSwitch": "Agent VPN 調試",
         "DebugEmpty": "暫無 Agent 返回",
         "ReportedAt": "回報時間",
         "CheckID": "檢查 ID",

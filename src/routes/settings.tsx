@@ -52,6 +52,7 @@ const settingFormSchema = z.object({
     tls: asOptionalField(z.boolean()),
     enable_ip_change_notification: asOptionalField(z.boolean()),
     enable_plain_ip_in_notification: asOptionalField(z.boolean()),
+    vpn_debug: asOptionalField(z.boolean()),
     tsdb_enabled: asOptionalField(z.boolean()),
 })
 
@@ -90,6 +91,7 @@ export default function SettingsPage() {
                 site_name: "",
                 language: "",
                 user_template: "user-dist",
+                vpn_debug: false,
                 tsdb_enabled: false,
             },
         resetOptions: {
@@ -183,6 +185,24 @@ export default function SettingsPage() {
                                                 onCheckedChange={field.onChange}
                                             />
                                             <Label className="text-sm">{t("TSDBStatus")}</Label>
+                                        </div>
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="vpn_debug"
+                            render={({ field }) => (
+                                <FormItem className="flex items-center space-x-2">
+                                    <FormControl>
+                                        <div className="flex items-center gap-2">
+                                            <Checkbox
+                                                checked={field.value}
+                                                onCheckedChange={field.onChange}
+                                            />
+                                            <Label className="text-sm">{t("VPN.DebugSwitch")}</Label>
                                         </div>
                                     </FormControl>
                                     <FormMessage />

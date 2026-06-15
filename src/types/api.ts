@@ -724,6 +724,8 @@ export interface ModelSetting {
     /** 用于前端判断生成的安装命令是否启用 TLS */
     tls: boolean
     user_template: string
+    /** Agent VPN 调试结果记录 */
+    vpn_debug: boolean
     /** 前端真实IP */
     web_real_ip_header: string
 }
@@ -748,6 +750,7 @@ export interface ModelSettingForm {
     tls?: boolean
     tsdb_enabled?: boolean
     user_template?: string
+    vpn_debug?: boolean
     /** 前端真实IP */
     web_real_ip_header?: string
 }

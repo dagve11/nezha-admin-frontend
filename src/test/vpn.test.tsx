@@ -242,6 +242,7 @@ vi.mock("@/hooks/useSetting", () => ({
         data: {
             config: {
                 site_name: "Nezha",
+                vpn_debug: false,
             },
         },
         isLoading: false,
@@ -271,14 +272,14 @@ beforeEach(() => {
     Reflect.deleteProperty(globalThis, "WebSocket")
 })
 
-test("Agent VPN page exposes the planned dashboard tabs", () => {
+test("Agent VPN page exposes the planned dashboard tabs with debug hidden by default", () => {
     render(<VPNPage />)
 
     expect(screen.getByRole("heading", { name: "VPN.Title" })).toBeTruthy()
     expect(screen.getByRole("tab", { name: "VPN.Overview" })).toBeTruthy()
     expect(screen.getByRole("tab", { name: "VPN.Policy" })).toBeTruthy()
     expect(screen.getByRole("tab", { name: "VPN.Session" })).toBeTruthy()
-    expect(screen.getByRole("tab", { name: "VPN.Debug" })).toBeTruthy()
+    expect(screen.queryByRole("tab", { name: "VPN.Debug" })).toBeNull()
     expect(screen.queryByRole("tab", { name: "VPN.Audit" })).toBeNull()
 })
 
