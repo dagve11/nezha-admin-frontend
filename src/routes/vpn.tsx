@@ -24,6 +24,7 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { DebugTab } from "@/components/vpn/debug-tab"
 import { OverviewTab } from "@/components/vpn/overview-tab"
 import { PolicyForm } from "@/components/vpn/policy-form"
 import { PolicyTab } from "@/components/vpn/policy-tab"
@@ -43,6 +44,7 @@ import { normalizePolicyForm, policyToForm, validatePolicyFormClient } from "@/c
 import { useNotification } from "@/hooks/useNotfication"
 import { useServer } from "@/hooks/useServer"
 import {
+    ModelAgentVPNDebugResult,
     ModelAgentVPNPolicy,
     ModelAgentVPNPolicyForm,
     ModelAgentVPNPolicyStatusCheck,
@@ -130,6 +132,13 @@ export default function VPNPage() {
         "/api/v1/vpn/session",
         swrFetcher,
     )
+    const {
+        data: debugResults = [],
+        mutate: mutateDebugResults,
+        isLoading: debugLoading,
+    } = useSWR<ModelAgentVPNDebugResult[]>("/api/v1/vpn/debug/agent-results?limit=200", swrFetcher, {
+        refreshInterval: activeTab === "debug" ? 2000 : 0,
+    })
 
     async function handleSavePolicy(): Promise<boolean> {
         if ((form.mode === "tun_split" || form.mode === "tun_global") && !tunRiskConfirmed) {
@@ -201,6 +210,7 @@ export default function VPNPage() {
         try {
             await prepareVPNPolicyCore(policyID)
             toast(t("Success"), { description: t("VPN.CorePrepareSent") })
+            void mutateDebugResults()
         } catch (error) {
             toast(t("Error"), { description: errorMessage(error) })
         }
@@ -210,6 +220,7 @@ export default function VPNPage() {
         try {
             await cleanupVPNPolicyCore(policyID)
             toast(t("Success"), { description: t("VPN.CoreCleanupSent") })
+            void mutateDebugResults()
         } catch (error) {
             toast(t("Error"), { description: errorMessage(error) })
         }
@@ -219,6 +230,7 @@ export default function VPNPage() {
         try {
             await prepareVPNPolicyRules(policyID)
             toast(t("Success"), { description: t("VPN.RulesPrepareSent") })
+            void mutateDebugResults()
         } catch (error) {
             toast(t("Error"), { description: errorMessage(error) })
         }
@@ -228,6 +240,7 @@ export default function VPNPage() {
         try {
             await cleanupVPNPolicyRules(policyID)
             toast(t("Success"), { description: t("VPN.RulesCleanupSent") })
+            void mutateDebugResults()
         } catch (error) {
             toast(t("Error"), { description: errorMessage(error) })
         }
@@ -321,10 +334,11 @@ export default function VPNPage() {
             </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-                <TabsList className="grid h-auto w-full grid-cols-3">
+                <TabsList className="grid h-auto w-full grid-cols-2 md:grid-cols-4">
                     <TabsTrigger value="overview">{t("VPN.Overview")}</TabsTrigger>
                     <TabsTrigger value="policy">{t("VPN.Policy")}</TabsTrigger>
                     <TabsTrigger value="session">{t("VPN.Session")}</TabsTrigger>
+                    <TabsTrigger value="debug">{t("VPN.Debug")}</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="overview">
@@ -454,6 +468,15 @@ export default function VPNPage() {
                             </AlertDialogFooter>
                         </AlertDialogContent>
                     </AlertDialog>
+                </TabsContent>
+
+                <TabsContent value="debug">
+                    <DebugTab
+                        results={debugResults}
+                        loading={debugLoading}
+                        serverName={serverName}
+                        onRefresh={() => void mutateDebugResults()}
+                    />
                 </TabsContent>
             </Tabs>
         </div>

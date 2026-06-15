@@ -114,6 +114,43 @@ export interface ModelAgentVPNPolicyNodeStatus {
     logs?: string[]
 }
 
+export interface ModelVPNControlResult {
+    session_id: string
+    action: string
+    role: string
+    state: string
+    check_id?: string
+    core_version?: string
+    core_status?: string
+    core_path?: string
+    rules_status?: string
+    rules_path?: string
+    rules_version?: string
+    local_http?: string
+    local_socks?: string
+    tun_name?: string
+    upload_bytes?: number
+    download_bytes?: number
+    active_conns?: number
+    last_error?: string
+    logs?: string[]
+    started_at?: number
+    stopped_at?: number
+}
+
+export interface ModelAgentVPNDebugResult {
+    id: number
+    reported_at: string
+    reporter_server_id: number
+    reporter_server_name?: string
+    session_id: string
+    action: string
+    role: string
+    state: string
+    last_error?: string
+    result: ModelVPNControlResult
+}
+
 export interface ModelAgentVPNAuditLog {
     id: number
     session_id?: string

@@ -1,4 +1,5 @@
 export { OverviewTab } from "./overview-tab"
+export { DebugTab } from "./debug-tab"
 export { PolicyTab } from "./policy-tab"
 export { PolicyForm } from "./policy-form"
 export { SessionTab } from "./session-tab"

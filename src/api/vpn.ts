@@ -1,5 +1,6 @@
 import {
     ModelAgentVPNPolicy,
+    ModelAgentVPNDebugResult,
     ModelAgentVPNPolicyForm,
     ModelAgentVPNPolicyStatusCheck,
     ModelAgentVPNAuditLog,
@@ -49,6 +50,14 @@ export const checkVPNPolicyStatus = async (
     )
 }
 
+export const getVPNAgentDebugResults = async (
+    limit = 200,
+): Promise<ModelAgentVPNDebugResult[]> => {
+    return fetcher<ModelAgentVPNDebugResult[]>(FetcherMethod.GET, "/api/v1/vpn/debug/agent-results", {
+        limit,
+    })
+}
+
 export const startVPNSession = async (policyID: number): Promise<ModelAgentVPNSession> => {
     return fetcher<ModelAgentVPNSession>(FetcherMethod.POST, "/api/v1/vpn/session/start", {
         policy_id: policyID,
@@ -91,6 +100,7 @@ export const controlVPNSession = async (
 }
 
 export type {
+    ModelAgentVPNDebugResult,
     ModelAgentVPNPolicy,
     ModelAgentVPNPolicyStatusCheck,
     ModelAgentVPNAuditLog,

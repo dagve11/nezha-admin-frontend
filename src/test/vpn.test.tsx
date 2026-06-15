@@ -278,6 +278,7 @@ test("Agent VPN page exposes the planned dashboard tabs", () => {
     expect(screen.getByRole("tab", { name: "VPN.Overview" })).toBeTruthy()
     expect(screen.getByRole("tab", { name: "VPN.Policy" })).toBeTruthy()
     expect(screen.getByRole("tab", { name: "VPN.Session" })).toBeTruthy()
+    expect(screen.getByRole("tab", { name: "VPN.Debug" })).toBeTruthy()
     expect(screen.queryByRole("tab", { name: "VPN.Audit" })).toBeNull()
 })
 
