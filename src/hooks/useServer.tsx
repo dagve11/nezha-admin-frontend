@@ -45,11 +45,12 @@ export const ServerProvider: React.FC<ServerProviderProps> = ({
             (async () => {
                 try {
                     const s = (await getServers()) || []
-                    const serverData = s.map(({ id, name, host, last_active }) => ({
+                    const serverData = s.map(({ id, name, host, last_active, online }) => ({
                         id,
                         name,
                         host,
                         last_active,
+                        online,
                     }))
                     setServer(serverData)
                 } catch (error: any) {

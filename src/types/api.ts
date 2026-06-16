@@ -562,6 +562,7 @@ export interface ModelServer {
     id: number
     last_active: string
     name: string
+    online?: boolean
     /** 管理员可见备注 */
     note: string
     override_ddns_domains?: Record<string, string[]>

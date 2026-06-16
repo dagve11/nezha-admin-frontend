@@ -31,6 +31,20 @@ function seededRandom(seed: number): number {
     return value - Math.floor(value)
 }
 
+function isServerOnline(server: ServerIdentifierType): boolean {
+    if (typeof server.online === "boolean") {
+        return server.online
+    }
+    if (!server.last_active) {
+        return false
+    }
+    const lastActive = new Date(server.last_active).getTime()
+    if (Number.isNaN(lastActive)) {
+        return false
+    }
+    return Date.now() - lastActive < 90000
+}
+
 // Spread nodes around the relay hub with stable jitter.
 function generateNodePositions(
     servers: ServerIdentifierType[],
@@ -55,9 +69,7 @@ function generateNodePositions(
             name: serverName(server.id),
             x: centerX + Math.cos(angle) * actualRadius,
             y: centerY + Math.sin(angle) * actualRadius,
-            isOnline: server.last_active
-                ? new Date().getTime() - new Date(server.last_active).getTime() < 90000
-                : false,
+            isOnline: isServerOnline(server),
         }
     })
 }
@@ -211,13 +223,7 @@ export function TopologyDiagramNew({ servers, sessions, serverName, t }: Topolog
 
             {/* Summary panel */}
             <div className="absolute left-4 top-4 z-20 rounded-lg border border-zinc-800 bg-zinc-900/80 backdrop-blur-sm">
-                <div className="flex items-center gap-2.5 border-b border-zinc-800 px-3.5 py-2.5">
-                    <div className="flex h-7 w-7 items-center justify-center rounded-md border border-zinc-700 bg-zinc-800">
-                        <Waypoints className="h-4 w-4 text-zinc-300" />
-                    </div>
-                    <h2 className="text-sm font-medium text-zinc-100">{t("VPN.Topology")}</h2>
-                </div>
-                <div className="flex divide-x divide-zinc-800 text-center">
+                <div className="flex divide-x divide-zinc-800 p-2 text-center">
                     <div className="px-3.5 py-2">
                         <div className="text-base font-semibold tabular-nums text-zinc-100">
                             {servers.length}

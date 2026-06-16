@@ -15,6 +15,7 @@ export interface ServerIdentifierType {
     name: string
     host?: ServerIdentifierHostType
     last_active?: string
+    online?: boolean
 }
 
 export interface ServerStore {
