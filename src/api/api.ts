@@ -72,10 +72,7 @@ export async function fetcher<T>(method: FetcherMethod, path: string, data?: any
         (!lastestRefreshTokenAt || Date.now() - lastestRefreshTokenAt > 1000 * 60 * 60)
     ) {
         lastestRefreshTokenAt = Date.now()
-        fetch("/api/v1/refresh-token", {
-            method: "POST",
-            headers: buildUnsafeHeaders(false),
-        })
+        fetch("/api/v1/refresh-token")
     }
 
     return responseData.data

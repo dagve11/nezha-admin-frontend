@@ -24,81 +24,35 @@ import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Textarea } from "@/components/ui/textarea"
 import { IconButton } from "@/components/xui/icon-button"
-import { asOptionalField } from "@/lib/utils"
 import { ModelServerTaskResponse } from "@/types"
+import { AgentConfigSchema, GroupedBoolFields, type AgentConfig } from "@/types/server"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { CogIcon } from "lucide-react"
 import { useEffect, useState } from "react"
 import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
-import { z } from "zod"
 
-const agentConfigSchema = z.object({
-    debug: asOptionalField(z.boolean()),
-    disable_auto_update: asOptionalField(z.boolean()),
-    disable_command_execute: asOptionalField(z.boolean()),
-    disable_force_update: asOptionalField(z.boolean()),
-    disable_nat: asOptionalField(z.boolean()),
-    disable_send_query: asOptionalField(z.boolean()),
-    gpu: asOptionalField(z.boolean()),
-    hard_drive_partition_allowlist: asOptionalField(z.array(z.string())),
-    hard_drive_partition_allowlist_raw: asOptionalField(
-        z.string().refine(
-            (val) => {
-                try {
-                    JSON.parse(val)
-                    return true
-                } catch {
-                    return false
-                }
-            },
-            {
-                message: "Invalid JSON string",
-            },
-        ),
-    ),
-    ip_report_period: asOptionalField(z.coerce.number().int().min(30)),
-    nic_allowlist: asOptionalField(z.record(z.string(), z.boolean())),
-    nic_allowlist_raw: asOptionalField(
-        z.string().refine(
-            (val) => {
-                try {
-                    JSON.parse(val)
-                    return true
-                } catch {
-                    return false
-                }
-            },
-            {
-                message: "Invalid JSON string",
-            },
-        ),
-    ),
-    report_delay: asOptionalField(z.coerce.number().int().min(1).max(4)),
-    skip_connection_count: asOptionalField(z.boolean()),
-    skip_procs_count: asOptionalField(z.boolean()),
-    temperature: asOptionalField(z.boolean()),
-})
+const parseServerConfig = (value: unknown): AgentConfig => {
+    if (typeof value !== "string" || !value.trim()) {
+        return {}
+    }
+    const parsed = JSON.parse(value)
+    return parsed && typeof parsed === "object" ? parsed : {}
+}
 
-type AgentConfig = z.infer<typeof agentConfigSchema>
+const formatJSONField = (value: unknown) => {
+    if (value === undefined || value === null) {
+        return ""
+    }
+    return JSON.stringify(value)
+}
 
-const boolFields: (keyof AgentConfig)[] = [
-    "disable_auto_update",
-    "disable_command_execute",
-    "disable_force_update",
-    "disable_nat",
-    "disable_send_query",
-    "gpu",
-    "temperature",
-    "skip_connection_count",
-    "skip_procs_count",
-    "debug",
-]
-
-const groupedBoolFields: (keyof AgentConfig)[][] = []
-for (let i = 0; i < boolFields.length; i += 2) {
-    groupedBoolFields.push(boolFields.slice(i, i + 2))
+const parseJSONField = (value: unknown) => {
+    if (typeof value !== "string" || !value.trim()) {
+        return undefined
+    }
+    return JSON.parse(value)
 }
 
 interface ServerConfigCardProps extends ButtonProps {
@@ -116,7 +70,7 @@ export const ServerConfigCard = ({ sid, menuItem = false, ...props }: ServerConf
         const fetchData = async () => {
             try {
                 const result = await getServerConfig(sid)
-                setData(JSON.parse(result))
+                setData(parseServerConfig(result))
             } catch (error) {
                 console.error(error)
                 toast(t("Error"), {
@@ -132,13 +86,13 @@ export const ServerConfigCard = ({ sid, menuItem = false, ...props }: ServerConf
     }, [open, sid, t])
 
     const form = useForm({
-        resolver: zodResolver(agentConfigSchema) as any,
+        resolver: zodResolver(AgentConfigSchema) as any,
         defaultValues: {
             ...data,
-            hard_drive_partition_allowlist_raw: JSON.stringify(
+            hard_drive_partition_allowlist_raw: formatJSONField(
                 data?.hard_drive_partition_allowlist,
             ),
-            nic_allowlist_raw: JSON.stringify(data?.nic_allowlist),
+            nic_allowlist_raw: formatJSONField(data?.nic_allowlist),
         },
         resetOptions: {
             keepDefaultValues: false,
@@ -149,10 +103,10 @@ export const ServerConfigCard = ({ sid, menuItem = false, ...props }: ServerConf
         if (data) {
             form.reset({
                 ...data,
-                hard_drive_partition_allowlist_raw: JSON.stringify(
+                hard_drive_partition_allowlist_raw: formatJSONField(
                     data.hard_drive_partition_allowlist,
                 ),
-                nic_allowlist_raw: JSON.stringify(data.nic_allowlist),
+                nic_allowlist_raw: formatJSONField(data.nic_allowlist),
             })
         }
     }, [data, form])
@@ -160,12 +114,10 @@ export const ServerConfigCard = ({ sid, menuItem = false, ...props }: ServerConf
     const onSubmit = async (values: any) => {
         let resp: ModelServerTaskResponse = {}
         try {
-            values.nic_allowlist = values.nic_allowlist_raw
-                ? JSON.parse(values.nic_allowlist_raw)
-                : undefined
-            values.hard_drive_partition_allowlist = values.hard_drive_partition_allowlist_raw
-                ? JSON.parse(values.hard_drive_partition_allowlist_raw)
-                : undefined
+            values.nic_allowlist = parseJSONField(values.nic_allowlist_raw)
+            values.hard_drive_partition_allowlist = parseJSONField(
+                values.hard_drive_partition_allowlist_raw,
+            )
             resp = await setServerConfig({ config: JSON.stringify(values), servers: [sid] })
         } catch (e) {
             console.error(e)
@@ -283,7 +235,7 @@ export const ServerConfigCard = ({ sid, menuItem = false, ...props }: ServerConf
                                             </FormItem>
                                         )}
                                     />
-                                    {groupedBoolFields.map((group, idx) => (
+                                    {GroupedBoolFields.map((group, idx) => (
                                         <div className="flex gap-8" key={idx}>
                                             {group.map((field) => (
                                                 <FormField

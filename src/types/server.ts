@@ -48,7 +48,7 @@ export const AgentConfigSchema = z.object({
     temperature: asOptionalField(z.boolean()),
 })
 
-type AgentConfig = z.infer<typeof AgentConfigSchema>
+export type AgentConfig = z.infer<typeof AgentConfigSchema>
 
 const boolFields: (keyof AgentConfig)[] = [
     "disable_auto_update",
