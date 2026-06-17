@@ -51,7 +51,7 @@ export function validatePolicyFormClient(form: ModelAgentVPNPolicyForm): string 
 export function normalizePolicyForm(form: ModelAgentVPNPolicyForm): ModelAgentVPNPolicyForm {
     return {
         ...form,
-        name: form.name.trim() || "Agent VPN",
+        name: form.name.trim() || "Proxy Tunnel",
         relay_mode: form.relay_mode || "auto",
         exit_nat_host: form.exit_nat_host.trim(),
         exit_nat_port: form.exit_nat_enabled ? Math.max(Number(form.exit_nat_port) || 0, 0) : 0,

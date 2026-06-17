@@ -588,7 +588,6 @@ test("BestIPPage keeps only the first ten candidate IPs", async () => {
     })
     expect(screen.queryByText("203.0.113.11")).toBeNull()
 
-    fireEvent.click(screen.getByRole("button", { name: "BestIP.NotifyResult" }))
     await waitFor(() => {
         expect(notifyBestIPResult).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -944,12 +943,10 @@ test("BestIPPage sends selected best IP records to notification group", async ()
     })
 
     expect(screen.getAllByText("bestip-notify").length).toBeGreaterThan(0)
-    fireEvent.click(screen.getByRole("checkbox", { name: "BestIP.AutoNotifyFission" }))
     fireEvent.click(screen.getByRole("button", { name: "BestIP.RunFission" }))
     await waitFor(() => {
         expect(screen.getByText("1.0.0.1")).toBeTruthy()
     })
-    fireEvent.click(screen.getByRole("button", { name: "BestIP.NotifyResult" }))
 
     await waitFor(() => {
         expect(notifyBestIPResult).toHaveBeenCalledWith(

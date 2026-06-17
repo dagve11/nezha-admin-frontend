@@ -35,7 +35,7 @@ import {
     ModelBestIPFissionResult,
     ModelDDNSProfile,
 } from "@/types"
-import { Loader2, Send } from "lucide-react"
+import { Loader2 } from "lucide-react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
@@ -250,107 +250,107 @@ function fissionEventDetail(
 ): string {
     const roundPrefix = fissionRoundPrefix(event, t)
     switch (event.type) {
-    case "start":
-        return `${t("BestIP.TotalIPs")}: ${event.total_ips ?? event.ips?.length ?? 0} · IP: ${recordsText(event.ips)}`
-    case "round_start":
-        return `${roundPrefix}IP: ${recordsText(event.ips)}`
-    case "ip_lookup_start":
-        return `${roundPrefix}IP: ${event.ip || "-"}`
-    case "lookup_source_start":
-        return [
-            `IP: ${event.ip || "-"}`,
-            `${t("BestIP.LookupSource")}: ${event.source || "-"}`,
-        ].join(" · ")
-    case "lookup_source_done": {
-        const details = [
-            `IP: ${event.ip || "-"}`,
-            `${t("BestIP.LookupSource")}: ${event.source || "-"}`,
-        ]
-        if (event.status_code) {
-            details.push(`${t("BestIP.HTTPStatus")}: ${event.status_code}`)
+        case "start":
+            return `${t("BestIP.TotalIPs")}: ${event.total_ips ?? event.ips?.length ?? 0} · IP: ${recordsText(event.ips)}`
+        case "round_start":
+            return `${roundPrefix}IP: ${recordsText(event.ips)}`
+        case "ip_lookup_start":
+            return `${roundPrefix}IP: ${event.ip || "-"}`
+        case "lookup_source_start":
+            return [
+                `IP: ${event.ip || "-"}`,
+                `${t("BestIP.LookupSource")}: ${event.source || "-"}`,
+            ].join(" · ")
+        case "lookup_source_done": {
+            const details = [
+                `IP: ${event.ip || "-"}`,
+                `${t("BestIP.LookupSource")}: ${event.source || "-"}`,
+            ]
+            if (event.status_code) {
+                details.push(`${t("BestIP.HTTPStatus")}: ${event.status_code}`)
+            }
+            details.push(
+                `${t("BestIP.TotalDomains")}: ${event.total_domains ?? event.domains?.length ?? 0}`,
+            )
+            details.push(`${t("Domains")}: ${recordsText(event.domains)}`)
+            if (event.error) {
+                details.push(`${t("Error")}: ${event.error}`)
+            }
+            return details.join(" · ")
         }
-        details.push(
-            `${t("BestIP.TotalDomains")}: ${event.total_domains ?? event.domains?.length ?? 0}`,
-        )
-        details.push(`${t("Domains")}: ${recordsText(event.domains)}`)
-        if (event.error) {
-            details.push(`${t("Error")}: ${event.error}`)
+        case "ip_lookup_done":
+            return `${roundPrefix}${event.ip || "-"} -> ${recordsText(event.domains)}`
+        case "domain_resolve_start":
+            return `${roundPrefix}${event.domain || "-"}`
+        case "domain_resolve_done":
+            return `${roundPrefix}${event.domain || "-"} -> ${recordsText(event.ips)}`
+        case "round_done": {
+            const round = event.round_result
+            return [
+                `${roundPrefix}${t("BestIP.NewIPs")}: ${recordsText(event.new_ips ?? round?.new_ips)}`,
+                `${t("BestIP.NewDomains")}: ${recordsText(event.new_domains ?? round?.new_domains)}`,
+                `${t("BestIP.TotalIPs")}: ${event.total_ips ?? round?.total_ips ?? 0}`,
+                `${t("BestIP.TotalDomains")}: ${event.total_domains ?? round?.total_domains ?? 0}`,
+            ].join(" · ")
         }
-        return details.join(" · ")
-    }
-    case "ip_lookup_done":
-        return `${roundPrefix}${event.ip || "-"} -> ${recordsText(event.domains)}`
-    case "domain_resolve_start":
-        return `${roundPrefix}${event.domain || "-"}`
-    case "domain_resolve_done":
-        return `${roundPrefix}${event.domain || "-"} -> ${recordsText(event.ips)}`
-    case "round_done": {
-        const round = event.round_result
-        return [
-            `${roundPrefix}${t("BestIP.NewIPs")}: ${recordsText(event.new_ips ?? round?.new_ips)}`,
-            `${t("BestIP.NewDomains")}: ${recordsText(event.new_domains ?? round?.new_domains)}`,
-            `${t("BestIP.TotalIPs")}: ${event.total_ips ?? round?.total_ips ?? 0}`,
-            `${t("BestIP.TotalDomains")}: ${event.total_domains ?? round?.total_domains ?? 0}`,
-        ].join(" · ")
-    }
-    case "cloudflare_validation_start":
-        return `${t("BestIP.TotalIPs")}: ${event.total_ips ?? event.ips?.length ?? 0} · IP: ${recordsText(event.ips)}`
-    case "cloudflare_validation_done":
-        return [
-            `${t("BestIP.TotalIPs")}: ${event.total_ips ?? event.ips?.length ?? 0}`,
-            `${t("BestIP.FilteredIPs")}: ${recordsText(event.filtered_ips)}`,
-            `${t("BestIP.CloudflareRanges")}: IPv4 ${event.cloudflare_ipv4_ranges ?? 0} / IPv6 ${event.cloudflare_ipv6_ranges ?? 0}`,
-            `${t("BestIP.CloudflareHitRate")}: ${formatSuccessRate(event.cloudflare_hit_rate ?? 0)}`,
-        ].join(" · ")
-    case "probe_start":
-        return [
-            `IP: ${recordsText(event.ips)}`,
-            `${t("BestIP.ProbePort")}: ${event.probe_port ?? "-"}`,
-            `${t("BestIP.ProbeCount")}: ${event.probe_count ?? "-"}`,
-        ].join(" · ")
-    case "probe_stage_start":
-        return [
-            `${t("BestIP.ProbeStage")}: ${event.stage || "-"}`,
-            `${t("BestIP.TotalIPs")}: ${event.total_ips ?? event.ips?.length ?? 0}`,
-            `${t("BestIP.ProbeCount")}: ${event.probe_count ?? "-"}`,
-            `${t("BestIP.Workers")}: ${event.workers ?? "-"}`,
-        ].join(" · ")
-    case "probe_stage_done":
-        return [
-            `${t("BestIP.ProbeStage")}: ${event.stage || "-"}`,
-            `${t("BestIP.DoneCount")}: ${event.done ?? 0}/${event.total_ips ?? 0}`,
-            `${t("BestIP.ProbeCount")}: ${event.probe_count ?? "-"}`,
-        ].join(" · ")
-    case "probe_result": {
-        const candidate = event.candidate
-        if (!candidate) return event.ip || "-"
-        return [
-            `IP: ${candidate.ip || event.ip || "-"}`,
-            `${t("BestIP.Latency")}: ${formatLatency(candidate.avg_latency_ms)}`,
-            `${t("BestIP.P95Latency")}: ${formatLatency(candidate.p95_latency_ms ?? 0)}`,
-            `${t("BestIP.SuccessRate")}: ${formatSuccessRate(candidate.success_rate)}`,
-            `${t("BestIP.ProbeErrors")}: ${candidate.timeout_count ?? 0}/${candidate.refused_count ?? 0}/${candidate.other_errors ?? 0}`,
-            `${t("BestIP.Score")}: ${formatScore(candidate.score)}`,
-        ].join(" · ")
-    }
-    case "probe_done": {
-        const stats = event.probe_stats
-        return [
-            `${t("BestIP.TotalIPs")}: ${event.total_ips ?? stats?.total_probes ?? 0}`,
-            `${t("BestIP.TCPDialAttempts")}: ${stats?.tcp_dial_attempts ?? "-"}`,
-            `${t("BestIP.SuccessRate")}: ${stats?.total_probes ? formatSuccessRate((stats.success_count ?? 0) / stats.total_probes) : "-"}`,
-            `${t("BestIP.ProbeErrors")}: ${stats?.timeout_count ?? 0}/${stats?.refused_count ?? 0}/${stats?.other_error_count ?? 0}`,
-            `${t("BestIP.HTTPTestCount")}: ${stats?.http_test_count ?? 0}`,
-            `${t("BestIP.HTTPResult")}: ${stats?.http_success_count ?? 0}/${stats?.http_fail_count ?? 0}`,
-            `${t("BestIP.StagedScan")}: ${stats?.staged_scan ? t("BestIP.Enabled") : t("BestIP.Disabled")}`,
-        ].join(" · ")
-    }
-    case "done":
-        return `${t("BestIP.TotalIPs")}: ${event.total_ips ?? event.result?.ips?.length ?? event.ips?.length ?? 0} · IP: ${recordsText(event.ips ?? event.result?.ips)}`
-    case "error":
-        return event.error || "-"
-    default:
-        return "-"
+        case "cloudflare_validation_start":
+            return `${t("BestIP.TotalIPs")}: ${event.total_ips ?? event.ips?.length ?? 0} · IP: ${recordsText(event.ips)}`
+        case "cloudflare_validation_done":
+            return [
+                `${t("BestIP.TotalIPs")}: ${event.total_ips ?? event.ips?.length ?? 0}`,
+                `${t("BestIP.FilteredIPs")}: ${recordsText(event.filtered_ips)}`,
+                `${t("BestIP.CloudflareRanges")}: IPv4 ${event.cloudflare_ipv4_ranges ?? 0} / IPv6 ${event.cloudflare_ipv6_ranges ?? 0}`,
+                `${t("BestIP.CloudflareHitRate")}: ${formatSuccessRate(event.cloudflare_hit_rate ?? 0)}`,
+            ].join(" · ")
+        case "probe_start":
+            return [
+                `IP: ${recordsText(event.ips)}`,
+                `${t("BestIP.ProbePort")}: ${event.probe_port ?? "-"}`,
+                `${t("BestIP.ProbeCount")}: ${event.probe_count ?? "-"}`,
+            ].join(" · ")
+        case "probe_stage_start":
+            return [
+                `${t("BestIP.ProbeStage")}: ${event.stage || "-"}`,
+                `${t("BestIP.TotalIPs")}: ${event.total_ips ?? event.ips?.length ?? 0}`,
+                `${t("BestIP.ProbeCount")}: ${event.probe_count ?? "-"}`,
+                `${t("BestIP.Workers")}: ${event.workers ?? "-"}`,
+            ].join(" · ")
+        case "probe_stage_done":
+            return [
+                `${t("BestIP.ProbeStage")}: ${event.stage || "-"}`,
+                `${t("BestIP.DoneCount")}: ${event.done ?? 0}/${event.total_ips ?? 0}`,
+                `${t("BestIP.ProbeCount")}: ${event.probe_count ?? "-"}`,
+            ].join(" · ")
+        case "probe_result": {
+            const candidate = event.candidate
+            if (!candidate) return event.ip || "-"
+            return [
+                `IP: ${candidate.ip || event.ip || "-"}`,
+                `${t("BestIP.Latency")}: ${formatLatency(candidate.avg_latency_ms)}`,
+                `${t("BestIP.P95Latency")}: ${formatLatency(candidate.p95_latency_ms ?? 0)}`,
+                `${t("BestIP.SuccessRate")}: ${formatSuccessRate(candidate.success_rate)}`,
+                `${t("BestIP.ProbeErrors")}: ${candidate.timeout_count ?? 0}/${candidate.refused_count ?? 0}/${candidate.other_errors ?? 0}`,
+                `${t("BestIP.Score")}: ${formatScore(candidate.score)}`,
+            ].join(" · ")
+        }
+        case "probe_done": {
+            const stats = event.probe_stats
+            return [
+                `${t("BestIP.TotalIPs")}: ${event.total_ips ?? stats?.total_probes ?? 0}`,
+                `${t("BestIP.TCPDialAttempts")}: ${stats?.tcp_dial_attempts ?? "-"}`,
+                `${t("BestIP.SuccessRate")}: ${stats?.total_probes ? formatSuccessRate((stats.success_count ?? 0) / stats.total_probes) : "-"}`,
+                `${t("BestIP.ProbeErrors")}: ${stats?.timeout_count ?? 0}/${stats?.refused_count ?? 0}/${stats?.other_error_count ?? 0}`,
+                `${t("BestIP.HTTPTestCount")}: ${stats?.http_test_count ?? 0}`,
+                `${t("BestIP.HTTPResult")}: ${stats?.http_success_count ?? 0}/${stats?.http_fail_count ?? 0}`,
+                `${t("BestIP.StagedScan")}: ${stats?.staged_scan ? t("BestIP.Enabled") : t("BestIP.Disabled")}`,
+            ].join(" · ")
+        }
+        case "done":
+            return `${t("BestIP.TotalIPs")}: ${event.total_ips ?? event.result?.ips?.length ?? event.ips?.length ?? 0} · IP: ${recordsText(event.ips ?? event.result?.ips)}`
+        case "error":
+            return event.error || "-"
+        default:
+            return "-"
     }
 }
 
@@ -405,7 +405,6 @@ export default function BestIPPage() {
     const [isSavingFissionConfig, setIsSavingFissionConfig] = useState(false)
     const [isSavingDNSConfig, setIsSavingDNSConfig] = useState(false)
     const [isSavingAutomation, setIsSavingAutomation] = useState(false)
-    const [isNotifyingResult, setIsNotifyingResult] = useState(false)
     const [isRunningAutomation, setIsRunningAutomation] = useState(false)
     const [isRollingBackAutomation, setIsRollingBackAutomation] = useState(false)
     const fissionLogRef = useRef<HTMLDivElement>(null)
@@ -490,17 +489,17 @@ export default function BestIPPage() {
     const effectiveNotificationGroupID = notificationGroupTouched
         ? notificationGroupID
         : hasSavedAutomation(automation)
-          ? automation?.notification_group_id ?? 0
+          ? (automation?.notification_group_id ?? 0)
           : notificationGroupID
     const effectivePushSuccessful = pushSuccessfulTouched
         ? pushSuccessful
         : hasSavedAutomation(automation)
-          ? automation?.push_successful ?? false
+          ? (automation?.push_successful ?? false)
           : pushSuccessful
     const effectivePushFailed = pushFailedTouched
         ? pushFailed
         : hasSavedAutomation(automation)
-          ? automation?.push_failed ?? false
+          ? (automation?.push_failed ?? false)
           : pushFailed
 
     const candidateRows = useMemo(() => candidateRowsFromResult(fissionResult), [fissionResult])
@@ -568,11 +567,15 @@ export default function BestIPPage() {
             push_successful: saved ? Boolean(automation?.push_successful) : effectivePushSuccessful,
             push_failed: saved ? Boolean(automation?.push_failed) : effectivePushFailed,
             notification_group_id: saved
-                ? automation?.notification_group_id ?? 0
+                ? (automation?.notification_group_id ?? 0)
                 : effectiveNotificationGroupID,
-            write_top_n: clampBestIPCandidateCount(saved ? automation?.write_top_n || 1 : writeTopN),
-            ddns_profiles: saved ? automation?.ddns_profiles ?? [] : effectiveSelectedDDNSProfiles,
-            domains: saved ? automation?.domains ?? [] : parseList(effectiveOverrideDomains),
+            write_top_n: clampBestIPCandidateCount(
+                saved ? automation?.write_top_n || 1 : writeTopN,
+            ),
+            ddns_profiles: saved
+                ? (automation?.ddns_profiles ?? [])
+                : effectiveSelectedDDNSProfiles,
+            domains: saved ? (automation?.domains ?? []) : parseList(effectiveOverrideDomains),
             fission: hasStoredFissionConfig(storedFission) ? storedFission : buildFissionForm(),
         }
     }
@@ -650,15 +653,13 @@ export default function BestIPPage() {
             })
             setFissionResult(result)
             const nextCandidateRows = candidateRowsFromResult(result)
-            if (effectivePushSuccessful) {
-                try {
-                    await sendNotifyResult(nextCandidateRows, false)
-                } catch (error) {
-                    toast(t("Error"), {
-                        description:
-                            error instanceof Error ? error.message : t("Results.UnExpectedError"),
-                    })
-                }
+            try {
+                await sendNotifyResult(nextCandidateRows, false)
+            } catch (error) {
+                toast(t("Error"), {
+                    description:
+                        error instanceof Error ? error.message : t("Results.UnExpectedError"),
+                })
             }
         } catch (error) {
             if (!receivedErrorEvent) {
@@ -755,19 +756,6 @@ export default function BestIPPage() {
         }
     }
 
-    const notifyResult = async () => {
-        setIsNotifyingResult(true)
-        try {
-            await sendNotifyResult(candidateRows, true)
-        } catch (error) {
-            toast(t("Error"), {
-                description: error instanceof Error ? error.message : t("Results.UnExpectedError"),
-            })
-        } finally {
-            setIsNotifyingResult(false)
-        }
-    }
-
     const toggleDDNSProfile = (id: number, checked: boolean) => {
         setDDNSSelectionTouched(true)
         setSelectedDDNSProfiles((current) => {
@@ -802,32 +790,6 @@ export default function BestIPPage() {
                             }}
                         />
                     </div>
-                    <label className="flex h-10 items-center gap-2 text-sm">
-                        <Checkbox
-                            checked={effectivePushSuccessful}
-                            onCheckedChange={(checked) => {
-                                setPushSuccessfulTouched(true)
-                                setPushSuccessful(checked === true)
-                            }}
-                        />
-                        {t("BestIP.AutoNotifyFission")}
-                    </label>
-                    <Button
-                        variant="outline"
-                        onClick={notifyResult}
-                        disabled={
-                            isNotifyingResult ||
-                            effectiveNotificationGroupID === 0 ||
-                            (selectedIPv4Records.length === 0 && selectedIPv6Records.length === 0)
-                        }
-                    >
-                        {isNotifyingResult ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                            <Send className="mr-2 h-4 w-4" />
-                        )}
-                        {t("BestIP.NotifyResult")}
-                    </Button>
                     <Button onClick={runFission} disabled={isRunning}>
                         {isRunning && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         {t("BestIP.RunFission")}

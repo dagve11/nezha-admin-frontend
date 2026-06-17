@@ -18,6 +18,7 @@ import { useTranslation } from "react-i18next"
 interface PolicyFormProps {
     form: ModelAgentVPNPolicyForm
     editingPolicyID: number | null
+    hasSession: boolean
     tunRiskConfirmed: boolean
     servers: ServerIdentifierType[]
     notifierGroups: Array<{ group: { id: number; name: string } }>
@@ -34,6 +35,7 @@ interface PolicyFormProps {
 export function PolicyForm({
     form,
     editingPolicyID,
+    hasSession,
     tunRiskConfirmed,
     servers,
     notifierGroups,
@@ -485,7 +487,7 @@ export function PolicyForm({
                 <Button variant="outline" onClick={onSave}>
                     {t("VPN.SavePolicy")}
                 </Button>
-                <Button disabled={editingPolicyID === null} onClick={onStart}>
+                <Button disabled={editingPolicyID === null || hasSession} onClick={onStart}>
                     <Play className="mr-2 h-4 w-4" />
                     {t("VPN.StartSession")}
                 </Button>

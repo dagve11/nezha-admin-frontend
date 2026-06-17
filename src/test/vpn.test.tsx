@@ -272,7 +272,7 @@ beforeEach(() => {
     Reflect.deleteProperty(globalThis, "WebSocket")
 })
 
-test("Agent VPN page exposes the planned dashboard tabs with debug hidden by default", () => {
+test("Proxy Tunnel page exposes the planned dashboard tabs with debug hidden by default", () => {
     render(<VPNPage />)
 
     expect(screen.getByRole("heading", { name: "VPN.Title" })).toBeTruthy()
@@ -283,7 +283,7 @@ test("Agent VPN page exposes the planned dashboard tabs with debug hidden by def
     expect(screen.queryByRole("tab", { name: "VPN.Audit" })).toBeNull()
 })
 
-test("Agent VPN overview shows VPN-capable agent status", () => {
+test("Proxy Tunnel overview shows Proxy Tunnel-capable agent status", () => {
     render(<VPNPage />)
 
     expect(screen.getByRole("heading", { name: "VPN.AgentCapability" })).toBeTruthy()
@@ -296,18 +296,13 @@ test("Agent VPN overview shows VPN-capable agent status", () => {
     expect(screen.getByText("Core not installed")).toBeTruthy()
 })
 
-test("Agent VPN page renders API policies and sessions, and calls session actions", async () => {
+test("Proxy Tunnel page renders API policies and sessions, and calls session actions", async () => {
     render(<VPNPage />)
 
     fireEvent.click(screen.getByRole("tab", { name: "VPN.Policy" }))
     expect(screen.getByText("github split")).toBeTruthy()
     expect(screen.getAllByText("entry-cn").length).toBeGreaterThan(0)
     expect(screen.getAllByText("exit-jp").length).toBeGreaterThan(0)
-
-    fireEvent.click(screen.getByRole("button", { name: "VPN.StartSession github split" }))
-    await waitFor(() => {
-        expect(startVPNSession).toHaveBeenCalledWith(7)
-    })
 
     fireEvent.click(screen.getByRole("tab", { name: "VPN.Session" }))
     expect(screen.getByText("vpn_session_1")).toBeTruthy()
@@ -327,7 +322,7 @@ test("Agent VPN page renders API policies and sessions, and calls session action
     })
 })
 
-test("Agent VPN policy tab edits, deletes, and requires TUN risk confirmation", async () => {
+test("Proxy Tunnel policy tab edits, deletes, and requires TUN risk confirmation", async () => {
     render(<VPNPage />)
 
     fireEvent.click(screen.getByRole("tab", { name: "VPN.Policy" }))
@@ -436,7 +431,7 @@ test("Agent VPN policy tab edits, deletes, and requires TUN risk confirmation", 
     })
 })
 
-test("Agent VPN policy form validates listen addresses and CIDR before saving", async () => {
+test("Proxy Tunnel policy form validates listen addresses and CIDR before saving", async () => {
     render(<VPNPage />)
 
     fireEvent.click(screen.getByRole("tab", { name: "VPN.Policy" }))
@@ -468,7 +463,7 @@ test("Agent VPN policy form validates listen addresses and CIDR before saving", 
     )
 })
 
-test("Agent VPN policy form validates URLs and SHA256 before saving", async () => {
+test("Proxy Tunnel policy form validates URLs and SHA256 before saving", async () => {
     render(<VPNPage />)
 
     fireEvent.click(screen.getByRole("tab", { name: "VPN.Policy" }))
@@ -554,7 +549,7 @@ test("Agent VPN policy form validates URLs and SHA256 before saving", async () =
     )
 })
 
-test("Agent VPN policy tab copies a saved policy into a new form", async () => {
+test("Proxy Tunnel policy tab copies a saved policy into a new form", async () => {
     render(<VPNPage />)
 
     fireEvent.click(screen.getByRole("tab", { name: "VPN.Policy" }))
@@ -577,22 +572,21 @@ test("Agent VPN policy tab copies a saved policy into a new form", async () => {
     expect(updateVPNPolicy).not.toHaveBeenCalled()
 })
 
-test("Agent VPN policy form start button starts the edited policy", async () => {
+test("Proxy Tunnel policy form start button is disabled when the policy has a session", async () => {
     render(<VPNPage />)
 
     fireEvent.click(screen.getByRole("tab", { name: "VPN.Policy" }))
     fireEvent.click(screen.getByRole("button", { name: "VPN.EditPolicy global tunnel" }))
 
-    const formStartButton = screen.getByRole("button", { name: "VPN.StartSession" })
+    const formStartButton = screen.getByRole("button", {
+        name: "VPN.StartSession",
+    }) as HTMLButtonElement
+    expect(formStartButton.disabled).toBe(true)
     fireEvent.click(formStartButton)
-
-    await waitFor(() => {
-        expect(startVPNSession).toHaveBeenCalledWith(8)
-    })
-    expect(startVPNSession).not.toHaveBeenCalledWith(7)
+    expect(startVPNSession).not.toHaveBeenCalled()
 })
 
-test("Agent VPN new policy button resets the form into create mode", () => {
+test("Proxy Tunnel new policy button resets the form into create mode", () => {
     render(<VPNPage />)
 
     fireEvent.click(screen.getByRole("tab", { name: "VPN.Policy" }))
@@ -615,19 +609,16 @@ test("Agent VPN new policy button resets the form into create mode", () => {
     ).toBe(true)
 })
 
-test("Agent VPN start selects the new session", async () => {
+test("Proxy Tunnel policy start is blocked when a policy already has a session", async () => {
     render(<VPNPage />)
 
     fireEvent.click(screen.getByRole("tab", { name: "VPN.Policy" }))
     fireEvent.click(screen.getByRole("button", { name: "VPN.StartSession github split" }))
 
-    await waitFor(() => {
-        expect(startVPNSession).toHaveBeenCalledWith(7)
-    })
-    expect(screen.getAllByText("vpn_session_2").length).toBeGreaterThan(0)
+    expect(startVPNSession).not.toHaveBeenCalled()
 })
 
-test("Agent VPN session tab starts inactive sessions from the primary action", async () => {
+test("Proxy Tunnel session tab starts inactive sessions from the primary action", async () => {
     render(<VPNPage />)
 
     fireEvent.click(screen.getByRole("tab", { name: "VPN.Session" }))
@@ -638,7 +629,7 @@ test("Agent VPN session tab starts inactive sessions from the primary action", a
     })
 })
 
-test("Agent VPN session actions are gated by session state", () => {
+test("Proxy Tunnel session actions are gated by session state", () => {
     render(<VPNPage />)
 
     fireEvent.click(screen.getByRole("tab", { name: "VPN.Session" }))
@@ -678,7 +669,7 @@ test("Agent VPN session actions are gated by session state", () => {
     ).toBe(false)
 })
 
-test("Agent VPN session tab filters sessions by state and entry or exit node", () => {
+test("Proxy Tunnel session tab filters sessions by state and entry or exit node", () => {
     render(<VPNPage />)
 
     fireEvent.click(screen.getByRole("tab", { name: "VPN.Session" }))
@@ -708,7 +699,7 @@ test("Agent VPN session tab filters sessions by state and entry or exit node", (
     expect(screen.getByRole("row", { name: /vpn_session_2/ })).toBeTruthy()
 })
 
-test("Agent VPN table action buttons include visible text labels", () => {
+test("Proxy Tunnel table action buttons include visible text labels", () => {
     render(<VPNPage />)
 
     fireEvent.click(screen.getByRole("tab", { name: "VPN.Policy" }))
@@ -730,7 +721,7 @@ test("Agent VPN table action buttons include visible text labels", () => {
     expect(deleteButton.textContent).toContain("VPN.DeleteSession")
 })
 
-test("Agent VPN session tab opens a per-session log dialog", async () => {
+test("Proxy Tunnel session tab opens a per-session log dialog", async () => {
     vi.stubGlobal("WebSocket", MockVPNWebSocket)
 
     render(<VPNPage />)
@@ -753,7 +744,7 @@ test("Agent VPN session tab opens a per-session log dialog", async () => {
     expect(screen.getByText(/session failed/)).toBeTruthy()
 })
 
-test("Agent VPN session log stream appends, caps logs, and reconnects", async () => {
+test("Proxy Tunnel session log stream appends, caps logs, and reconnects", async () => {
     vi.stubGlobal("WebSocket", MockVPNWebSocket)
 
     render(<VPNPage />)
@@ -794,7 +785,7 @@ test("Agent VPN session log stream appends, caps logs, and reconnects", async ()
     }
 })
 
-test("Agent VPN session log stream displays server-provided log lines", async () => {
+test("Proxy Tunnel session log stream displays server-provided log lines", async () => {
     vi.stubGlobal("WebSocket", MockVPNWebSocket)
 
     render(<VPNPage />)
@@ -820,7 +811,7 @@ test("Agent VPN session log stream displays server-provided log lines", async ()
     expect(screen.getByText("[08:00:01] sidecar accepted connection")).toBeTruthy()
 })
 
-test("Agent VPN session tab keeps detailed fields in the detail dialog", () => {
+test("Proxy Tunnel session tab keeps detailed fields in the detail dialog", () => {
     render(<VPNPage />)
 
     fireEvent.click(screen.getByRole("tab", { name: "VPN.Session" }))
@@ -854,7 +845,7 @@ test("Agent VPN session tab keeps detailed fields in the detail dialog", () => {
     expect(screen.getByText("tun preflight failed")).toBeTruthy()
 })
 
-test("header exposes Agent VPN navigation entry", () => {
+test("header exposes Proxy Tunnel navigation entry", () => {
     render(
         <MemoryRouter initialEntries={["/dashboard"]}>
             <Header />
@@ -865,13 +856,13 @@ test("header exposes Agent VPN navigation entry", () => {
     expect(links.some((link) => link.getAttribute("href") === "/dashboard/vpn")).toBe(true)
 })
 
-test("Agent VPN detail label is present in all locale files", () => {
+test("Proxy Tunnel detail label is present in all locale files", () => {
     expect(zhCNTranslation.VPN.Detail).toBe("详情")
     expect(zhTWTranslation.VPN.Detail).toBe("詳情")
     expect(enTranslation.VPN.Detail).toBe("Detail")
 })
 
-test("Agent VPN action labels are present in all locale files", () => {
+test("Proxy Tunnel action labels are present in all locale files", () => {
     const expectedActionLabels = [
         "ActionCreatePolicy",
         "ActionUpdatePolicy",

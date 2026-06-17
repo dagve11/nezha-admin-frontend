@@ -376,6 +376,7 @@ export default function VPNPage() {
                 <TabsContent value="policy" className="space-y-4">
                     <PolicyTab
                         policies={policies}
+                        sessions={sessions}
                         servers={servers}
                         serverName={serverName}
                         onNew={handleNewPolicy}
@@ -417,6 +418,12 @@ export default function VPNPage() {
                             <PolicyForm
                                 form={form}
                                 editingPolicyID={editingPolicyID}
+                                hasSession={
+                                    editingPolicyID !== null &&
+                                    sessions.some(
+                                        (session) => session.policy_id === editingPolicyID,
+                                    )
+                                }
                                 tunRiskConfirmed={tunRiskConfirmed}
                                 servers={servers}
                                 notifierGroups={notifierGroup}

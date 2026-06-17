@@ -26,7 +26,7 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
-import { ModelAgentVPNPolicy, ServerIdentifierType } from "@/types"
+import { ModelAgentVPNPolicy, ModelAgentVPNSession, ServerIdentifierType } from "@/types"
 import {
     ClipboardList,
     Download,
@@ -43,6 +43,7 @@ import { useTranslation } from "react-i18next"
 
 interface PolicyTabProps {
     policies: ModelAgentVPNPolicy[]
+    sessions: ModelAgentVPNSession[]
     servers: ServerIdentifierType[]
     serverName: (id?: number) => string
     onNew: () => void
@@ -58,6 +59,7 @@ interface PolicyTabProps {
 
 export function PolicyTab({
     policies,
+    sessions,
     servers,
     serverName,
     onNew,
@@ -72,6 +74,7 @@ export function PolicyTab({
 }: PolicyTabProps) {
     const { t } = useTranslation()
     const serverByID = new Map(servers.map((server) => [server.id, server]))
+    const policiesWithSession = new Set(sessions.map((session) => session.policy_id))
 
     return (
         <Card>
@@ -107,120 +110,128 @@ export function PolicyTab({
                                 </TableCell>
                             </TableRow>
                         )}
-                        {policies.map((policy) => (
-                            <TableRow key={policy.id}>
-                                <TableCell className="font-medium">{policy.name}</TableCell>
-                                <TableCell>{serverName(policy.entry_server_id)}</TableCell>
-                                <TableCell>{serverName(policy.exit_server_id)}</TableCell>
-                                <TableCell>
-                                    <Badge variant="outline">{modeLabel(t, policy.mode)}</Badge>
-                                </TableCell>
-                                <TableCell>
-                                    <CoreStatus
-                                        entry={serverByID.get(policy.entry_server_id)}
-                                        exit={serverByID.get(policy.exit_server_id)}
-                                        t={t}
-                                    />
-                                </TableCell>
-                                <TableCell>
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <Button
-                                                size="icon"
-                                                variant="ghost"
-                                                aria-label={`${t("Actions")} ${policy.name}`}
-                                            >
-                                                <MoreHorizontal className="h-4 w-4" />
-                                            </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end" className="w-48">
-                                            <DropdownMenuItem
-                                                onClick={() => onEdit(policy)}
-                                                aria-label={`${t("VPN.EditPolicy")} ${policy.name}`}
-                                            >
-                                                <Pencil className="h-4 w-4" />
-                                                <span>{t("VPN.EditPolicy")}</span>
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem
-                                                onClick={() => onStart(policy.id)}
-                                                aria-label={`${t("VPN.StartSession")} ${policy.name}`}
-                                            >
-                                                <Play className="h-4 w-4" />
-                                                <span>{t("VPN.StartSession")}</span>
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem
-                                                onClick={() => onCheckStatus(policy.id)}
-                                                aria-label={`${t("VPN.CheckStatus")} ${policy.name}`}
-                                            >
-                                                <RefreshCw className="h-4 w-4" />
-                                                <span>{t("VPN.CheckStatus")}</span>
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem
-                                                onClick={() => onPrepareCore(policy.id)}
-                                                aria-label={`${t("VPN.PrepareCore")} ${policy.name}`}
-                                            >
-                                                <Download className="h-4 w-4" />
-                                                <span>{t("VPN.PrepareCore")}</span>
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem
-                                                onClick={() => onCleanupCore(policy.id)}
-                                                aria-label={`${t("VPN.CleanupCore")} ${policy.name}`}
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                                <span>{t("VPN.CleanupCore")}</span>
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem
-                                                onClick={() => onPrepareRules(policy.id)}
-                                                aria-label={`${t("VPN.PrepareRules")} ${policy.name}`}
-                                            >
-                                                <FileDown className="h-4 w-4" />
-                                                <span>{t("VPN.PrepareRules")}</span>
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem
-                                                onClick={() => onCleanupRules(policy.id)}
-                                                aria-label={`${t("VPN.CleanupRules")} ${policy.name}`}
-                                            >
-                                                <FileX className="h-4 w-4" />
-                                                <span>{t("VPN.CleanupRules")}</span>
-                                            </DropdownMenuItem>
-                                            <AlertDialog>
-                                                <AlertDialogTrigger asChild>
-                                                    <DropdownMenuItem
-                                                        className="text-destructive focus:text-destructive"
-                                                        onSelect={(e) => e.preventDefault()}
-                                                        aria-label={`${t("VPN.DeletePolicy")} ${policy.name}`}
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                        <span>{t("VPN.DeletePolicy")}</span>
-                                                    </DropdownMenuItem>
-                                                </AlertDialogTrigger>
-                                                <AlertDialogContent>
-                                                    <AlertDialogHeader>
-                                                        <AlertDialogTitle>
-                                                            {t("ConfirmDeletion")}
-                                                        </AlertDialogTitle>
-                                                        <AlertDialogDescription>
-                                                            {t("Results.ThisOperationIsUnrecoverable")}
-                                                        </AlertDialogDescription>
-                                                    </AlertDialogHeader>
-                                                    <AlertDialogFooter>
-                                                        <AlertDialogCancel>{t("Close")}</AlertDialogCancel>
-                                                        <AlertDialogAction
-                                                            className={buttonVariants({
-                                                                variant: "destructive",
-                                                            })}
-                                                            onClick={() => onDelete(policy.id)}
+                        {policies.map((policy) => {
+                            const hasSession = policiesWithSession.has(policy.id)
+                            return (
+                                <TableRow key={policy.id}>
+                                    <TableCell className="font-medium">{policy.name}</TableCell>
+                                    <TableCell>{serverName(policy.entry_server_id)}</TableCell>
+                                    <TableCell>{serverName(policy.exit_server_id)}</TableCell>
+                                    <TableCell>
+                                        <Badge variant="outline">{modeLabel(t, policy.mode)}</Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                        <CoreStatus
+                                            entry={serverByID.get(policy.entry_server_id)}
+                                            exit={serverByID.get(policy.exit_server_id)}
+                                            t={t}
+                                        />
+                                    </TableCell>
+                                    <TableCell>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button
+                                                    size="icon"
+                                                    variant="ghost"
+                                                    aria-label={`${t("Actions")} ${policy.name}`}
+                                                >
+                                                    <MoreHorizontal className="h-4 w-4" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end" className="w-48">
+                                                <DropdownMenuItem
+                                                    onClick={() => onEdit(policy)}
+                                                    aria-label={`${t("VPN.EditPolicy")} ${policy.name}`}
+                                                >
+                                                    <Pencil className="h-4 w-4" />
+                                                    <span>{t("VPN.EditPolicy")}</span>
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem
+                                                    onClick={() => onStart(policy.id)}
+                                                    disabled={hasSession}
+                                                    aria-label={`${t("VPN.StartSession")} ${policy.name}`}
+                                                >
+                                                    <Play className="h-4 w-4" />
+                                                    <span>{t("VPN.StartSession")}</span>
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem
+                                                    onClick={() => onCheckStatus(policy.id)}
+                                                    aria-label={`${t("VPN.CheckStatus")} ${policy.name}`}
+                                                >
+                                                    <RefreshCw className="h-4 w-4" />
+                                                    <span>{t("VPN.CheckStatus")}</span>
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem
+                                                    onClick={() => onPrepareCore(policy.id)}
+                                                    aria-label={`${t("VPN.PrepareCore")} ${policy.name}`}
+                                                >
+                                                    <Download className="h-4 w-4" />
+                                                    <span>{t("VPN.PrepareCore")}</span>
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem
+                                                    onClick={() => onCleanupCore(policy.id)}
+                                                    aria-label={`${t("VPN.CleanupCore")} ${policy.name}`}
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                    <span>{t("VPN.CleanupCore")}</span>
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem
+                                                    onClick={() => onPrepareRules(policy.id)}
+                                                    aria-label={`${t("VPN.PrepareRules")} ${policy.name}`}
+                                                >
+                                                    <FileDown className="h-4 w-4" />
+                                                    <span>{t("VPN.PrepareRules")}</span>
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem
+                                                    onClick={() => onCleanupRules(policy.id)}
+                                                    aria-label={`${t("VPN.CleanupRules")} ${policy.name}`}
+                                                >
+                                                    <FileX className="h-4 w-4" />
+                                                    <span>{t("VPN.CleanupRules")}</span>
+                                                </DropdownMenuItem>
+                                                <AlertDialog>
+                                                    <AlertDialogTrigger asChild>
+                                                        <DropdownMenuItem
+                                                            className="text-destructive focus:text-destructive"
+                                                            onSelect={(e) => e.preventDefault()}
+                                                            aria-label={`${t("VPN.DeletePolicy")} ${policy.name}`}
                                                         >
-                                                            {t("Confirm")}
-                                                        </AlertDialogAction>
-                                                    </AlertDialogFooter>
-                                                </AlertDialogContent>
-                                            </AlertDialog>
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
-                                </TableCell>
-                            </TableRow>
-                        ))}
+                                                            <Trash2 className="h-4 w-4" />
+                                                            <span>{t("VPN.DeletePolicy")}</span>
+                                                        </DropdownMenuItem>
+                                                    </AlertDialogTrigger>
+                                                    <AlertDialogContent>
+                                                        <AlertDialogHeader>
+                                                            <AlertDialogTitle>
+                                                                {t("ConfirmDeletion")}
+                                                            </AlertDialogTitle>
+                                                            <AlertDialogDescription>
+                                                                {t(
+                                                                    "Results.ThisOperationIsUnrecoverable",
+                                                                )}
+                                                            </AlertDialogDescription>
+                                                        </AlertDialogHeader>
+                                                        <AlertDialogFooter>
+                                                            <AlertDialogCancel>
+                                                                {t("Close")}
+                                                            </AlertDialogCancel>
+                                                            <AlertDialogAction
+                                                                className={buttonVariants({
+                                                                    variant: "destructive",
+                                                                })}
+                                                                onClick={() => onDelete(policy.id)}
+                                                            >
+                                                                {t("Confirm")}
+                                                            </AlertDialogAction>
+                                                        </AlertDialogFooter>
+                                                    </AlertDialogContent>
+                                                </AlertDialog>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </TableCell>
+                                </TableRow>
+                            )
+                        })}
                     </TableBody>
                 </Table>
             </CardContent>
