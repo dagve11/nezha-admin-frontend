@@ -236,6 +236,102 @@ export function PolicyForm({
                         </Field>
                     </div>
 
+                    <div className="grid gap-4 rounded-md border bg-muted/30 p-3 md:grid-cols-2 xl:grid-cols-4">
+                        <Field label={t("VPN.DirectTransport")} id="vpn-direct-transport">
+                            <Select
+                                value={form.direct_transport}
+                                onValueChange={(value) =>
+                                    onFormChange("direct_transport", value)
+                                }
+                            >
+                                <SelectTrigger id="vpn-direct-transport">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="tcp_tls">
+                                        {t("VPN.DirectTransportTCPTLS")}
+                                    </SelectItem>
+                                    <SelectItem value="ws_tls">
+                                        {t("VPN.DirectTransportWSTLS")}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </Field>
+                        {form.direct_transport === "ws_tls" && (
+                            <>
+                                <Field label={t("VPN.DirectHost")} id="vpn-direct-host">
+                                    <Input
+                                        id="vpn-direct-host"
+                                        value={form.direct_host}
+                                        onChange={(e) =>
+                                            onFormChange("direct_host", e.target.value)
+                                        }
+                                        placeholder="pt.example.com"
+                                    />
+                                </Field>
+                                <Field label={t("VPN.DirectPort")} id="vpn-direct-port">
+                                    <Input
+                                        id="vpn-direct-port"
+                                        type="number"
+                                        min={1}
+                                        max={65535}
+                                        step={1}
+                                        value={form.direct_port || ""}
+                                        onChange={(e) =>
+                                            onFormChange("direct_port", Number(e.target.value))
+                                        }
+                                        placeholder="443"
+                                    />
+                                </Field>
+                                <Field label={t("VPN.DirectTLSServerName")} id="vpn-direct-sni">
+                                    <Input
+                                        id="vpn-direct-sni"
+                                        value={form.direct_tls_server_name}
+                                        onChange={(e) =>
+                                            onFormChange(
+                                                "direct_tls_server_name",
+                                                e.target.value,
+                                            )
+                                        }
+                                        placeholder="pt.example.com"
+                                    />
+                                </Field>
+                                <Field label={t("VPN.DirectWSPath")} id="vpn-direct-ws-path">
+                                    <Input
+                                        id="vpn-direct-ws-path"
+                                        value={form.direct_ws_path}
+                                        onChange={(e) =>
+                                            onFormChange("direct_ws_path", e.target.value)
+                                        }
+                                        placeholder="/agent-vpn/ws"
+                                    />
+                                </Field>
+                                <Field label={t("VPN.DirectCertSHA256")} id="vpn-direct-cert-pin">
+                                    <Input
+                                        id="vpn-direct-cert-pin"
+                                        value={form.direct_cert_sha256}
+                                        onChange={(e) =>
+                                            onFormChange("direct_cert_sha256", e.target.value)
+                                        }
+                                        placeholder="optional"
+                                    />
+                                </Field>
+                                <div className="flex items-center justify-between gap-3 rounded-md border bg-background px-3 py-2">
+                                    <Label htmlFor="vpn-direct-tls-verify">
+                                        {t("VPN.DirectTLSVerify")}
+                                    </Label>
+                                    <Switch
+                                        id="vpn-direct-tls-verify"
+                                        checked={form.direct_tls_verify}
+                                        onCheckedChange={(checked) =>
+                                            onFormChange("direct_tls_verify", checked)
+                                        }
+                                    />
+                                </div>
+                            </>
+                        )}
+                    </div>
+
                     <div className="grid gap-4 rounded-md border bg-muted/30 p-3 md:grid-cols-[12rem_1fr_10rem]">
                         <div className="flex items-center justify-between md:col-span-3">
                             <Label htmlFor="vpn-exit-nat-enabled">{t("VPN.ExitNAT")}</Label>

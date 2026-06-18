@@ -44,6 +44,20 @@ export function validatePolicyFormClient(form: ModelAgentVPNPolicyForm): string 
     ) {
         return "VPN.ValidationExitNATInvalid"
     }
+    if (
+        form.direct_transport === "ws_tls" &&
+        (!isValidNATHost(form.direct_host) ||
+            !Number.isInteger(form.direct_port) ||
+            form.direct_port <= 0 ||
+            form.direct_port > 65535 ||
+            (form.direct_tls_server_name.trim() !== "" &&
+                !isValidNATHost(form.direct_tls_server_name)) ||
+            !isValidDirectWSPath(form.direct_ws_path) ||
+            !isValidSHA256(form.direct_cert_sha256) ||
+            (!form.direct_tls_verify && form.direct_cert_sha256.trim() === ""))
+    ) {
+        return "VPN.ValidationDirectTransportInvalid"
+    }
     if (form.expires_seconds <= 0) return "VPN.ValidationExpiresRequired"
     return null
 }
@@ -53,6 +67,12 @@ export function normalizePolicyForm(form: ModelAgentVPNPolicyForm): ModelAgentVP
         ...form,
         name: form.name.trim() || "Proxy Tunnel",
         relay_mode: form.relay_mode || "auto",
+        direct_transport: form.direct_transport || "tcp_tls",
+        direct_host: form.direct_host.trim(),
+        direct_port: Math.max(Number(form.direct_port) || 0, 0),
+        direct_tls_server_name: form.direct_tls_server_name.trim(),
+        direct_ws_path: normalizeDirectWSPath(form.direct_ws_path),
+        direct_cert_sha256: form.direct_cert_sha256.trim().toLowerCase(),
         exit_nat_host: form.exit_nat_host.trim(),
         exit_nat_port: form.exit_nat_enabled ? Math.max(Number(form.exit_nat_port) || 0, 0) : 0,
         domains: form.domains.filter(Boolean),
@@ -80,6 +100,13 @@ export function policyToForm(policy: ModelAgentVPNPolicy): ModelAgentVPNPolicyFo
         mode: policy.mode,
         rule_mode: policy.rule_mode,
         relay_mode: policy.relay_mode ?? "auto",
+        direct_transport: policy.direct_transport ?? "tcp_tls",
+        direct_host: policy.direct_host ?? "",
+        direct_port: policy.direct_port ?? 443,
+        direct_tls_server_name: policy.direct_tls_server_name ?? "",
+        direct_ws_path: policy.direct_ws_path ?? "/agent-vpn/ws",
+        direct_tls_verify: policy.direct_tls_verify ?? true,
+        direct_cert_sha256: policy.direct_cert_sha256 ?? "",
         exit_nat_enabled: policy.exit_nat_enabled ?? false,
         exit_nat_host: policy.exit_nat_host ?? "",
         exit_nat_port: policy.exit_nat_port ?? 0,
@@ -105,6 +132,17 @@ export function policyToForm(policy: ModelAgentVPNPolicy): ModelAgentVPNPolicyFo
         core_download_url: policy.core_download_url ?? "",
         core_sha256: policy.core_sha256 ?? "",
     }
+}
+
+function normalizeDirectWSPath(value: string): string {
+    const trimmed = value.trim()
+    if (!trimmed) return "/agent-vpn/ws"
+    return trimmed.startsWith("/") ? trimmed : `/${trimmed}`
+}
+
+function isValidDirectWSPath(value: string): boolean {
+    const path = normalizeDirectWSPath(value)
+    return path.startsWith("/") && !/[\s?#]/.test(path)
 }
 
 function validateListenAddress(value: string): boolean {

@@ -6,6 +6,13 @@ export interface ModelAgentVPNPolicy {
     mode: string
     rule_mode: string
     relay_mode?: string
+    direct_transport?: string
+    direct_host?: string
+    direct_port?: number
+    direct_tls_server_name?: string
+    direct_ws_path?: string
+    direct_tls_verify?: boolean
+    direct_cert_sha256?: string
     exit_nat_enabled?: boolean
     exit_nat_host?: string
     exit_nat_port?: number
@@ -39,6 +46,13 @@ export interface ModelAgentVPNPolicyForm {
     mode: string
     rule_mode: string
     relay_mode: string
+    direct_transport: string
+    direct_host: string
+    direct_port: number
+    direct_tls_server_name: string
+    direct_ws_path: string
+    direct_tls_verify: boolean
+    direct_cert_sha256: string
     exit_nat_enabled: boolean
     exit_nat_host: string
     exit_nat_port: number

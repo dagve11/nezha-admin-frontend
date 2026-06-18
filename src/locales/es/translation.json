@@ -256,5 +256,17 @@
     "CopiedToClipboard": "Copiar al portapapeles",
     "ClipboardWriteFailed": "Error al escribir en el portapapeles",
     "PastedFromClipboard": "Pegado del portapapeles",
-    "ClipboardReadFailed": "Falló la lectura del portapapeles"
+    "ClipboardReadFailed": "Falló la lectura del portapapeles",
+    "VPN": {
+        "DirectTransport": "Direct transport",
+        "DirectTransportTCPTLS": "Legacy TCP/TLS",
+        "DirectTransportWSTLS": "WSS / TLS 1.3",
+        "DirectHost": "WSS public host",
+        "DirectPort": "WSS port",
+        "DirectTLSServerName": "TLS server name",
+        "DirectWSPath": "WebSocket path",
+        "DirectTLSVerify": "Verify TLS certificate",
+        "DirectCertSHA256": "Certificate pin SHA256",
+        "ValidationDirectTransportInvalid": "WSS direct transport requires a valid host, port, path, and optional SHA256 certificate pin."
+    }
 }

@@ -187,5 +187,17 @@
     "IPChangeNotification": "Уведомление об изменении IP",
     "CreateAlertRule": "Создать правила оповещений",
     "UserId": "ID пользователя",
-    "NewUser": "Новый пользователь"
+    "NewUser": "Новый пользователь",
+    "VPN": {
+        "DirectTransport": "Direct transport",
+        "DirectTransportTCPTLS": "Legacy TCP/TLS",
+        "DirectTransportWSTLS": "WSS / TLS 1.3",
+        "DirectHost": "WSS public host",
+        "DirectPort": "WSS port",
+        "DirectTLSServerName": "TLS server name",
+        "DirectWSPath": "WebSocket path",
+        "DirectTLSVerify": "Verify TLS certificate",
+        "DirectCertSHA256": "Certificate pin SHA256",
+        "ValidationDirectTransportInvalid": "WSS direct transport requires a valid host, port, path, and optional SHA256 certificate pin."
+    }
 }
