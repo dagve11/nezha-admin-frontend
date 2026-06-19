@@ -99,6 +99,7 @@ const initialForm: ModelAgentVPNPolicyForm = {
     auto_restart_on_relay_failure: true,
     auto_restart_on_exit_failure: true,
     auto_restart_on_agent_reconnect: true,
+    auto_restart_settings_configured: true,
     set_system_proxy: true,
     tun_health_url: "",
     tun_health_timeout_seconds: 10,

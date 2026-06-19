@@ -36,6 +36,7 @@ export interface ModelAgentVPNPolicy {
     auto_restart_on_relay_failure?: boolean
     auto_restart_on_exit_failure?: boolean
     auto_restart_on_agent_reconnect?: boolean
+    auto_restart_settings_configured?: boolean
     set_system_proxy?: boolean
     tun_health_url?: string
     tun_health_timeout_seconds?: number
@@ -82,6 +83,7 @@ export interface ModelAgentVPNPolicyForm {
     auto_restart_on_relay_failure: boolean
     auto_restart_on_exit_failure: boolean
     auto_restart_on_agent_reconnect: boolean
+    auto_restart_settings_configured: boolean
     set_system_proxy: boolean
     tun_health_url: string
     tun_health_timeout_seconds: number
