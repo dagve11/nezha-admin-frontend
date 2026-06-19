@@ -235,15 +235,23 @@ export function SessionTab({
                                             {session.session_id}
                                         </TableCell>
                                         <TableCell>
-                                            <Badge
-                                                variant={
-                                                    session.state === "running"
-                                                        ? "default"
-                                                        : "secondary"
-                                                }
-                                            >
-                                                {session.state}
-                                            </Badge>
+                                            <div className="flex flex-wrap gap-1.5">
+                                                <Badge
+                                                    variant={
+                                                        session.state === "running"
+                                                            ? "default"
+                                                            : "secondary"
+                                                    }
+                                                >
+                                                    {session.state}
+                                                </Badge>
+                                                {session.recovery_state &&
+                                                    session.recovery_state !== "idle" && (
+                                                        <Badge variant="outline">
+                                                            {session.recovery_state}
+                                                        </Badge>
+                                                    )}
+                                            </div>
                                         </TableCell>
                                         <TableCell>
                                             {formatBytes(session.upload_bytes)} /{" "}
@@ -734,10 +742,43 @@ function SessionDetailDialog({
                     <DetailItem
                         label={t("Status")}
                         value={
-                            <Badge variant={session.state === "running" ? "default" : "secondary"}>
-                                {session.state}
-                            </Badge>
+                            <div className="flex flex-wrap gap-1.5">
+                                <Badge
+                                    variant={
+                                        session.state === "running" ? "default" : "secondary"
+                                    }
+                                >
+                                    {session.state}
+                                </Badge>
+                                {session.recovery_state && session.recovery_state !== "idle" && (
+                                    <Badge variant="outline">{session.recovery_state}</Badge>
+                                )}
+                            </div>
                         }
+                    />
+                    <DetailItem
+                        label={t("VPN.RuntimeInstance")}
+                        value={session.runtime_instance_id || "-"}
+                    />
+                    <DetailItem
+                        label={t("VPN.RecoveryAttempt")}
+                        value={String(session.recovery_attempt ?? 0)}
+                    />
+                    <DetailItem
+                        label={t("VPN.RecoveryStartedAt")}
+                        value={session.recovery_started_at || "-"}
+                    />
+                    <DetailItem
+                        label={t("VPN.RecoveryNextAt")}
+                        value={session.recovery_next_at || "-"}
+                    />
+                    <DetailItem
+                        label={t("VPN.RecoveryReason")}
+                        value={session.recovery_reason || "-"}
+                    />
+                    <DetailItem
+                        label={t("VPN.RecoveryLastError")}
+                        value={session.recovery_last_error || "-"}
                     />
                     <DetailItem
                         label={t("VPN.Traffic")}

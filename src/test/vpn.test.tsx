@@ -272,6 +272,30 @@ beforeEach(() => {
     Reflect.deleteProperty(globalThis, "WebSocket")
 })
 
+function switchVPNTab(name: string) {
+    fireEvent.mouseDown(screen.getByRole("tab", { name }), { button: 0, ctrlKey: false })
+}
+
+function openActionMenu(owner: string) {
+    fireEvent.pointerDown(screen.getByRole("button", { name: `Actions ${owner}` }), {
+        button: 0,
+        ctrlKey: false,
+    })
+}
+
+function clickActionMenuItem(action: string, owner: string) {
+    openActionMenu(owner)
+    fireEvent.click(screen.getByRole("menuitem", { name: `${action} ${owner}` }))
+}
+
+function clickVisibleCloseButton() {
+    const button = screen
+        .getAllByRole("button", { name: "Close" })
+        .find((element) => element.textContent === "Close")
+    if (!button) throw new Error("visible Close button not found")
+    fireEvent.click(button)
+}
+
 test("Proxy Tunnel page exposes the planned dashboard tabs with debug hidden by default", () => {
     render(<VPNPage />)
 
@@ -286,29 +310,26 @@ test("Proxy Tunnel page exposes the planned dashboard tabs with debug hidden by 
 test("Proxy Tunnel overview shows Proxy Tunnel-capable agent status", () => {
     render(<VPNPage />)
 
-    expect(screen.getByRole("heading", { name: "VPN.AgentCapability" })).toBeTruthy()
+    expect(screen.getByRole("img", { name: "VPN.Topology" })).toBeTruthy()
     expect(screen.getByText("entry-cn")).toBeTruthy()
     expect(screen.getByText("exit-jp")).toBeTruthy()
-    expect(screen.getByText("linux/amd64")).toBeTruthy()
-    expect(screen.getByText("windows/amd64")).toBeTruthy()
-    expect(screen.getByText("1.12.0")).toBeTruthy()
-    expect(screen.getByText("VPN.CoreMissing")).toBeTruthy()
-    expect(screen.getByText("Core not installed")).toBeTruthy()
+    expect(screen.getByText("VPN.FlowRelay")).toBeTruthy()
+    expect(screen.getAllByText("VPN.ActiveSessions").length).toBeGreaterThan(0)
 })
 
 test("Proxy Tunnel page renders API policies and sessions, and calls session actions", async () => {
     render(<VPNPage />)
 
-    fireEvent.click(screen.getByRole("tab", { name: "VPN.Policy" }))
+    switchVPNTab("VPN.Policy")
     expect(screen.getByText("github split")).toBeTruthy()
     expect(screen.getAllByText("entry-cn").length).toBeGreaterThan(0)
     expect(screen.getAllByText("exit-jp").length).toBeGreaterThan(0)
 
-    fireEvent.click(screen.getByRole("tab", { name: "VPN.Session" }))
+    switchVPNTab("VPN.Session")
     expect(screen.getByText("vpn_session_1")).toBeTruthy()
     expect(screen.getByText("123 B / 456 B")).toBeTruthy()
 
-    fireEvent.click(screen.getByRole("button", { name: "VPN.StopSession vpn_session_1" }))
+    clickActionMenuItem("VPN.StopSession", "vpn_session_1")
     expect(stopVPNSession).not.toHaveBeenCalled()
     expect(screen.getByText("VPN.ConfirmStopSession")).toBeTruthy()
     fireEvent.click(screen.getByRole("button", { name: "Confirm" }))
@@ -316,7 +337,7 @@ test("Proxy Tunnel page renders API policies and sessions, and calls session act
         expect(stopVPNSession).toHaveBeenCalledWith("vpn_session_1")
     })
 
-    fireEvent.click(screen.getByRole("button", { name: "VPN.RefreshSession vpn_session_1" }))
+    clickActionMenuItem("VPN.RefreshSession", "vpn_session_1")
     await waitFor(() => {
         expect(refreshVPNSessionStatus).toHaveBeenCalledWith("vpn_session_1")
     })
@@ -325,8 +346,8 @@ test("Proxy Tunnel page renders API policies and sessions, and calls session act
 test("Proxy Tunnel policy tab edits, deletes, and requires TUN risk confirmation", async () => {
     render(<VPNPage />)
 
-    fireEvent.click(screen.getByRole("tab", { name: "VPN.Policy" }))
-    fireEvent.click(screen.getByRole("button", { name: "VPN.EditPolicy github split" }))
+    switchVPNTab("VPN.Policy")
+    clickActionMenuItem("VPN.EditPolicy", "github split")
     fireEvent.change(screen.getByLabelText("Name"), {
         target: { value: "github split edited" },
     })
@@ -383,16 +404,17 @@ test("Proxy Tunnel policy tab edits, deletes, and requires TUN risk confirmation
         )
     })
 
-    fireEvent.click(screen.getByRole("button", { name: "VPN.DeletePolicy github split" }))
+    clickActionMenuItem("VPN.DeletePolicy", "github split")
     expect(deleteVPNPolicy).not.toHaveBeenCalled()
     expect(screen.getByText("ConfirmDeletion")).toBeTruthy()
     fireEvent.click(screen.getByRole("button", { name: "Confirm" }))
     await waitFor(() => {
         expect(deleteVPNPolicy).toHaveBeenCalledWith([7])
     })
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" })
 
     updateVPNPolicy.mockClear()
-    fireEvent.click(screen.getByRole("button", { name: "VPN.EditPolicy global tunnel" }))
+    clickActionMenuItem("VPN.EditPolicy", "global tunnel")
     expect((screen.getByLabelText("VPN.TunHealthURL") as HTMLInputElement).value).toBe(
         "https://old.example.com/generate_204",
     )
@@ -434,8 +456,8 @@ test("Proxy Tunnel policy tab edits, deletes, and requires TUN risk confirmation
 test("Proxy Tunnel policy form validates listen addresses and CIDR before saving", async () => {
     render(<VPNPage />)
 
-    fireEvent.click(screen.getByRole("tab", { name: "VPN.Policy" }))
-    fireEvent.click(screen.getByRole("button", { name: "VPN.EditPolicy github split" }))
+    switchVPNTab("VPN.Policy")
+    clickActionMenuItem("VPN.EditPolicy", "github split")
     fireEvent.change(screen.getByLabelText("VPN.LocalSocks"), {
         target: { value: "0.0.0.0:1080" },
     })
@@ -466,8 +488,8 @@ test("Proxy Tunnel policy form validates listen addresses and CIDR before saving
 test("Proxy Tunnel policy form validates URLs and SHA256 before saving", async () => {
     render(<VPNPage />)
 
-    fireEvent.click(screen.getByRole("tab", { name: "VPN.Policy" }))
-    fireEvent.click(screen.getByRole("button", { name: "VPN.EditPolicy github split" }))
+    switchVPNTab("VPN.Policy")
+    clickActionMenuItem("VPN.EditPolicy", "github split")
     fireEvent.change(screen.getByLabelText("VPN.CoreDownloadURL"), {
         target: { value: "file:///tmp/sing-box" },
     })
@@ -534,8 +556,8 @@ test("Proxy Tunnel policy form validates URLs and SHA256 before saving", async (
     )
 
     toastMock.mockClear()
-    fireEvent.click(screen.getByText("Close"))
-    fireEvent.click(screen.getByRole("button", { name: "VPN.EditPolicy global tunnel" }))
+    clickVisibleCloseButton()
+    clickActionMenuItem("VPN.EditPolicy", "global tunnel")
     fireEvent.change(screen.getByLabelText("VPN.TunHealthURL"), {
         target: { value: "file:///tmp/health" },
     })
@@ -552,8 +574,8 @@ test("Proxy Tunnel policy form validates URLs and SHA256 before saving", async (
 test("Proxy Tunnel policy tab copies a saved policy into a new form", async () => {
     render(<VPNPage />)
 
-    fireEvent.click(screen.getByRole("tab", { name: "VPN.Policy" }))
-    fireEvent.click(screen.getByRole("button", { name: "VPN.CopyPolicy github split" }))
+    switchVPNTab("VPN.Policy")
+    clickActionMenuItem("VPN.CopyPolicy", "github split")
 
     expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("github split copy")
     fireEvent.click(screen.getByRole("button", { name: "VPN.SavePolicy" }))
@@ -575,8 +597,8 @@ test("Proxy Tunnel policy tab copies a saved policy into a new form", async () =
 test("Proxy Tunnel policy form start button is disabled when the policy has a session", async () => {
     render(<VPNPage />)
 
-    fireEvent.click(screen.getByRole("tab", { name: "VPN.Policy" }))
-    fireEvent.click(screen.getByRole("button", { name: "VPN.EditPolicy global tunnel" }))
+    switchVPNTab("VPN.Policy")
+    clickActionMenuItem("VPN.EditPolicy", "global tunnel")
 
     const formStartButton = screen.getByRole("button", {
         name: "VPN.StartSession",
@@ -589,20 +611,18 @@ test("Proxy Tunnel policy form start button is disabled when the policy has a se
 test("Proxy Tunnel new policy button resets the form into create mode", () => {
     render(<VPNPage />)
 
-    fireEvent.click(screen.getByRole("tab", { name: "VPN.Policy" }))
-    fireEvent.click(screen.getByRole("button", { name: "VPN.EditPolicy global tunnel" }))
+    switchVPNTab("VPN.Policy")
+    clickActionMenuItem("VPN.EditPolicy", "global tunnel")
 
     expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("global tunnel")
     expect(
         (screen.getByRole("button", { name: "VPN.StartSession" }) as HTMLButtonElement).disabled,
-    ).toBe(false)
+    ).toBe(true)
 
-    fireEvent.click(screen.getByText("Close"))
+    clickVisibleCloseButton()
     fireEvent.click(screen.getByRole("button", { name: "VPN.NewPolicy" }))
 
-    expect(screen.getByRole("tab", { name: "VPN.Policy" }).getAttribute("data-state")).toBe(
-        "active",
-    )
+    expect(screen.getByRole("dialog", { name: "VPN.PolicyForm" })).toBeTruthy()
     expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("")
     expect(
         (screen.getByRole("button", { name: "VPN.StartSession" }) as HTMLButtonElement).disabled,
@@ -612,8 +632,13 @@ test("Proxy Tunnel new policy button resets the form into create mode", () => {
 test("Proxy Tunnel policy start is blocked when a policy already has a session", async () => {
     render(<VPNPage />)
 
-    fireEvent.click(screen.getByRole("tab", { name: "VPN.Policy" }))
-    fireEvent.click(screen.getByRole("button", { name: "VPN.StartSession github split" }))
+    switchVPNTab("VPN.Policy")
+    openActionMenu("github split")
+    expect(
+        screen
+            .getByRole("menuitem", { name: "VPN.StartSession github split" })
+            .getAttribute("aria-disabled"),
+    ).toBe("true")
 
     expect(startVPNSession).not.toHaveBeenCalled()
 })
@@ -621,8 +646,8 @@ test("Proxy Tunnel policy start is blocked when a policy already has a session",
 test("Proxy Tunnel session tab starts inactive sessions from the primary action", async () => {
     render(<VPNPage />)
 
-    fireEvent.click(screen.getByRole("tab", { name: "VPN.Session" }))
-    fireEvent.click(screen.getByRole("button", { name: "VPN.StartSession vpn_session_2" }))
+    switchVPNTab("VPN.Session")
+    clickActionMenuItem("VPN.StartSession", "vpn_session_2")
 
     await waitFor(() => {
         expect(restartVPNSession).toHaveBeenCalledWith("vpn_session_2")
@@ -632,47 +657,64 @@ test("Proxy Tunnel session tab starts inactive sessions from the primary action"
 test("Proxy Tunnel session actions are gated by session state", () => {
     render(<VPNPage />)
 
-    fireEvent.click(screen.getByRole("tab", { name: "VPN.Session" }))
+    switchVPNTab("VPN.Session")
 
     expect(
-        (screen.getByRole("button", { name: "VPN.StopSession vpn_session_1" }) as HTMLButtonElement)
-            .disabled,
-    ).toBe(false)
+        screen
+            .getByRole("button", { name: "Actions vpn_session_1" })
+            .getAttribute("data-disabled"),
+    ).toBeNull()
+    expect(
+        screen
+            .getByRole("button", { name: "Actions vpn_session_2" })
+            .getAttribute("data-disabled"),
+    ).toBeNull()
+
+    openActionMenu("vpn_session_1")
     expect(
         (
-            screen.getByRole("button", {
+            screen.getByRole("menuitem", {
+                name: "VPN.StopSession vpn_session_1",
+            }) as HTMLElement
+        ).getAttribute("aria-disabled"),
+    ).toBeNull()
+    expect(
+        (
+            screen.getByRole("menuitem", {
                 name: "VPN.RefreshSession vpn_session_1",
-            }) as HTMLButtonElement
-        ).disabled,
-    ).toBe(false)
+            }) as HTMLElement
+        ).getAttribute("aria-disabled"),
+    ).toBeNull()
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" })
 
+    openActionMenu("vpn_session_2")
     expect(
         (
-            screen.getByRole("button", {
+            screen.getByRole("menuitem", {
                 name: "VPN.StartSession vpn_session_2",
-            }) as HTMLButtonElement
-        ).disabled,
-    ).toBe(false)
+            }) as HTMLElement
+        ).getAttribute("aria-disabled"),
+    ).toBeNull()
     expect(
         (
-            screen.getByRole("button", {
+            screen.getByRole("menuitem", {
                 name: "VPN.RefreshSession vpn_session_2",
-            }) as HTMLButtonElement
-        ).disabled,
-    ).toBe(false)
+            }) as HTMLElement
+        ).getAttribute("aria-disabled"),
+    ).toBeNull()
     expect(
         (
-            screen.getByRole("button", {
+            screen.getByRole("menuitem", {
                 name: "VPN.DeleteSession vpn_session_2",
-            }) as HTMLButtonElement
-        ).disabled,
-    ).toBe(false)
+            }) as HTMLElement
+        ).getAttribute("aria-disabled"),
+    ).toBeNull()
 })
 
 test("Proxy Tunnel session tab filters sessions by state and entry or exit node", () => {
     render(<VPNPage />)
 
-    fireEvent.click(screen.getByRole("tab", { name: "VPN.Session" }))
+    switchVPNTab("VPN.Session")
     expect(screen.getByRole("row", { name: /vpn_session_1/ })).toBeTruthy()
     expect(screen.getByRole("row", { name: /vpn_session_2/ })).toBeTruthy()
 
@@ -702,23 +744,29 @@ test("Proxy Tunnel session tab filters sessions by state and entry or exit node"
 test("Proxy Tunnel table action buttons include visible text labels", () => {
     render(<VPNPage />)
 
-    fireEvent.click(screen.getByRole("tab", { name: "VPN.Policy" }))
-    const policyStartButton = screen.getByRole("button", { name: "VPN.StartSession github split" })
-    expect(policyStartButton.textContent).toContain("VPN.StartSession")
-    const policyDeleteButton = screen.getByRole("button", { name: "VPN.DeletePolicy github split" })
-    expect(policyDeleteButton.textContent).toContain("VPN.DeletePolicy")
+    switchVPNTab("VPN.Policy")
+    openActionMenu("github split")
+    expect(screen.getByRole("menuitem", { name: "VPN.StartSession github split" }).textContent)
+        .toContain("VPN.StartSession")
+    expect(screen.getByRole("menuitem", { name: "VPN.DeletePolicy github split" }).textContent)
+        .toContain("VPN.DeletePolicy")
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" })
 
-    fireEvent.click(screen.getByRole("tab", { name: "VPN.Session" }))
-    const stopButton = screen.getByRole("button", { name: "VPN.StopSession vpn_session_1" })
-    expect(stopButton.textContent).toContain("VPN.StopSession")
-    const startButton = screen.getByRole("button", { name: "VPN.StartSession vpn_session_2" })
-    expect(startButton.textContent).toContain("VPN.StartSession")
-    const refreshButton = screen.getByRole("button", { name: "VPN.RefreshSession vpn_session_1" })
-    expect(refreshButton.textContent).toContain("VPN.RefreshSession")
-    const logButton = screen.getByRole("button", { name: "VPN.ViewSessionLog vpn_session_1" })
-    expect(logButton.textContent).toContain("VPN.ViewSessionLog")
-    const deleteButton = screen.getByRole("button", { name: "VPN.DeleteSession vpn_session_1" })
-    expect(deleteButton.textContent).toContain("VPN.DeleteSession")
+    switchVPNTab("VPN.Session")
+    openActionMenu("vpn_session_1")
+    expect(screen.getByRole("menuitem", { name: "VPN.StopSession vpn_session_1" }).textContent)
+        .toContain("VPN.StopSession")
+    expect(screen.getByRole("menuitem", { name: "VPN.RefreshSession vpn_session_1" }).textContent)
+        .toContain("VPN.RefreshSession")
+    expect(screen.getByRole("menuitem", { name: "VPN.ViewSessionLog vpn_session_1" }).textContent)
+        .toContain("VPN.ViewSessionLog")
+    expect(screen.getByRole("menuitem", { name: "VPN.DeleteSession vpn_session_1" }).textContent)
+        .toContain("VPN.DeleteSession")
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" })
+
+    openActionMenu("vpn_session_2")
+    expect(screen.getByRole("menuitem", { name: "VPN.StartSession vpn_session_2" }).textContent)
+        .toContain("VPN.StartSession")
 })
 
 test("Proxy Tunnel session tab opens a per-session log dialog", async () => {
@@ -726,8 +774,8 @@ test("Proxy Tunnel session tab opens a per-session log dialog", async () => {
 
     render(<VPNPage />)
 
-    fireEvent.click(screen.getByRole("tab", { name: "VPN.Session" }))
-    fireEvent.click(screen.getByRole("button", { name: "VPN.ViewSessionLog vpn_session_2" }))
+    switchVPNTab("VPN.Session")
+    clickActionMenuItem("VPN.ViewSessionLog", "vpn_session_2")
 
     await waitFor(() => {
         expect(MockVPNWebSocket.instances.length).toBe(1)
@@ -749,8 +797,8 @@ test("Proxy Tunnel session log stream appends, caps logs, and reconnects", async
 
     render(<VPNPage />)
 
-    fireEvent.click(screen.getByRole("tab", { name: "VPN.Session" }))
-    fireEvent.click(screen.getByRole("button", { name: "VPN.ViewSessionLog vpn_session_1" }))
+    switchVPNTab("VPN.Session")
+    clickActionMenuItem("VPN.ViewSessionLog", "vpn_session_1")
 
     await waitFor(() => {
         expect(MockVPNWebSocket.instances.length).toBe(1)
@@ -790,8 +838,8 @@ test("Proxy Tunnel session log stream displays server-provided log lines", async
 
     render(<VPNPage />)
 
-    fireEvent.click(screen.getByRole("tab", { name: "VPN.Session" }))
-    fireEvent.click(screen.getByRole("button", { name: "VPN.ViewSessionLog vpn_session_1" }))
+    switchVPNTab("VPN.Session")
+    clickActionMenuItem("VPN.ViewSessionLog", "vpn_session_1")
 
     await waitFor(() => {
         expect(MockVPNWebSocket.instances.length).toBe(1)
@@ -814,7 +862,7 @@ test("Proxy Tunnel session log stream displays server-provided log lines", async
 test("Proxy Tunnel session tab keeps detailed fields in the detail dialog", () => {
     render(<VPNPage />)
 
-    fireEvent.click(screen.getByRole("tab", { name: "VPN.Session" }))
+    switchVPNTab("VPN.Session")
 
     expect(screen.getByRole("columnheader", { name: "Session" })).toBeTruthy()
     expect(screen.getByRole("columnheader", { name: "Status" })).toBeTruthy()

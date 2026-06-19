@@ -93,6 +93,12 @@ const initialForm: ModelAgentVPNPolicyForm = {
     idle_timeout_seconds: 0,
     notification_group_id: 0,
     auto_restart: true,
+    auto_restart_max_attempts: 5,
+    auto_restart_backoff_seconds: [0, 5, 15, 30, 60],
+    auto_restart_window_seconds: 600,
+    auto_restart_on_relay_failure: true,
+    auto_restart_on_exit_failure: true,
+    auto_restart_on_agent_reconnect: true,
     set_system_proxy: true,
     tun_health_url: "",
     tun_health_timeout_seconds: 10,
@@ -107,6 +113,7 @@ const newInitialForm = (): ModelAgentVPNPolicyForm => ({
     domains: [],
     cidrs: [],
     direct_cidrs: [],
+    auto_restart_backoff_seconds: [...initialForm.auto_restart_backoff_seconds],
 })
 
 export default function VPNPage() {
@@ -220,6 +227,17 @@ export default function VPNPage() {
     function handleEditPolicy(policy: ModelAgentVPNPolicy) {
         setEditingPolicyID(policy.id)
         setForm(policyToForm(policy))
+        setTunRiskConfirmed(policy.mode !== "tun_split" && policy.mode !== "tun_global")
+        setActiveTab("policy")
+        setPolicyFormOpen(true)
+    }
+
+    function handleCopyPolicy(policy: ModelAgentVPNPolicy) {
+        setEditingPolicyID(null)
+        setForm({
+            ...policyToForm(policy),
+            name: `${policy.name} copy`,
+        })
         setTunRiskConfirmed(policy.mode !== "tun_split" && policy.mode !== "tun_global")
         setActiveTab("policy")
         setPolicyFormOpen(true)
@@ -388,6 +406,7 @@ export default function VPNPage() {
                         serverName={serverName}
                         onNew={handleNewPolicy}
                         onEdit={handleEditPolicy}
+                        onCopy={handleCopyPolicy}
                         onStart={(id) => void handleStartPolicy(id)}
                         onPrepareCore={(id) => void handlePreparePolicyCore(id)}
                         onCleanupCore={(id) => void handleCleanupPolicyCore(id)}

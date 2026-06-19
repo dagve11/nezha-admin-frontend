@@ -47,6 +47,14 @@ export function PolicyForm({
 }: PolicyFormProps) {
     const { t } = useTranslation()
     const isTunMode = form.mode === "tun_split" || form.mode === "tun_global"
+    const autoRestartBackoff = form.auto_restart_backoff_seconds.join(", ")
+    const handleAutoRestartBackoffChange = (value: string) => {
+        const values = value
+            .split(",")
+            .map((part) => Number(part.trim()))
+            .filter((value) => Number.isFinite(value))
+        onFormChange("auto_restart_backoff_seconds", values)
+    }
 
     const vpnCapableServers = servers.filter(
         (server) =>
@@ -465,6 +473,96 @@ export function PolicyForm({
                             onCheckedChange={(checked) => onFormChange("auto_restart", checked)}
                         />
                     </div>
+
+                    {form.auto_restart && (
+                        <div className="grid gap-4 rounded-md border bg-muted/30 p-3 md:grid-cols-3">
+                            <Field
+                                label={t("VPN.AutoRestartMaxAttempts")}
+                                id="vpn-auto-restart-max-attempts"
+                            >
+                                <Input
+                                    id="vpn-auto-restart-max-attempts"
+                                    type="number"
+                                    min={1}
+                                    max={20}
+                                    value={form.auto_restart_max_attempts}
+                                    onChange={(e) =>
+                                        onFormChange(
+                                            "auto_restart_max_attempts",
+                                            Number(e.target.value),
+                                        )
+                                    }
+                                />
+                            </Field>
+                            <Field
+                                label={t("VPN.AutoRestartBackoff")}
+                                id="vpn-auto-restart-backoff"
+                            >
+                                <Input
+                                    id="vpn-auto-restart-backoff"
+                                    value={autoRestartBackoff}
+                                    onChange={(e) =>
+                                        handleAutoRestartBackoffChange(e.target.value)
+                                    }
+                                    placeholder="0,5,15,30,60"
+                                />
+                            </Field>
+                            <Field
+                                label={t("VPN.AutoRestartWindow")}
+                                id="vpn-auto-restart-window"
+                            >
+                                <Input
+                                    id="vpn-auto-restart-window"
+                                    type="number"
+                                    min={0}
+                                    max={86400}
+                                    value={form.auto_restart_window_seconds}
+                                    onChange={(e) =>
+                                        onFormChange(
+                                            "auto_restart_window_seconds",
+                                            Number(e.target.value),
+                                        )
+                                    }
+                                />
+                            </Field>
+                            <div className="flex items-center justify-between gap-3">
+                                <Label htmlFor="vpn-auto-restart-relay">
+                                    {t("VPN.AutoRestartRelayFailure")}
+                                </Label>
+                                <Switch
+                                    id="vpn-auto-restart-relay"
+                                    checked={form.auto_restart_on_relay_failure}
+                                    onCheckedChange={(checked) =>
+                                        onFormChange("auto_restart_on_relay_failure", checked)
+                                    }
+                                />
+                            </div>
+                            <div className="flex items-center justify-between gap-3">
+                                <Label htmlFor="vpn-auto-restart-exit">
+                                    {t("VPN.AutoRestartExitFailure")}
+                                </Label>
+                                <Switch
+                                    id="vpn-auto-restart-exit"
+                                    checked={form.auto_restart_on_exit_failure}
+                                    onCheckedChange={(checked) =>
+                                        onFormChange("auto_restart_on_exit_failure", checked)
+                                    }
+                                />
+                            </div>
+                            <div className="flex items-center justify-between gap-3">
+                                <Label htmlFor="vpn-auto-restart-agent">
+                                    {t("VPN.AutoRestartAgentReconnect")}
+                                </Label>
+                                <Switch
+                                    id="vpn-auto-restart-agent"
+                                    checked={form.auto_restart_on_agent_reconnect}
+                                    onCheckedChange={(checked) =>
+                                        onFormChange("auto_restart_on_agent_reconnect", checked)
+                                    }
+                                />
+                            </div>
+                        </div>
+                    )}
 
                     <div className="grid gap-4 rounded-md border bg-muted/30 p-3 md:grid-cols-[12rem_1fr] xl:grid-cols-[12rem_1fr_1fr]">
                         <Field label={t("VPN.CoreVersion")} id="vpn-core-version">

@@ -29,6 +29,7 @@ import {
 import { ModelAgentVPNPolicy, ModelAgentVPNSession, ServerIdentifierType } from "@/types"
 import {
     ClipboardList,
+    Copy,
     Download,
     FileDown,
     FileX,
@@ -48,6 +49,7 @@ interface PolicyTabProps {
     serverName: (id?: number) => string
     onNew: () => void
     onEdit: (policy: ModelAgentVPNPolicy) => void
+    onCopy: (policy: ModelAgentVPNPolicy) => void
     onStart: (policyID: number) => void
     onPrepareCore: (policyID: number) => void
     onCleanupCore: (policyID: number) => void
@@ -64,6 +66,7 @@ export function PolicyTab({
     serverName,
     onNew,
     onEdit,
+    onCopy,
     onStart,
     onPrepareCore,
     onCleanupCore,
@@ -145,6 +148,13 @@ export function PolicyTab({
                                                 >
                                                     <Pencil className="h-4 w-4" />
                                                     <span>{t("VPN.EditPolicy")}</span>
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem
+                                                    onClick={() => onCopy(policy)}
+                                                    aria-label={`${t("VPN.CopyPolicy")} ${policy.name}`}
+                                                >
+                                                    <Copy className="h-4 w-4" />
+                                                    <span>{t("VPN.CopyPolicy")}</span>
                                                 </DropdownMenuItem>
                                                 <DropdownMenuItem
                                                     onClick={() => onStart(policy.id)}

@@ -59,6 +59,21 @@ export function validatePolicyFormClient(form: ModelAgentVPNPolicyForm): string 
         return "VPN.ValidationDirectTransportInvalid"
     }
     if (form.expires_seconds <= 0) return "VPN.ValidationExpiresRequired"
+    if (
+        form.auto_restart &&
+        (!Number.isInteger(form.auto_restart_max_attempts) ||
+            form.auto_restart_max_attempts < 1 ||
+            form.auto_restart_max_attempts > 20 ||
+            !Number.isInteger(form.auto_restart_window_seconds) ||
+            form.auto_restart_window_seconds < 0 ||
+            form.auto_restart_window_seconds > 86400 ||
+            form.auto_restart_backoff_seconds.length === 0 ||
+            form.auto_restart_backoff_seconds.some(
+                (value) => !Number.isInteger(value) || value < 0 || value > 600,
+            ))
+    ) {
+        return "VPN.ValidationAutoRestartInvalid"
+    }
     return null
 }
 
@@ -86,6 +101,16 @@ export function normalizePolicyForm(form: ModelAgentVPNPolicyForm): ModelAgentVP
             60,
         ),
         egress_probe_url: form.egress_probe_url.trim(),
+        auto_restart_max_attempts: normalizeInteger(form.auto_restart_max_attempts, 5, 1, 20),
+        auto_restart_backoff_seconds: normalizeBackoffSeconds(
+            form.auto_restart_backoff_seconds,
+        ),
+        auto_restart_window_seconds: normalizeInteger(
+            form.auto_restart_window_seconds,
+            600,
+            0,
+            86400,
+        ),
         core_version: form.core_version.trim(),
         core_download_url: form.core_download_url.trim(),
         core_sha256: form.core_sha256.trim(),
@@ -124,6 +149,14 @@ export function policyToForm(policy: ModelAgentVPNPolicy): ModelAgentVPNPolicyFo
         idle_timeout_seconds: policy.idle_timeout_seconds ?? 0,
         notification_group_id: policy.notification_group_id ?? 0,
         auto_restart: policy.auto_restart ?? true,
+        auto_restart_max_attempts: policy.auto_restart_max_attempts ?? 5,
+        auto_restart_backoff_seconds: normalizeBackoffSeconds(
+            policy.auto_restart_backoff_seconds ?? [0, 5, 15, 30, 60],
+        ),
+        auto_restart_window_seconds: policy.auto_restart_window_seconds ?? 600,
+        auto_restart_on_relay_failure: policy.auto_restart_on_relay_failure ?? true,
+        auto_restart_on_exit_failure: policy.auto_restart_on_exit_failure ?? true,
+        auto_restart_on_agent_reconnect: policy.auto_restart_on_agent_reconnect ?? true,
         set_system_proxy: policy.set_system_proxy ?? false,
         tun_health_url: policy.tun_health_url ?? "",
         tun_health_timeout_seconds: policy.tun_health_timeout_seconds ?? 10,
@@ -132,6 +165,19 @@ export function policyToForm(policy: ModelAgentVPNPolicy): ModelAgentVPNPolicyFo
         core_download_url: policy.core_download_url ?? "",
         core_sha256: policy.core_sha256 ?? "",
     }
+}
+
+function normalizeInteger(value: number, fallback: number, min: number, max: number): number {
+    const parsed = Number(value)
+    if (!Number.isFinite(parsed)) return fallback
+    return Math.min(Math.max(Math.round(parsed), min), max)
+}
+
+function normalizeBackoffSeconds(values: number[]): number[] {
+    const normalized = values
+        .slice(0, 20)
+        .map((value) => normalizeInteger(value, 0, 0, 600))
+    return normalized.length > 0 ? normalized : [0, 5, 15, 30, 60]
 }
 
 function normalizeDirectWSPath(value: string): string {

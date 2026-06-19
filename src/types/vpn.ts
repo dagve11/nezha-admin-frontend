@@ -30,6 +30,12 @@ export interface ModelAgentVPNPolicy {
     idle_timeout_seconds?: number
     notification_group_id?: number
     auto_restart?: boolean
+    auto_restart_max_attempts?: number
+    auto_restart_backoff_seconds?: number[]
+    auto_restart_window_seconds?: number
+    auto_restart_on_relay_failure?: boolean
+    auto_restart_on_exit_failure?: boolean
+    auto_restart_on_agent_reconnect?: boolean
     set_system_proxy?: boolean
     tun_health_url?: string
     tun_health_timeout_seconds?: number
@@ -70,6 +76,12 @@ export interface ModelAgentVPNPolicyForm {
     idle_timeout_seconds: number
     notification_group_id: number
     auto_restart: boolean
+    auto_restart_max_attempts: number
+    auto_restart_backoff_seconds: number[]
+    auto_restart_window_seconds: number
+    auto_restart_on_relay_failure: boolean
+    auto_restart_on_exit_failure: boolean
+    auto_restart_on_agent_reconnect: boolean
     set_system_proxy: boolean
     tun_health_url: string
     tun_health_timeout_seconds: number
@@ -85,6 +97,7 @@ export interface ModelAgentVPNSession {
     entry_server_id: number
     exit_server_id: number
     session_id: string
+    runtime_instance_id?: string
     mode: string
     rule_mode?: string
     relay_mode?: string
@@ -114,6 +127,12 @@ export interface ModelAgentVPNSession {
     download_bytes?: number
     active_connections?: number
     last_error?: string
+    recovery_state?: string
+    recovery_attempt?: number
+    recovery_started_at?: string
+    recovery_next_at?: string
+    recovery_last_error?: string
+    recovery_reason?: string
     started_at?: string
     expires_at?: string
     stopped_at?: string
@@ -153,6 +172,7 @@ export interface ModelAgentVPNPolicyNodeStatus {
 
 export interface ModelVPNControlResult {
     session_id: string
+    runtime_instance_id?: string
     action: string
     role: string
     state: string
@@ -178,6 +198,7 @@ export interface ModelVPNControlResult {
     upload_bytes?: number
     download_bytes?: number
     active_conns?: number
+    failure_reason?: string
     last_error?: string
     logs?: string[]
     started_at?: number
