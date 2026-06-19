@@ -21,8 +21,16 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
 import { IconButton } from "@/components/xui/icon-button"
-import { ModelNAT } from "@/types"
+import { useServer } from "@/hooks/useServer"
+import { ModelNAT, ModelNATForm, ServerIdentifierType } from "@/types"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useState } from "react"
 import { useForm } from "react-hook-form"
@@ -39,11 +47,28 @@ interface NATCardProps {
     mutate: KeyedMutator<ModelNAT[]>
 }
 
+export const NAT_LOCAL_HOST = "127.0.0.1"
+
+export function extractNATLocalPort(host?: string): number {
+    const match = host?.trim().match(/:(\d+)$/)
+    const port = Number(match?.[1])
+    return Number.isInteger(port) && port > 0 && port <= 65535 ? port : 0
+}
+
+export function natServerLabel(
+    servers: ServerIdentifierType[] | undefined,
+    serverID: number,
+    fallbackName?: string,
+) {
+    const server = servers?.find((item) => item.id === serverID)
+    const name = server?.name || fallbackName || `#${serverID}`
+    return `${name} (#${serverID})`
+}
+
 const natFormSchema = z.object({
-    name: z.string().min(1),
     enabled: z.boolean(),
     server_id: z.coerce.number().int().min(1),
-    host: z.string().trim().min(1),
+    local_port: z.coerce.number().int().min(1).max(65535),
     port: z.coerce.number().int().min(1).max(65535),
 })
 
@@ -52,23 +77,22 @@ type NatFormData = z.output<typeof natFormSchema>
 
 export const NATCard: React.FC<NATCardProps> = ({ data, mutate }) => {
     const { t } = useTranslation()
+    const { servers = [] } = useServer()
     const form = useForm<NatFormInput, unknown, NatFormData>({
         resolver: zodResolver(natFormSchema),
         defaultValues: data
             ? {
-                name: data.name ?? "",
-                enabled: data.enabled ?? false,
-                server_id: data.server_id ?? 0,
-                host: data.host ?? "",
-                port: data.port ?? 0,
-            }
+                  enabled: data.enabled ?? false,
+                  server_id: data.server_id ?? 0,
+                  local_port: extractNATLocalPort(data.host),
+                  port: data.port ?? 0,
+              }
             : {
-                name: "",
-                enabled: false,
-                server_id: 0,
-                host: "",
-                port: 0,
-            },
+                  enabled: false,
+                  server_id: 0,
+                  local_port: 0,
+                  port: 0,
+              },
         resetOptions: {
             keepDefaultValues: false,
         },
@@ -78,10 +102,19 @@ export const NATCard: React.FC<NATCardProps> = ({ data, mutate }) => {
 
     const onSubmit = async (values: NatFormData) => {
         try {
+            const selectedServer = servers.find((server) => server.id === values.server_id)
+            const payload: ModelNATForm = {
+                name: selectedServer?.name || data?.name || `#${values.server_id}`,
+                enabled: values.enabled,
+                server_id: values.server_id,
+                local_port: values.local_port,
+                host: `${NAT_LOCAL_HOST}:${values.local_port}`,
+                port: values.port,
+            }
             if (data?.id) {
-                await updateNAT(data.id, values)
+                await updateNAT(data.id, payload)
             } else {
-                await createNAT(values)
+                await createNAT(payload)
             }
         } catch (e) {
             console.error(e)
@@ -113,56 +146,79 @@ export const NATCard: React.FC<NATCardProps> = ({ data, mutate }) => {
                             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2 my-2">
                                 <FormField
                                     control={form.control}
-                                    name="name"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>{t("Name")}</FormLabel>
-                                            <FormControl>
-                                                <Input placeholder="My NAT Profile" {...field} />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                                <FormField
-                                    control={form.control}
                                     name="server_id"
-                                    render={({ field }) => {
-                                        const { value, ...fieldProps } = field
-                                        return (
-                                            <FormItem>
-                                                <FormLabel>{t("Server")} ID</FormLabel>
-                                                <FormControl>
-                                                    <Input
-                                                        type="number"
-                                                        placeholder="1"
-                                                        value={String(value ?? "")}
-                                                        {...fieldProps}
-                                                    />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )
-                                    }}
-                                />
-                                <FormField
-                                    control={form.control}
-                                    name="host"
                                     render={({ field }) => (
                                         <FormItem>
-                                            <FormLabel>{t("LocalService")}</FormLabel>
+                                            <FormLabel>{t("NATTargetMachine")}</FormLabel>
                                             <FormControl>
-                                                <Input
-                                                    placeholder="192.168.1.1:80 (with port)"
-                                                    {...field}
-                                                />
+                                                <Select
+                                                    value={String(field.value ?? 0)}
+                                                    onValueChange={(value) =>
+                                                        field.onChange(Number(value))
+                                                    }
+                                                >
+                                                    <SelectTrigger>
+                                                        <SelectValue
+                                                            placeholder={t("SelectServer")}
+                                                        />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="0" disabled>
+                                                            {t("SelectServer")}
+                                                        </SelectItem>
+                                                        {servers.map((server) => (
+                                                            <SelectItem
+                                                                key={server.id}
+                                                                value={String(server.id)}
+                                                            >
+                                                                {natServerLabel(
+                                                                    servers,
+                                                                    server.id,
+                                                                    server.name,
+                                                                )}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
                                             </FormControl>
                                             <FormDescription>
-                                                {t("NATLocalServiceHint")}
+                                                {t("NATTargetMachineHint")}
                                             </FormDescription>
                                             <FormMessage />
                                         </FormItem>
                                     )}
+                                />
+                                <FormField
+                                    control={form.control}
+                                    name="local_port"
+                                    render={({ field }) => {
+                                        const { value, ...fieldProps } = field
+                                        return (
+                                            <FormItem>
+                                                <FormLabel>{t("LocalPort")}</FormLabel>
+                                                <FormControl>
+                                                    <div className="flex">
+                                                        <span className="inline-flex h-10 items-center rounded-l-md border border-r-0 border-input bg-muted px-3 text-sm text-muted-foreground">
+                                                            {NAT_LOCAL_HOST}:
+                                                        </span>
+                                                        <Input
+                                                            className="rounded-l-none"
+                                                            type="number"
+                                                            min={1}
+                                                            max={65535}
+                                                            placeholder="8000"
+                                                            value={String(value ?? "")}
+                                                            {...fieldProps}
+                                                        />
+                                                    </div>
+                                                </FormControl>
+                                                <FormDescription>
+                                                    {t("NATLocalPortHint")}
+                                                </FormDescription>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )
+                                    }}
                                 />
                                 <FormField
                                     control={form.control}

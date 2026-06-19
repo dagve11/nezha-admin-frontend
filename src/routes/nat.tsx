@@ -2,7 +2,7 @@ import { swrFetcher } from "@/api/api"
 import { deleteNAT } from "@/api/nat"
 import { ActionButtonGroup } from "@/components/action-button-group"
 import { HeaderButtonGroup } from "@/components/header-button-group"
-import { NATCard } from "@/components/nat"
+import { NATCard, NAT_LOCAL_HOST, extractNATLocalPort, natServerLabel } from "@/components/nat"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
     Table,
@@ -12,6 +12,7 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
+import { useServer } from "@/hooks/useServer"
 import { ModelNAT } from "@/types"
 import { ColumnDef, flexRender, getCoreRowModel, useReactTable } from "@tanstack/react-table"
 import { useEffect, useMemo } from "react"
@@ -21,6 +22,7 @@ import useSWR from "swr"
 
 export default function NATPage() {
     const { t } = useTranslation()
+    const { servers = [] } = useServer()
     const { data, mutate, error, isLoading } = useSWR<ModelNAT[]>("/api/v1/nat", swrFetcher)
 
     useEffect(() => {
@@ -67,26 +69,30 @@ export default function NATPage() {
             accessorFn: (row) => row.enabled,
         },
         {
-            header: t("Name"),
+            header: t("NATTargetMachine"),
             accessorKey: "name",
             accessorFn: (row) => row.name,
             cell: ({ row }) => {
                 const s = row.original
-                return <div className="max-w-32 whitespace-normal break-words">{s.name}</div>
+                return (
+                    <div className="max-w-40 whitespace-normal break-words">
+                        {natServerLabel(servers, s.server_id, s.name)}
+                    </div>
+                )
             },
         },
         {
-            header: t("Server") + " ID",
-            accessorKey: "serverID",
-            accessorFn: (row) => row.server_id,
-        },
-        {
-            header: t("LocalService"),
+            header: t("LocalPort"),
             accessorKey: "host",
             accessorFn: (row) => row.host,
             cell: ({ row }) => {
                 const s = row.original
-                return <div className="max-w-32 whitespace-normal break-words">{s.host}</div>
+                const localPort = extractNATLocalPort(s.host)
+                return (
+                    <div className="max-w-32 whitespace-normal break-words">
+                        {localPort ? `${NAT_LOCAL_HOST}:${localPort}` : s.host}
+                    </div>
+                )
             },
         },
         {
@@ -156,9 +162,9 @@ export default function NATPage() {
                                         {header.isPlaceholder
                                             ? null
                                             : flexRender(
-                                                header.column.columnDef.header,
-                                                header.getContext(),
-                                            )}
+                                                  header.column.columnDef.header,
+                                                  header.getContext(),
+                                              )}
                                     </TableHead>
                                 )
                             })}

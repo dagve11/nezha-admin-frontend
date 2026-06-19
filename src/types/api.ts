@@ -410,7 +410,8 @@ export interface ModelNAT {
 
 export interface ModelNATForm {
     enabled: boolean
-    host: string
+    host?: string
+    local_port?: number
     /** @minLength 1 */
     name: string
     port: number
