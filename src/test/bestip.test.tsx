@@ -12,6 +12,11 @@ vi.mock("react-i18next", () => ({
     initReactI18next: { type: "3rdParty", init: () => undefined },
 }))
 
+Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+    value: vi.fn(),
+    writable: true,
+})
+
 const runBestIPFission = vi.fn()
 const runBestIPFissionStream = vi.fn()
 const writeBestIPDNS = vi.fn()
@@ -35,6 +40,7 @@ const swrMockState = vi.hoisted(() => {
         domains: ["cdn.example.com"],
         fission: {
             seed_ips: ["1.1.1.1"],
+            probe_server_id: 0,
             rounds: 2,
             concurrency: 10,
             timeout_ms: 3000,
@@ -135,6 +141,15 @@ vi.mock("@/hooks/useNotfication", () => ({
                 group: { id: 10, name: "automation-notify" },
                 notifications: [1],
             },
+        ],
+    }),
+}))
+
+vi.mock("@/hooks/useServer", () => ({
+    useServer: () => ({
+        servers: [
+            { id: 22, name: "cn-probe", online: true },
+            { id: 23, name: "offline-probe", online: false },
         ],
     }),
 }))
@@ -331,6 +346,28 @@ test("BestIPPage renders probe metrics and writes the top scored IP by default",
         )
     })
     expect(screen.getByText("BestIP.DNSSuccess")).toBeTruthy()
+})
+
+test("BestIPPage runs fission from the selected probe server", async () => {
+    mockFissionWithCandidates()
+
+    const { default: BestIPPage } = await import("@/routes/bestip")
+    await act(async () => {
+        render(<BestIPPage />)
+    })
+
+    fireEvent.click(screen.getByRole("combobox", { name: "BestIP.ProbeServer" }))
+    fireEvent.click(await screen.findByText("cn-probe"))
+    fireEvent.click(screen.getByRole("button", { name: "BestIP.RunFission" }))
+
+    await waitFor(() => {
+        expect(runBestIPFissionStream).toHaveBeenCalledWith(
+            expect.objectContaining({
+                probe_server_id: 22,
+            }),
+            expect.any(Function),
+        )
+    })
 })
 
 test("BestIPPage writes the top N scored IPv4 records", async () => {
@@ -710,6 +747,7 @@ test("BestIPPage treats an id zero automation response as unsaved defaults", asy
         domains: [],
         fission: {
             seed_ips: [],
+            probe_server_id: 0,
             rounds: 0,
             concurrency: 0,
             timeout_ms: 0,

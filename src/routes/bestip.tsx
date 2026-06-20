@@ -25,6 +25,7 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { MultiSelect } from "@/components/xui/multi-select"
 import { useNotification } from "@/hooks/useNotfication"
+import { useServer } from "@/hooks/useServer"
 import {
     ModelBestIPAutomation,
     ModelBestIPAutomationForm,
@@ -121,7 +122,8 @@ export function defaultBestIPDDNSCredentialIDs(
 ): number[] {
     const items = credentials ?? []
     const cloudflareCredentials = items.filter((credential) => credential.provider === "cloudflare")
-    if (cloudflareCredentials.length) return cloudflareCredentials.map((credential) => credential.id)
+    if (cloudflareCredentials.length)
+        return cloudflareCredentials.map((credential) => credential.id)
 
     const dnsProviderCredentials = items.filter(
         (credential) => credential.provider !== "dummy" && credential.provider !== "webhook",
@@ -363,12 +365,11 @@ export default function BestIPPage() {
     const { t } = useTranslation()
     const { data: ddnsCredentials, isLoading: isLoadingDDNSCredentials } = useSWR<
         ModelDDNSCredential[]
-    >(
-        "/api/v1/ddns-credential",
-        swrFetcher,
-    )
+    >("/api/v1/ddns-credential", swrFetcher)
     const { notifierGroup } = useNotification()
+    const { servers = [] } = useServer()
     const [seedIPs, setSeedIPs] = useState(defaultSeedIPs)
+    const [probeServerID, setProbeServerID] = useState(0)
     const [rounds, setRounds] = useState(2)
     const [concurrency, setConcurrency] = useState(10)
     const [timeoutMS, setTimeoutMS] = useState(3000)
@@ -405,7 +406,8 @@ export default function BestIPPage() {
     const [fissionNotificationGroupID, setFissionNotificationGroupID] = useState(0)
     const [fissionNotificationGroupTouched, setFissionNotificationGroupTouched] = useState(false)
     const [automationNotificationGroupID, setAutomationNotificationGroupID] = useState(0)
-    const [automationNotificationGroupTouched, setAutomationNotificationGroupTouched] = useState(false)
+    const [automationNotificationGroupTouched, setAutomationNotificationGroupTouched] =
+        useState(false)
     const [pushSuccessful, setPushSuccessful] = useState(true)
     const [pushSuccessfulTouched, setPushSuccessfulTouched] = useState(false)
     const [pushFailed, setPushFailed] = useState(true)
@@ -432,9 +434,7 @@ export default function BestIPPage() {
         setAutomationEnabled(Boolean(nextAutomation.enabled))
         setAutomationScheduler(nextAutomation.scheduler || defaultScheduler)
         setAutomationAutoWriteDNS(saved ? nextAutomation.auto_write_dns : true)
-        setFissionNotificationGroupID(
-            saved ? nextAutomation.fission_notification_group_id || 0 : 0,
-        )
+        setFissionNotificationGroupID(saved ? nextAutomation.fission_notification_group_id || 0 : 0)
         setAutomationNotificationGroupID(saved ? nextAutomation.notification_group_id || 0 : 0)
         setPushSuccessful(saved ? nextAutomation.push_successful : true)
         setPushFailed(saved ? nextAutomation.push_failed : true)
@@ -446,6 +446,7 @@ export default function BestIPPage() {
         setOverrideDomains(saved ? nextAutomation.domains?.join("\n") || "" : "")
         if (hasStoredFissionConfig(nextAutomation.fission)) {
             setSeedIPs((nextAutomation.fission.seed_ips ?? []).join("\n") || defaultSeedIPs)
+            setProbeServerID(nextAutomation.fission.probe_server_id ?? 0)
             setRounds(nextAutomation.fission.rounds || 2)
             setConcurrency(nextAutomation.fission.concurrency || 10)
             setTimeoutMS(nextAutomation.fission.timeout_ms || 3000)
@@ -562,8 +563,22 @@ export default function BestIPPage() {
         [notifierGroup, t],
     )
 
+    const probeServerOptions = useMemo(
+        () => [
+            { value: "0", label: t("BestIP.ProbeDashboard") },
+            ...servers.map((server) => ({
+                value: String(server.id),
+                label: server.online
+                    ? server.name
+                    : `${server.name} (${t("BestIP.ProbeServerOffline")})`,
+            })),
+        ],
+        [servers, t],
+    )
+
     const buildFissionForm = (): ModelBestIPFissionForm => ({
         seed_ips: parseList(seedIPs),
+        probe_server_id: probeServerID,
         rounds,
         concurrency,
         timeout_ms: timeoutMS,
@@ -799,6 +814,26 @@ export default function BestIPPage() {
             <div className="flex flex-col lg:flex-row lg:items-end justify-between w-full gap-3 mt-6 mb-4">
                 <h1 className="text-3xl font-bold tracking-tight">{t("BestIP.Title")}</h1>
                 <div className="flex flex-col sm:flex-row sm:items-end gap-2">
+                    <div className="grid gap-1 sm:w-56">
+                        <Label
+                            htmlFor="bestip-probe-server"
+                            className="text-xs text-muted-foreground"
+                        >
+                            {t("BestIP.ProbeServer")}
+                        </Label>
+                        <Combobox
+                            key={`probe-${probeServerID}-${probeServerOptions.length}`}
+                            id="bestip-probe-server"
+                            aria-label={t("BestIP.ProbeServer")}
+                            options={probeServerOptions}
+                            defaultValue={String(probeServerID)}
+                            placeholder={t("BestIP.ProbeDashboard")}
+                            onValueChange={(value) => {
+                                const next = Number(value || 0)
+                                setProbeServerID(Number.isFinite(next) ? next : 0)
+                            }}
+                        />
+                    </div>
                     <div className="grid gap-1 sm:w-56">
                         <Label
                             htmlFor="bestip-fission-notification-group"

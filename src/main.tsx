@@ -108,9 +108,11 @@ const router = createBrowserRouter([
             {
                 path: "/dashboard/bestip",
                 element: (
-                    <NotificationProvider withNotifierGroup>
-                        <BestIPPage />
-                    </NotificationProvider>
+                    <ServerProvider withServer>
+                        <NotificationProvider withNotifierGroup>
+                            <BestIPPage />
+                        </NotificationProvider>
+                    </ServerProvider>
                 ),
             },
             {

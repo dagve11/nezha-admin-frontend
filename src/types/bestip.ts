@@ -1,5 +1,6 @@
 export interface ModelBestIPFissionForm {
     seed_ips: string[]
+    probe_server_id?: number
     rounds: number
     concurrency: number
     timeout_ms: number
