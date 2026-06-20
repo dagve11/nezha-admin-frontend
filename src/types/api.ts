@@ -32,6 +32,12 @@ export interface GithubComNezhahqNezhaModelCommonResponseArrayModelDDNSProfile {
     success: boolean
 }
 
+export interface GithubComNezhahqNezhaModelCommonResponseArrayModelDDNSCredential {
+    data: ModelDDNSCredential[]
+    error: string
+    success: boolean
+}
+
 export interface GithubComNezhahqNezhaModelCommonResponseArrayModelNAT {
     data: ModelNAT[]
     error: string
@@ -297,6 +303,7 @@ export interface ModelCycleTransferStats {
 export interface ModelDDNSForm {
     access_id?: string
     access_secret?: string
+    credential_id?: number
     domains: string[]
     enable_ipv4?: boolean
     enable_ipv6?: boolean
@@ -314,9 +321,40 @@ export interface ModelDDNSForm {
     webhook_url?: string
 }
 
+export interface ModelDDNSCredentialForm {
+    access_id?: string
+    access_secret?: string
+    /** @minLength 1 */
+    name: string
+    provider: string
+    webhook_headers?: string
+    /** @default 1 */
+    webhook_method?: number
+    webhook_request_body?: string
+    /** @default 1 */
+    webhook_request_type?: number
+    webhook_url?: string
+}
+
+export interface ModelDDNSCredential {
+    access_id: string
+    access_secret_set: boolean
+    created_at: string
+    id: number
+    name: string
+    provider: string
+    updated_at: string
+    webhook_headers: string
+    webhook_method: number
+    webhook_request_body: string
+    webhook_request_type: number
+    webhook_url: string
+}
+
 export interface ModelDDNSProfile {
     access_id: string
-    access_secret: string
+    credential_id: number
+    credential_name: string
     created_at: string
     domains: string[]
     enable_ipv4: boolean
