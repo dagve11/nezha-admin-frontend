@@ -23,6 +23,7 @@ import {
     TableRow,
 } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
+import { MultiSelect } from "@/components/xui/multi-select"
 import { useNotification } from "@/hooks/useNotfication"
 import {
     ModelBestIPAutomation,
@@ -490,6 +491,15 @@ export default function BestIPPage() {
         return defaultBestIPDDNSCredentialIDs(ddnsCredentials)
     }, [automation, ddnsCredentials, ddnsSelectionTouched, selectedDDNSCredentials])
 
+    const ddnsCredentialOptions = useMemo(
+        () =>
+            (ddnsCredentials ?? []).map((credential) => ({
+                label: `${credential.name} (${credential.provider})`,
+                value: String(credential.id),
+            })),
+        [ddnsCredentials],
+    )
+
     const effectiveOverrideDomains = overrideDomainsTouched
         ? overrideDomains
         : overrideDomains || automation?.domains?.join("\n") || ""
@@ -767,15 +777,9 @@ export default function BestIPPage() {
         }
     }
 
-    const toggleDDNSCredential = (id: number, checked: boolean) => {
+    const handleDDNSCredentialsChange = (values: string[]) => {
         setDDNSSelectionTouched(true)
-        setSelectedDDNSCredentials((current) => {
-            const currentSelection = ddnsSelectionTouched
-                ? current
-                : effectiveSelectedDDNSCredentials
-            if (checked) return Array.from(new Set([...currentSelection, id]))
-            return currentSelection.filter((item) => item !== id)
-        })
+        setSelectedDDNSCredentials(values.map(Number).filter((value) => Number.isFinite(value)))
     }
 
     return (
@@ -1046,33 +1050,20 @@ export default function BestIPPage() {
                     <CardContent className="grid gap-4">
                         <div className="grid gap-2">
                             <Label>{t("BestIP.DDNSCredentials")}</Label>
-                            <div className="grid gap-2 rounded-md border p-3">
-                                {(ddnsCredentials ?? []).map((credential) => (
-                                    <label
-                                        key={credential.id}
-                                        className="flex items-center justify-between gap-3 text-sm"
-                                    >
-                                        <span className="flex min-w-0 items-center gap-2">
-                                            <Checkbox
-                                                checked={effectiveSelectedDDNSCredentials.includes(
-                                                    credential.id,
-                                                )}
-                                                onCheckedChange={(checked) =>
-                                                    toggleDDNSCredential(
-                                                        credential.id,
-                                                        checked === true,
-                                                    )
-                                                }
-                                            />
-                                            <span className="truncate">{credential.name}</span>
-                                        </span>
-                                        <Badge variant="outline">{credential.provider}</Badge>
-                                    </label>
-                                ))}
+                            <div className="grid gap-2">
                                 {isLoadingDDNSCredentials && (
-                                    <div className="py-2 text-center text-sm text-muted-foreground">
+                                    <div className="rounded-md border px-3 py-2 text-sm text-muted-foreground">
                                         {t("Loading")}
                                     </div>
+                                )}
+                                {!isLoadingDDNSCredentials && Boolean(ddnsCredentials?.length) && (
+                                    <MultiSelect
+                                        options={ddnsCredentialOptions}
+                                        value={effectiveSelectedDDNSCredentials.map(String)}
+                                        onValueChange={handleDDNSCredentialsChange}
+                                        placeholder={t("BestIP.SelectDDNSCredentials")}
+                                        maxCount={2}
+                                    />
                                 )}
                                 {!isLoadingDDNSCredentials && !ddnsCredentials?.length && (
                                     <div className="grid gap-3 rounded-md bg-muted/40 p-3 text-sm sm:flex sm:items-center sm:justify-between">

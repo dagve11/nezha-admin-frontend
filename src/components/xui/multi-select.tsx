@@ -88,6 +88,9 @@ interface MultiSelectProps
      */
     onValueChange: (value: string[]) => void
 
+    /** Controlled selected values. */
+    value?: string[]
+
     /** The default selected values when the component mounts. */
     defaultValue?: string[]
 
@@ -134,6 +137,7 @@ export const MultiSelect = forwardRef<HTMLButtonElement, MultiSelectProps>(
         {
             options,
             onValueChange,
+            value,
             variant,
             defaultValue = [],
             placeholder = "Select options",
@@ -145,9 +149,17 @@ export const MultiSelect = forwardRef<HTMLButtonElement, MultiSelectProps>(
         },
         ref,
     ) => {
-        const [selectedValues, setSelectedValues] = useState<string[]>(defaultValue)
+        const [internalSelectedValues, setInternalSelectedValues] = useState<string[]>(defaultValue)
+        const selectedValues = value ?? internalSelectedValues
         const [isPopoverOpen, setIsPopoverOpen] = useState(false)
         const [isAnimating, setIsAnimating] = useState(false)
+
+        const updateSelectedValues = (newSelectedValues: string[]) => {
+            if (value === undefined) {
+                setInternalSelectedValues(newSelectedValues)
+            }
+            onValueChange(newSelectedValues)
+        }
 
         const handleInputKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
             if (event.key === "Enter") {
@@ -155,8 +167,7 @@ export const MultiSelect = forwardRef<HTMLButtonElement, MultiSelectProps>(
             } else if (event.key === "Backspace" && !event.currentTarget.value) {
                 const newSelectedValues = [...selectedValues]
                 newSelectedValues.pop()
-                setSelectedValues(newSelectedValues)
-                onValueChange(newSelectedValues)
+                updateSelectedValues(newSelectedValues)
             }
         }
 
@@ -164,13 +175,11 @@ export const MultiSelect = forwardRef<HTMLButtonElement, MultiSelectProps>(
             const newSelectedValues = selectedValues.includes(option)
                 ? selectedValues.filter((value) => value !== option)
                 : [...selectedValues, option]
-            setSelectedValues(newSelectedValues)
-            onValueChange(newSelectedValues)
+            updateSelectedValues(newSelectedValues)
         }
 
         const handleClear = () => {
-            setSelectedValues([])
-            onValueChange([])
+            updateSelectedValues([])
         }
 
         const handleTogglePopover = () => {
@@ -179,8 +188,7 @@ export const MultiSelect = forwardRef<HTMLButtonElement, MultiSelectProps>(
 
         const clearExtraOptions = () => {
             const newSelectedValues = selectedValues.slice(0, maxCount)
-            setSelectedValues(newSelectedValues)
-            onValueChange(newSelectedValues)
+            updateSelectedValues(newSelectedValues)
         }
 
         const toggleAll = () => {
@@ -188,8 +196,7 @@ export const MultiSelect = forwardRef<HTMLButtonElement, MultiSelectProps>(
                 handleClear()
             } else {
                 const allValues = options.map((option) => option.value)
-                setSelectedValues(allValues)
-                onValueChange(allValues)
+                updateSelectedValues(allValues)
             }
         }
 

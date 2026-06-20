@@ -66,6 +66,7 @@
         "DDNSCredentialsEmpty": "No DDNS credentials yet",
         "DDNSCredentialsEmptyHint": "Create Cloudflare or other DNS writeback credentials on the Dynamic DNS page first.",
         "CreateDDNSCredential": "Create DDNS credential",
+        "SelectDDNSCredentials": "Select DDNS credentials",
         "OverrideDomains": "Override domains",
         "OverrideDomainsPlaceholder": "Leave empty to use domains from the DDNS profile",
         "WritebackDomains": "Writeback domains",
