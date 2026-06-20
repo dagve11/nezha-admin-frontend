@@ -402,8 +402,10 @@ export default function BestIPPage() {
     const [automationEnabled, setAutomationEnabled] = useState(false)
     const [automationScheduler, setAutomationScheduler] = useState(defaultScheduler)
     const [automationAutoWriteDNS, setAutomationAutoWriteDNS] = useState(true)
-    const [notificationGroupID, setNotificationGroupID] = useState(0)
-    const [notificationGroupTouched, setNotificationGroupTouched] = useState(false)
+    const [fissionNotificationGroupID, setFissionNotificationGroupID] = useState(0)
+    const [fissionNotificationGroupTouched, setFissionNotificationGroupTouched] = useState(false)
+    const [automationNotificationGroupID, setAutomationNotificationGroupID] = useState(0)
+    const [automationNotificationGroupTouched, setAutomationNotificationGroupTouched] = useState(false)
     const [pushSuccessful, setPushSuccessful] = useState(true)
     const [pushSuccessfulTouched, setPushSuccessfulTouched] = useState(false)
     const [pushFailed, setPushFailed] = useState(true)
@@ -430,7 +432,10 @@ export default function BestIPPage() {
         setAutomationEnabled(Boolean(nextAutomation.enabled))
         setAutomationScheduler(nextAutomation.scheduler || defaultScheduler)
         setAutomationAutoWriteDNS(saved ? nextAutomation.auto_write_dns : true)
-        setNotificationGroupID(saved ? nextAutomation.notification_group_id || 0 : 0)
+        setFissionNotificationGroupID(
+            saved ? nextAutomation.fission_notification_group_id || 0 : 0,
+        )
+        setAutomationNotificationGroupID(saved ? nextAutomation.notification_group_id || 0 : 0)
         setPushSuccessful(saved ? nextAutomation.push_successful : true)
         setPushFailed(saved ? nextAutomation.push_failed : true)
         setWriteTopN(clampBestIPCandidateCount(nextAutomation.write_top_n || 1))
@@ -504,11 +509,16 @@ export default function BestIPPage() {
         ? overrideDomains
         : overrideDomains || automation?.domains?.join("\n") || ""
 
-    const effectiveNotificationGroupID = notificationGroupTouched
-        ? notificationGroupID
+    const effectiveFissionNotificationGroupID = fissionNotificationGroupTouched
+        ? fissionNotificationGroupID
+        : hasSavedAutomation(automation)
+            ? (automation?.fission_notification_group_id ?? 0)
+            : fissionNotificationGroupID
+    const effectiveAutomationNotificationGroupID = automationNotificationGroupTouched
+        ? automationNotificationGroupID
         : hasSavedAutomation(automation)
             ? (automation?.notification_group_id ?? 0)
-            : notificationGroupID
+            : automationNotificationGroupID
     const effectivePushSuccessful = pushSuccessfulTouched
         ? pushSuccessful
         : hasSavedAutomation(automation)
@@ -533,7 +543,7 @@ export default function BestIPPage() {
     )
 
     const buildNotifyForm = (rows: ModelBestIPCandidateResult[]) => ({
-        notification_group_id: effectiveNotificationGroupID,
+        notification_group_id: effectiveFissionNotificationGroupID,
         domains: parseList(effectiveOverrideDomains),
         ipv4_records: selectWriteRecords(rows, "ipv4", writeTopN),
         ipv6_records: selectWriteRecords(rows, "ipv6", writeTopN),
@@ -584,9 +594,10 @@ export default function BestIPPage() {
             auto_write_dns: saved ? Boolean(automation?.auto_write_dns) : automationAutoWriteDNS,
             push_successful: saved ? Boolean(automation?.push_successful) : effectivePushSuccessful,
             push_failed: saved ? Boolean(automation?.push_failed) : effectivePushFailed,
-            notification_group_id: saved
-                ? (automation?.notification_group_id ?? 0)
-                : effectiveNotificationGroupID,
+            fission_notification_group_id: saved
+                ? (automation?.fission_notification_group_id ?? 0)
+                : 0,
+            notification_group_id: saved ? (automation?.notification_group_id ?? 0) : 0,
             write_top_n: clampBestIPCandidateCount(
                 saved ? automation?.write_top_n || 1 : writeTopN,
             ),
@@ -601,6 +612,7 @@ export default function BestIPPage() {
 
     const buildFissionConfigForm = (): ModelBestIPAutomationForm => ({
         ...buildStoredConfigForm(),
+        fission_notification_group_id: effectiveFissionNotificationGroupID,
         fission: buildFissionForm(),
     })
 
@@ -619,7 +631,7 @@ export default function BestIPPage() {
         auto_write_dns: automationAutoWriteDNS,
         push_successful: effectivePushSuccessful,
         push_failed: effectivePushFailed,
-        notification_group_id: effectiveNotificationGroupID,
+        notification_group_id: effectiveAutomationNotificationGroupID,
     })
 
     const applyAutomationHistory = (history: ModelBestIPAutomationHistory) => {
@@ -795,15 +807,15 @@ export default function BestIPPage() {
                             {t("BestIP.FissionNotificationGroup")}
                         </Label>
                         <Combobox
-                            key={`fission-${effectiveNotificationGroupID}`}
+                            key={`fission-${effectiveFissionNotificationGroupID}`}
                             id="bestip-fission-notification-group"
                             aria-label={t("BestIP.FissionNotificationGroup")}
                             options={notificationGroupOptions}
-                            defaultValue={String(effectiveNotificationGroupID)}
+                            defaultValue={String(effectiveFissionNotificationGroupID)}
                             placeholder={t("BestIP.NoNotificationGroup")}
                             onValueChange={(value) => {
-                                setNotificationGroupTouched(true)
-                                setNotificationGroupID(Number(value || 0))
+                                setFissionNotificationGroupTouched(true)
+                                setFissionNotificationGroupID(Number(value || 0))
                             }}
                         />
                     </div>
@@ -1155,15 +1167,15 @@ export default function BestIPPage() {
                                 {t("BestIP.NotificationGroup")}
                             </Label>
                             <Combobox
-                                key={effectiveNotificationGroupID}
+                                key={effectiveAutomationNotificationGroupID}
                                 id="bestip-notification-group"
                                 aria-label={t("BestIP.NotificationGroup")}
                                 options={notificationGroupOptions}
-                                defaultValue={String(effectiveNotificationGroupID)}
+                                defaultValue={String(effectiveAutomationNotificationGroupID)}
                                 placeholder={t("BestIP.NoNotificationGroup")}
                                 onValueChange={(value) => {
-                                    setNotificationGroupTouched(true)
-                                    setNotificationGroupID(Number(value || 0))
+                                    setAutomationNotificationGroupTouched(true)
+                                    setAutomationNotificationGroupID(Number(value || 0))
                                 }}
                             />
                         </div>

@@ -154,6 +154,7 @@ export interface ModelBestIPAutomationForm {
     auto_write_dns: boolean
     push_successful: boolean
     push_failed: boolean
+    fission_notification_group_id: number
     notification_group_id: number
     write_top_n: number
     ddns_profiles?: number[]
