@@ -113,7 +113,8 @@ export interface ModelBestIPFissionProgressEvent {
 }
 
 export interface ModelBestIPDNSWriteForm {
-    ddns_profiles: number[]
+    ddns_profiles?: number[]
+    ddns_credentials?: number[]
     domains: string[]
     ipv4?: string
     ipv6?: string
@@ -122,7 +123,8 @@ export interface ModelBestIPDNSWriteForm {
 }
 
 export interface ModelBestIPDNSWriteResult {
-    profile_id: number
+    profile_id?: number
+    credential_id?: number
     provider: string
     domains: string[]
     success: boolean
@@ -154,7 +156,8 @@ export interface ModelBestIPAutomationForm {
     push_failed: boolean
     notification_group_id: number
     write_top_n: number
-    ddns_profiles: number[]
+    ddns_profiles?: number[]
+    ddns_credentials?: number[]
     domains: string[]
     fission: ModelBestIPFissionForm
 }

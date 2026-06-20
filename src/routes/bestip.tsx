@@ -33,7 +33,7 @@ import {
     ModelBestIPFissionForm,
     ModelBestIPFissionProgressEvent,
     ModelBestIPFissionResult,
-    ModelDDNSProfile,
+    ModelDDNSCredential,
 } from "@/types"
 import { Loader2 } from "lucide-react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
@@ -115,20 +115,24 @@ function candidateRowsFromResult(result?: ModelBestIPFissionResult): ModelBestIP
     return Array.from(new Set(source)).slice(0, maxBestIPCandidateCount).map(candidateFromIP)
 }
 
-export function defaultBestIPDDNSProfileIDs(
-    profiles?: Pick<ModelDDNSProfile, "id" | "provider">[],
+export function defaultBestIPDDNSCredentialIDs(
+    credentials?: Pick<ModelDDNSCredential, "id" | "provider">[],
 ): number[] {
-    const items = profiles ?? []
-    const cloudflareProfiles = items.filter((profile) => profile.provider === "cloudflare")
-    if (cloudflareProfiles.length) return cloudflareProfiles.map((profile) => profile.id)
+    const items = credentials ?? []
+    const cloudflareCredentials = items.filter((credential) => credential.provider === "cloudflare")
+    if (cloudflareCredentials.length) return cloudflareCredentials.map((credential) => credential.id)
 
-    const dnsProviderProfiles = items.filter(
-        (profile) => profile.provider !== "dummy" && profile.provider !== "webhook",
+    const dnsProviderCredentials = items.filter(
+        (credential) => credential.provider !== "dummy" && credential.provider !== "webhook",
     )
-    if (dnsProviderProfiles.length) return dnsProviderProfiles.map((profile) => profile.id)
+    if (dnsProviderCredentials.length) {
+        return dnsProviderCredentials.map((credential) => credential.id)
+    }
 
-    return items.map((profile) => profile.id)
+    return items.map((credential) => credential.id)
 }
+
+export const defaultBestIPDDNSProfileIDs = defaultBestIPDDNSCredentialIDs
 
 function selectWriteRecords(
     candidates: ModelBestIPCandidateResult[],
@@ -250,114 +254,116 @@ function fissionEventDetail(
 ): string {
     const roundPrefix = fissionRoundPrefix(event, t)
     switch (event.type) {
-        case "start":
-            return `${t("BestIP.TotalIPs")}: ${event.total_ips ?? event.ips?.length ?? 0} · IP: ${recordsText(event.ips)}`
-        case "round_start":
-            return `${roundPrefix}IP: ${recordsText(event.ips)}`
-        case "ip_lookup_start":
-            return `${roundPrefix}IP: ${event.ip || "-"}`
-        case "lookup_source_start":
-            return [
-                `IP: ${event.ip || "-"}`,
-                `${t("BestIP.LookupSource")}: ${event.source || "-"}`,
-            ].join(" · ")
-        case "lookup_source_done": {
-            const details = [
-                `IP: ${event.ip || "-"}`,
-                `${t("BestIP.LookupSource")}: ${event.source || "-"}`,
-            ]
-            if (event.status_code) {
-                details.push(`${t("BestIP.HTTPStatus")}: ${event.status_code}`)
-            }
-            details.push(
-                `${t("BestIP.TotalDomains")}: ${event.total_domains ?? event.domains?.length ?? 0}`,
-            )
-            details.push(`${t("Domains")}: ${recordsText(event.domains)}`)
-            if (event.error) {
-                details.push(`${t("Error")}: ${event.error}`)
-            }
-            return details.join(" · ")
+    case "start":
+        return `${t("BestIP.TotalIPs")}: ${event.total_ips ?? event.ips?.length ?? 0} · IP: ${recordsText(event.ips)}`
+    case "round_start":
+        return `${roundPrefix}IP: ${recordsText(event.ips)}`
+    case "ip_lookup_start":
+        return `${roundPrefix}IP: ${event.ip || "-"}`
+    case "lookup_source_start":
+        return [
+            `IP: ${event.ip || "-"}`,
+            `${t("BestIP.LookupSource")}: ${event.source || "-"}`,
+        ].join(" · ")
+    case "lookup_source_done": {
+        const details = [
+            `IP: ${event.ip || "-"}`,
+            `${t("BestIP.LookupSource")}: ${event.source || "-"}`,
+        ]
+        if (event.status_code) {
+            details.push(`${t("BestIP.HTTPStatus")}: ${event.status_code}`)
         }
-        case "ip_lookup_done":
-            return `${roundPrefix}${event.ip || "-"} -> ${recordsText(event.domains)}`
-        case "domain_resolve_start":
-            return `${roundPrefix}${event.domain || "-"}`
-        case "domain_resolve_done":
-            return `${roundPrefix}${event.domain || "-"} -> ${recordsText(event.ips)}`
-        case "round_done": {
-            const round = event.round_result
-            return [
-                `${roundPrefix}${t("BestIP.NewIPs")}: ${recordsText(event.new_ips ?? round?.new_ips)}`,
-                `${t("BestIP.NewDomains")}: ${recordsText(event.new_domains ?? round?.new_domains)}`,
-                `${t("BestIP.TotalIPs")}: ${event.total_ips ?? round?.total_ips ?? 0}`,
-                `${t("BestIP.TotalDomains")}: ${event.total_domains ?? round?.total_domains ?? 0}`,
-            ].join(" · ")
+        details.push(
+            `${t("BestIP.TotalDomains")}: ${event.total_domains ?? event.domains?.length ?? 0}`,
+        )
+        details.push(`${t("Domains")}: ${recordsText(event.domains)}`)
+        if (event.error) {
+            details.push(`${t("Error")}: ${event.error}`)
         }
-        case "cloudflare_validation_start":
-            return `${t("BestIP.TotalIPs")}: ${event.total_ips ?? event.ips?.length ?? 0} · IP: ${recordsText(event.ips)}`
-        case "cloudflare_validation_done":
-            return [
-                `${t("BestIP.TotalIPs")}: ${event.total_ips ?? event.ips?.length ?? 0}`,
-                `${t("BestIP.FilteredIPs")}: ${recordsText(event.filtered_ips)}`,
-                `${t("BestIP.CloudflareRanges")}: IPv4 ${event.cloudflare_ipv4_ranges ?? 0} / IPv6 ${event.cloudflare_ipv6_ranges ?? 0}`,
-                `${t("BestIP.CloudflareHitRate")}: ${formatSuccessRate(event.cloudflare_hit_rate ?? 0)}`,
-            ].join(" · ")
-        case "probe_start":
-            return [
-                `IP: ${recordsText(event.ips)}`,
-                `${t("BestIP.ProbePort")}: ${event.probe_port ?? "-"}`,
-                `${t("BestIP.ProbeCount")}: ${event.probe_count ?? "-"}`,
-            ].join(" · ")
-        case "probe_stage_start":
-            return [
-                `${t("BestIP.ProbeStage")}: ${event.stage || "-"}`,
-                `${t("BestIP.TotalIPs")}: ${event.total_ips ?? event.ips?.length ?? 0}`,
-                `${t("BestIP.ProbeCount")}: ${event.probe_count ?? "-"}`,
-                `${t("BestIP.Workers")}: ${event.workers ?? "-"}`,
-            ].join(" · ")
-        case "probe_stage_done":
-            return [
-                `${t("BestIP.ProbeStage")}: ${event.stage || "-"}`,
-                `${t("BestIP.DoneCount")}: ${event.done ?? 0}/${event.total_ips ?? 0}`,
-                `${t("BestIP.ProbeCount")}: ${event.probe_count ?? "-"}`,
-            ].join(" · ")
-        case "probe_result": {
-            const candidate = event.candidate
-            if (!candidate) return event.ip || "-"
-            return [
-                `IP: ${candidate.ip || event.ip || "-"}`,
-                `${t("BestIP.Latency")}: ${formatLatency(candidate.avg_latency_ms)}`,
-                `${t("BestIP.P95Latency")}: ${formatLatency(candidate.p95_latency_ms ?? 0)}`,
-                `${t("BestIP.SuccessRate")}: ${formatSuccessRate(candidate.success_rate)}`,
-                `${t("BestIP.ProbeErrors")}: ${candidate.timeout_count ?? 0}/${candidate.refused_count ?? 0}/${candidate.other_errors ?? 0}`,
-                `${t("BestIP.Score")}: ${formatScore(candidate.score)}`,
-            ].join(" · ")
-        }
-        case "probe_done": {
-            const stats = event.probe_stats
-            return [
-                `${t("BestIP.TotalIPs")}: ${event.total_ips ?? stats?.total_probes ?? 0}`,
-                `${t("BestIP.TCPDialAttempts")}: ${stats?.tcp_dial_attempts ?? "-"}`,
-                `${t("BestIP.SuccessRate")}: ${stats?.total_probes ? formatSuccessRate((stats.success_count ?? 0) / stats.total_probes) : "-"}`,
-                `${t("BestIP.ProbeErrors")}: ${stats?.timeout_count ?? 0}/${stats?.refused_count ?? 0}/${stats?.other_error_count ?? 0}`,
-                `${t("BestIP.HTTPTestCount")}: ${stats?.http_test_count ?? 0}`,
-                `${t("BestIP.HTTPResult")}: ${stats?.http_success_count ?? 0}/${stats?.http_fail_count ?? 0}`,
-                `${t("BestIP.StagedScan")}: ${stats?.staged_scan ? t("BestIP.Enabled") : t("BestIP.Disabled")}`,
-            ].join(" · ")
-        }
-        case "done":
-            return `${t("BestIP.TotalIPs")}: ${event.total_ips ?? event.result?.ips?.length ?? event.ips?.length ?? 0} · IP: ${recordsText(event.ips ?? event.result?.ips)}`
-        case "error":
-            return event.error || "-"
-        default:
-            return "-"
+        return details.join(" · ")
+    }
+    case "ip_lookup_done":
+        return `${roundPrefix}${event.ip || "-"} -> ${recordsText(event.domains)}`
+    case "domain_resolve_start":
+        return `${roundPrefix}${event.domain || "-"}`
+    case "domain_resolve_done":
+        return `${roundPrefix}${event.domain || "-"} -> ${recordsText(event.ips)}`
+    case "round_done": {
+        const round = event.round_result
+        return [
+            `${roundPrefix}${t("BestIP.NewIPs")}: ${recordsText(event.new_ips ?? round?.new_ips)}`,
+            `${t("BestIP.NewDomains")}: ${recordsText(event.new_domains ?? round?.new_domains)}`,
+            `${t("BestIP.TotalIPs")}: ${event.total_ips ?? round?.total_ips ?? 0}`,
+            `${t("BestIP.TotalDomains")}: ${event.total_domains ?? round?.total_domains ?? 0}`,
+        ].join(" · ")
+    }
+    case "cloudflare_validation_start":
+        return `${t("BestIP.TotalIPs")}: ${event.total_ips ?? event.ips?.length ?? 0} · IP: ${recordsText(event.ips)}`
+    case "cloudflare_validation_done":
+        return [
+            `${t("BestIP.TotalIPs")}: ${event.total_ips ?? event.ips?.length ?? 0}`,
+            `${t("BestIP.FilteredIPs")}: ${recordsText(event.filtered_ips)}`,
+            `${t("BestIP.CloudflareRanges")}: IPv4 ${event.cloudflare_ipv4_ranges ?? 0} / IPv6 ${event.cloudflare_ipv6_ranges ?? 0}`,
+            `${t("BestIP.CloudflareHitRate")}: ${formatSuccessRate(event.cloudflare_hit_rate ?? 0)}`,
+        ].join(" · ")
+    case "probe_start":
+        return [
+            `IP: ${recordsText(event.ips)}`,
+            `${t("BestIP.ProbePort")}: ${event.probe_port ?? "-"}`,
+            `${t("BestIP.ProbeCount")}: ${event.probe_count ?? "-"}`,
+        ].join(" · ")
+    case "probe_stage_start":
+        return [
+            `${t("BestIP.ProbeStage")}: ${event.stage || "-"}`,
+            `${t("BestIP.TotalIPs")}: ${event.total_ips ?? event.ips?.length ?? 0}`,
+            `${t("BestIP.ProbeCount")}: ${event.probe_count ?? "-"}`,
+            `${t("BestIP.Workers")}: ${event.workers ?? "-"}`,
+        ].join(" · ")
+    case "probe_stage_done":
+        return [
+            `${t("BestIP.ProbeStage")}: ${event.stage || "-"}`,
+            `${t("BestIP.DoneCount")}: ${event.done ?? 0}/${event.total_ips ?? 0}`,
+            `${t("BestIP.ProbeCount")}: ${event.probe_count ?? "-"}`,
+        ].join(" · ")
+    case "probe_result": {
+        const candidate = event.candidate
+        if (!candidate) return event.ip || "-"
+        return [
+            `IP: ${candidate.ip || event.ip || "-"}`,
+            `${t("BestIP.Latency")}: ${formatLatency(candidate.avg_latency_ms)}`,
+            `${t("BestIP.P95Latency")}: ${formatLatency(candidate.p95_latency_ms ?? 0)}`,
+            `${t("BestIP.SuccessRate")}: ${formatSuccessRate(candidate.success_rate)}`,
+            `${t("BestIP.ProbeErrors")}: ${candidate.timeout_count ?? 0}/${candidate.refused_count ?? 0}/${candidate.other_errors ?? 0}`,
+            `${t("BestIP.Score")}: ${formatScore(candidate.score)}`,
+        ].join(" · ")
+    }
+    case "probe_done": {
+        const stats = event.probe_stats
+        return [
+            `${t("BestIP.TotalIPs")}: ${event.total_ips ?? stats?.total_probes ?? 0}`,
+            `${t("BestIP.TCPDialAttempts")}: ${stats?.tcp_dial_attempts ?? "-"}`,
+            `${t("BestIP.SuccessRate")}: ${stats?.total_probes ? formatSuccessRate((stats.success_count ?? 0) / stats.total_probes) : "-"}`,
+            `${t("BestIP.ProbeErrors")}: ${stats?.timeout_count ?? 0}/${stats?.refused_count ?? 0}/${stats?.other_error_count ?? 0}`,
+            `${t("BestIP.HTTPTestCount")}: ${stats?.http_test_count ?? 0}`,
+            `${t("BestIP.HTTPResult")}: ${stats?.http_success_count ?? 0}/${stats?.http_fail_count ?? 0}`,
+            `${t("BestIP.StagedScan")}: ${stats?.staged_scan ? t("BestIP.Enabled") : t("BestIP.Disabled")}`,
+        ].join(" · ")
+    }
+    case "done":
+        return `${t("BestIP.TotalIPs")}: ${event.total_ips ?? event.result?.ips?.length ?? event.ips?.length ?? 0} · IP: ${recordsText(event.ips ?? event.result?.ips)}`
+    case "error":
+        return event.error || "-"
+    default:
+        return "-"
     }
 }
 
 export default function BestIPPage() {
     const { t } = useTranslation()
-    const { data: ddnsProfiles, isLoading: isLoadingDDNSProfiles } = useSWR<ModelDDNSProfile[]>(
-        "/api/v1/ddns",
+    const { data: ddnsCredentials, isLoading: isLoadingDDNSCredentials } = useSWR<
+        ModelDDNSCredential[]
+    >(
+        "/api/v1/ddns-credential",
         swrFetcher,
     )
     const { notifierGroup } = useNotification()
@@ -382,7 +388,7 @@ export default function BestIPPage() {
     const [stagedScanEnabled, setStagedScanEnabled] = useState(false)
     const [quickTCPCount, setQuickTCPCount] = useState(80)
     const [latencyCheckCount, setLatencyCheckCount] = useState(40)
-    const [selectedDDNSProfiles, setSelectedDDNSProfiles] = useState<number[]>([])
+    const [selectedDDNSCredentials, setSelectedDDNSCredentials] = useState<number[]>([])
     const [ddnsSelectionTouched, setDDNSSelectionTouched] = useState(false)
     const [overrideDomains, setOverrideDomains] = useState("")
     const [overrideDomainsTouched, setOverrideDomainsTouched] = useState(false)
@@ -428,7 +434,7 @@ export default function BestIPPage() {
         setPushFailed(saved ? nextAutomation.push_failed : true)
         setWriteTopN(clampBestIPCandidateCount(nextAutomation.write_top_n || 1))
         if (saved) {
-            setSelectedDDNSProfiles(nextAutomation.ddns_profiles ?? [])
+            setSelectedDDNSCredentials(nextAutomation.ddns_credentials ?? [])
             setDDNSSelectionTouched(true)
         }
         setOverrideDomains(saved ? nextAutomation.domains?.join("\n") || "" : "")
@@ -476,11 +482,13 @@ export default function BestIPPage() {
         ModelBestIPAutomationHistory[]
     >("/api/v1/bestip/automation/history", swrFetcher)
 
-    const effectiveSelectedDDNSProfiles = useMemo(() => {
-        if (ddnsSelectionTouched || selectedDDNSProfiles.length > 0) return selectedDDNSProfiles
-        if (hasSavedAutomation(automation)) return automation.ddns_profiles ?? []
-        return defaultBestIPDDNSProfileIDs(ddnsProfiles)
-    }, [automation, ddnsProfiles, ddnsSelectionTouched, selectedDDNSProfiles])
+    const effectiveSelectedDDNSCredentials = useMemo(() => {
+        if (ddnsSelectionTouched || selectedDDNSCredentials.length > 0) {
+            return selectedDDNSCredentials
+        }
+        if (hasSavedAutomation(automation)) return automation.ddns_credentials ?? []
+        return defaultBestIPDDNSCredentialIDs(ddnsCredentials)
+    }, [automation, ddnsCredentials, ddnsSelectionTouched, selectedDDNSCredentials])
 
     const effectiveOverrideDomains = overrideDomainsTouched
         ? overrideDomains
@@ -489,18 +497,18 @@ export default function BestIPPage() {
     const effectiveNotificationGroupID = notificationGroupTouched
         ? notificationGroupID
         : hasSavedAutomation(automation)
-          ? (automation?.notification_group_id ?? 0)
-          : notificationGroupID
+            ? (automation?.notification_group_id ?? 0)
+            : notificationGroupID
     const effectivePushSuccessful = pushSuccessfulTouched
         ? pushSuccessful
         : hasSavedAutomation(automation)
-          ? (automation?.push_successful ?? false)
-          : pushSuccessful
+            ? (automation?.push_successful ?? false)
+            : pushSuccessful
     const effectivePushFailed = pushFailedTouched
         ? pushFailed
         : hasSavedAutomation(automation)
-          ? (automation?.push_failed ?? false)
-          : pushFailed
+            ? (automation?.push_failed ?? false)
+            : pushFailed
 
     const candidateRows = useMemo(() => candidateRowsFromResult(fissionResult), [fissionResult])
 
@@ -572,9 +580,10 @@ export default function BestIPPage() {
             write_top_n: clampBestIPCandidateCount(
                 saved ? automation?.write_top_n || 1 : writeTopN,
             ),
-            ddns_profiles: saved
-                ? (automation?.ddns_profiles ?? [])
-                : effectiveSelectedDDNSProfiles,
+            ddns_profiles: saved ? (automation?.ddns_profiles ?? []) : [],
+            ddns_credentials: saved
+                ? (automation?.ddns_credentials ?? [])
+                : effectiveSelectedDDNSCredentials,
             domains: saved ? (automation?.domains ?? []) : parseList(effectiveOverrideDomains),
             fission: hasStoredFissionConfig(storedFission) ? storedFission : buildFissionForm(),
         }
@@ -588,7 +597,8 @@ export default function BestIPPage() {
     const buildDNSConfigForm = (): ModelBestIPAutomationForm => ({
         ...buildStoredConfigForm(),
         write_top_n: clampBestIPCandidateCount(writeTopN),
-        ddns_profiles: effectiveSelectedDDNSProfiles,
+        ddns_profiles: [],
+        ddns_credentials: effectiveSelectedDDNSCredentials,
         domains: parseList(effectiveOverrideDomains),
     })
 
@@ -741,7 +751,8 @@ export default function BestIPPage() {
         setIsWriting(true)
         try {
             const results = await writeBestIPDNS({
-                ddns_profiles: effectiveSelectedDDNSProfiles,
+                ddns_profiles: [],
+                ddns_credentials: effectiveSelectedDDNSCredentials,
                 domains: parseList(effectiveOverrideDomains),
                 ipv4_records: selectedIPv4Records,
                 ipv6_records: selectedIPv6Records,
@@ -756,10 +767,12 @@ export default function BestIPPage() {
         }
     }
 
-    const toggleDDNSProfile = (id: number, checked: boolean) => {
+    const toggleDDNSCredential = (id: number, checked: boolean) => {
         setDDNSSelectionTouched(true)
-        setSelectedDDNSProfiles((current) => {
-            const currentSelection = ddnsSelectionTouched ? current : effectiveSelectedDDNSProfiles
+        setSelectedDDNSCredentials((current) => {
+            const currentSelection = ddnsSelectionTouched
+                ? current
+                : effectiveSelectedDDNSCredentials
             if (checked) return Array.from(new Set([...currentSelection, id]))
             return currentSelection.filter((item) => item !== id)
         })
@@ -1032,40 +1045,43 @@ export default function BestIPPage() {
                     </CardHeader>
                     <CardContent className="grid gap-4">
                         <div className="grid gap-2">
-                            <Label>{t("BestIP.DDNSProfiles")}</Label>
+                            <Label>{t("BestIP.DDNSCredentials")}</Label>
                             <div className="grid gap-2 rounded-md border p-3">
-                                {(ddnsProfiles ?? []).map((profile) => (
+                                {(ddnsCredentials ?? []).map((credential) => (
                                     <label
-                                        key={profile.id}
+                                        key={credential.id}
                                         className="flex items-center justify-between gap-3 text-sm"
                                     >
                                         <span className="flex min-w-0 items-center gap-2">
                                             <Checkbox
-                                                checked={effectiveSelectedDDNSProfiles.includes(
-                                                    profile.id,
+                                                checked={effectiveSelectedDDNSCredentials.includes(
+                                                    credential.id,
                                                 )}
                                                 onCheckedChange={(checked) =>
-                                                    toggleDDNSProfile(profile.id, checked === true)
+                                                    toggleDDNSCredential(
+                                                        credential.id,
+                                                        checked === true,
+                                                    )
                                                 }
                                             />
-                                            <span className="truncate">{profile.name}</span>
+                                            <span className="truncate">{credential.name}</span>
                                         </span>
-                                        <Badge variant="outline">{profile.provider}</Badge>
+                                        <Badge variant="outline">{credential.provider}</Badge>
                                     </label>
                                 ))}
-                                {isLoadingDDNSProfiles && (
+                                {isLoadingDDNSCredentials && (
                                     <div className="py-2 text-center text-sm text-muted-foreground">
                                         {t("Loading")}
                                     </div>
                                 )}
-                                {!isLoadingDDNSProfiles && !ddnsProfiles?.length && (
+                                {!isLoadingDDNSCredentials && !ddnsCredentials?.length && (
                                     <div className="grid gap-3 rounded-md bg-muted/40 p-3 text-sm sm:flex sm:items-center sm:justify-between">
                                         <div className="grid gap-1">
                                             <div className="font-medium text-foreground">
-                                                {t("BestIP.DDNSProfilesEmpty")}
+                                                {t("BestIP.DDNSCredentialsEmpty")}
                                             </div>
                                             <div className="text-muted-foreground">
-                                                {t("BestIP.DDNSProfilesEmptyHint")}
+                                                {t("BestIP.DDNSCredentialsEmptyHint")}
                                             </div>
                                         </div>
                                         <Button
@@ -1075,7 +1091,7 @@ export default function BestIPPage() {
                                             className="w-full sm:w-auto"
                                         >
                                             <a href="/dashboard/ddns">
-                                                {t("BestIP.CreateDDNSProfile")}
+                                                {t("BestIP.CreateDDNSCredential")}
                                             </a>
                                         </Button>
                                     </div>
@@ -1085,7 +1101,7 @@ export default function BestIPPage() {
                         <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_12rem]">
                             <div className="grid gap-2">
                                 <Label htmlFor="bestip-domains">
-                                    {t("BestIP.OverrideDomains")}
+                                    {t("BestIP.WritebackDomains")}
                                 </Label>
                                 <Input
                                     id="bestip-domains"
@@ -1094,7 +1110,7 @@ export default function BestIPPage() {
                                         setOverrideDomainsTouched(true)
                                         setOverrideDomains(event.target.value)
                                     }}
-                                    placeholder={t("BestIP.OverrideDomainsPlaceholder")}
+                                    placeholder={t("BestIP.WritebackDomainsPlaceholder")}
                                 />
                             </div>
                             <NumberField
@@ -1111,7 +1127,8 @@ export default function BestIPPage() {
                                 onClick={writeDNS}
                                 disabled={
                                     isWriting ||
-                                    effectiveSelectedDDNSProfiles.length === 0 ||
+                                    effectiveSelectedDDNSCredentials.length === 0 ||
+                                    parseList(effectiveOverrideDomains).length === 0 ||
                                     (selectedIPv4Records.length === 0 &&
                                         selectedIPv6Records.length === 0)
                                 }

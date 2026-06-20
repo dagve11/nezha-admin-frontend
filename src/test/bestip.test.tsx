@@ -29,7 +29,8 @@ const swrMockState = vi.hoisted(() => {
         push_failed: true,
         notification_group_id: 9,
         write_top_n: 1,
-        ddns_profiles: [7],
+        ddns_profiles: [],
+        ddns_credentials: [7],
         domains: ["cdn.example.com"],
         fission: {
             seed_ips: ["1.1.1.1"],
@@ -66,7 +67,7 @@ const swrMockState = vi.hoisted(() => {
             ipv4_records: ["9.9.9.9"],
             dns_results: [
                 {
-                    profile_id: 7,
+                    credential_id: 7,
                     provider: "dummy",
                     domains: ["cdn.example.com"],
                     success: false,
@@ -83,7 +84,7 @@ const swrMockState = vi.hoisted(() => {
             ipv4_records: ["1.0.0.1"],
             dns_results: [
                 {
-                    profile_id: 7,
+                    credential_id: 7,
                     provider: "dummy",
                     domains: ["cdn.example.com"],
                     success: true,
@@ -93,15 +94,13 @@ const swrMockState = vi.hoisted(() => {
     ]
 
     return {
-        ddnsProfiles: [
+        ddnsCredentials: [
             {
                 id: 7,
-                name: "dummy-ddns",
+                name: "dummy-credential",
                 provider: "dummy",
-                domains: ["cdn.example.com"],
-                enable_ipv4: true,
-                enable_ipv6: false,
-                max_retries: 1,
+                access_id: "",
+                access_secret_set: true,
             },
         ],
         automation: makeAutomation(),
@@ -139,8 +138,8 @@ vi.mock("swr", () => {
     return {
         default: (key: string) => {
             let data: unknown = swrMockState.automationHistories
-            if (key === "/api/v1/ddns") {
-                data = swrMockState.ddnsProfiles
+            if (key === "/api/v1/ddns-credential") {
+                data = swrMockState.ddnsCredentials
             } else if (key === "/api/v1/bestip/automation") {
                 data = swrMockState.automation
             } else if (key === "/api/v1/bestip/automation/history") {
@@ -158,15 +157,13 @@ vi.mock("swr", () => {
 })
 
 beforeEach(() => {
-    swrMockState.ddnsProfiles = [
+    swrMockState.ddnsCredentials = [
         {
             id: 7,
-            name: "dummy-ddns",
+            name: "dummy-credential",
             provider: "dummy",
-            domains: ["cdn.example.com"],
-            enable_ipv4: true,
-            enable_ipv6: false,
-            max_retries: 1,
+            access_id: "",
+            access_secret_set: true,
         },
     ]
     swrMockState.automation = swrMockState.makeAutomation()
@@ -180,16 +177,16 @@ beforeEach(() => {
     notifyBestIPResult.mockReset()
 })
 
-test("BestIPPage links to DDNS creation when no DDNS profile exists", async () => {
-    swrMockState.ddnsProfiles = []
+test("BestIPPage links to DDNS credential creation when no DDNS credential exists", async () => {
+    swrMockState.ddnsCredentials = []
 
     const { default: BestIPPage } = await import("@/routes/bestip")
     await act(async () => {
         render(<BestIPPage />)
     })
 
-    expect(screen.getByText("BestIP.DDNSProfilesEmpty")).toBeTruthy()
-    const createLink = screen.getByRole("link", { name: "BestIP.CreateDDNSProfile" })
+    expect(screen.getByText("BestIP.DDNSCredentialsEmpty")).toBeTruthy()
+    const createLink = screen.getByRole("link", { name: "BestIP.CreateDDNSCredential" })
     expect(createLink.getAttribute("href")).toBe("/dashboard/ddns")
 })
 
@@ -276,7 +273,7 @@ test("BestIPPage renders probe metrics and writes the top scored IP by default",
     mockFissionWithCandidates()
     writeBestIPDNS.mockResolvedValue([
         {
-            profile_id: 7,
+            credential_id: 7,
             provider: "dummy",
             domains: ["cdn.example.com"],
             success: true,
@@ -321,7 +318,9 @@ test("BestIPPage renders probe metrics and writes the top scored IP by default",
     await waitFor(() => {
         expect(writeBestIPDNS).toHaveBeenCalledWith(
             expect.objectContaining({
-                ddns_profiles: [7],
+                ddns_profiles: [],
+                ddns_credentials: [7],
+                domains: ["cdn.example.com"],
                 ipv4_records: ["1.0.0.1"],
             }),
         )
@@ -333,7 +332,7 @@ test("BestIPPage writes the top N scored IPv4 records", async () => {
     mockFissionWithCandidates()
     writeBestIPDNS.mockResolvedValue([
         {
-            profile_id: 7,
+            credential_id: 7,
             provider: "dummy",
             domains: ["cdn.example.com"],
             success: true,
@@ -420,7 +419,7 @@ test("BestIPPage writes only candidate IPs and caps DNS write count at ten", asy
     })
     writeBestIPDNS.mockResolvedValue([
         {
-            profile_id: 7,
+            credential_id: 7,
             provider: "dummy",
             domains: ["cdn.example.com"],
             success: true,
@@ -514,7 +513,7 @@ test("BestIPPage treats DNS write count as total top candidates across IP famili
     })
     writeBestIPDNS.mockResolvedValue([
         {
-            profile_id: 7,
+            credential_id: 7,
             provider: "dummy",
             domains: ["cdn.example.com"],
             success: true,
@@ -603,11 +602,11 @@ test("BestIPPage keeps only the first ten candidate IPs", async () => {
     )
 })
 
-test("BestIP DNS writeback defaults to Cloudflare profiles when no config is saved", async () => {
-    const { defaultBestIPDDNSProfileIDs } = await import("@/routes/bestip")
+test("BestIP DNS writeback defaults to Cloudflare credentials when no config is saved", async () => {
+    const { defaultBestIPDDNSCredentialIDs } = await import("@/routes/bestip")
 
     expect(
-        defaultBestIPDDNSProfileIDs([
+        defaultBestIPDDNSCredentialIDs([
             {
                 id: 7,
                 provider: "dummy",
@@ -627,7 +626,8 @@ test("BestIPPage exposes separate save buttons for fission and DNS settings", as
         scheduler: "0 */30 * * * *",
         auto_write_dns: true,
         write_top_n: 2,
-        ddns_profiles: [7],
+        ddns_profiles: [],
+        ddns_credentials: [7],
         domains: ["cdn.example.com"],
     })
 
@@ -639,7 +639,7 @@ test("BestIPPage exposes separate save buttons for fission and DNS settings", as
     fireEvent.change(screen.getByLabelText("BestIP.SeedIPs"), {
         target: { value: "1.1.1.1\n1.0.0.1" },
     })
-    fireEvent.change(screen.getByLabelText("BestIP.OverrideDomains"), {
+    fireEvent.change(screen.getByLabelText("BestIP.WritebackDomains"), {
         target: { value: "other.example.com" },
     })
     fireEvent.change(screen.getByLabelText("BestIP.WriteTopN"), {
@@ -655,7 +655,8 @@ test("BestIPPage exposes separate save buttons for fission and DNS settings", as
                 scheduler: "0 */30 * * * *",
                 auto_write_dns: true,
                 write_top_n: 1,
-                ddns_profiles: [7],
+                ddns_profiles: [],
+                ddns_credentials: [7],
                 domains: ["cdn.example.com"],
                 fission: expect.objectContaining({
                     seed_ips: ["1.1.1.1", "1.0.0.1"],
@@ -670,7 +671,8 @@ test("BestIPPage exposes separate save buttons for fission and DNS settings", as
         expect(saveBestIPAutomation).toHaveBeenLastCalledWith(
             expect.objectContaining({
                 write_top_n: 2,
-                ddns_profiles: [7],
+                ddns_profiles: [],
+                ddns_credentials: [7],
                 domains: ["other.example.com"],
                 fission: expect.objectContaining({
                     seed_ips: ["1.1.1.1"],
@@ -692,6 +694,7 @@ test("BestIPPage treats an id zero automation response as unsaved defaults", asy
         notification_group_id: 0,
         write_top_n: 1,
         ddns_profiles: [],
+        ddns_credentials: [],
         domains: [],
         fission: {
             seed_ips: [],
@@ -732,7 +735,8 @@ test("BestIPPage treats an id zero automation response as unsaved defaults", asy
                 auto_write_dns: true,
                 push_successful: true,
                 push_failed: true,
-                ddns_profiles: [7],
+                ddns_profiles: [],
+                ddns_credentials: [7],
                 domains: [],
                 fission: expect.objectContaining({
                     seed_ips: ["1.1.1.1", "1.0.0.1"],
@@ -751,7 +755,8 @@ test("BestIPPage submits probe scoring and staged scan settings", async () => {
         scheduler: "0 */30 * * * *",
         auto_write_dns: true,
         write_top_n: 1,
-        ddns_profiles: [7],
+        ddns_profiles: [],
+        ddns_credentials: [7],
         domains: ["cdn.example.com"],
     })
 
@@ -846,7 +851,8 @@ test("BestIPPage saves automation, runs it, and rolls back DNS records", async (
         push_failed: true,
         notification_group_id: 9,
         write_top_n: 1,
-        ddns_profiles: [7],
+        ddns_profiles: [],
+        ddns_credentials: [7],
         domains: ["cdn.example.com"],
         rollback_ipv4_records: ["9.9.9.9"],
     })
@@ -869,7 +875,7 @@ test("BestIPPage saves automation, runs it, and rolls back DNS records", async (
         ],
         dns_results: [
             {
-                profile_id: 7,
+                credential_id: 7,
                 provider: "dummy",
                 domains: ["cdn.example.com"],
                 success: true,
@@ -883,7 +889,7 @@ test("BestIPPage saves automation, runs it, and rolls back DNS records", async (
         rollback_ipv4_records: ["1.0.0.1"],
         dns_results: [
             {
-                profile_id: 7,
+                credential_id: 7,
                 provider: "dummy",
                 domains: ["cdn.example.com"],
                 success: true,
@@ -897,7 +903,7 @@ test("BestIPPage saves automation, runs it, and rolls back DNS records", async (
     })
 
     fireEvent.click(screen.getByRole("checkbox", { name: "BestIP.EnableAutomation" }))
-    fireEvent.change(screen.getByLabelText("BestIP.OverrideDomains"), {
+    fireEvent.change(screen.getByLabelText("BestIP.WritebackDomains"), {
         target: { value: "cdn.example.com" },
     })
     fireEvent.click(screen.getByRole("button", { name: "BestIP.SaveAutomation" }))
@@ -911,7 +917,8 @@ test("BestIPPage saves automation, runs it, and rolls back DNS records", async (
                 push_failed: true,
                 notification_group_id: 9,
                 write_top_n: 1,
-                ddns_profiles: [7],
+                ddns_profiles: [],
+                ddns_credentials: [7],
                 domains: ["cdn.example.com"],
             }),
         )
