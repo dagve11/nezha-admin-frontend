@@ -869,7 +869,7 @@ export default function BestIPPage() {
                 </CardContent>
             </Card>
 
-            <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_24rem] xl:items-start">
+            <div className="mt-4 grid gap-4">
                 <Card className="rounded-md shadow-none">
                     <CardHeader className="gap-3 space-y-0 sm:flex-row sm:items-center sm:justify-between">
                         <CardTitle className="text-lg">{t("BestIP.FissionConfig")}</CardTitle>
@@ -1089,259 +1089,246 @@ export default function BestIPPage() {
                     </CardContent>
                 </Card>
 
-                <div className="grid gap-4">
-                    <Card className="rounded-md shadow-none">
-                        <CardHeader className="gap-3 space-y-0 sm:flex-row sm:items-center sm:justify-between">
-                            <CardTitle className="text-lg">{t("BestIP.DNSWriteback")}</CardTitle>
-                            <Button
-                                variant="outline"
-                                onClick={saveDNSConfig}
-                                disabled={isSavingDNSConfig}
-                                className="w-full sm:w-auto"
-                            >
-                                {isSavingDNSConfig && (
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                )}
-                                {t("BestIP.SaveDNSConfig")}
-                            </Button>
-                        </CardHeader>
-                        <CardContent className="grid gap-4">
+                <Card className="rounded-md shadow-none">
+                    <CardHeader className="gap-3 space-y-0 sm:flex-row sm:items-center sm:justify-between">
+                        <CardTitle className="text-lg">{t("BestIP.DNSWriteback")}</CardTitle>
+                        <Button
+                            variant="outline"
+                            onClick={saveDNSConfig}
+                            disabled={isSavingDNSConfig}
+                            className="w-full sm:w-auto"
+                        >
+                            {isSavingDNSConfig && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            {t("BestIP.SaveDNSConfig")}
+                        </Button>
+                    </CardHeader>
+                    <CardContent className="grid gap-4">
+                        <div className="grid gap-2">
+                            <Label>{t("BestIP.DDNSCredentials")}</Label>
                             <div className="grid gap-2">
-                                <Label>{t("BestIP.DDNSCredentials")}</Label>
-                                <div className="grid gap-2">
-                                    {isLoadingDDNSCredentials && (
-                                        <div className="rounded-md border px-3 py-2 text-sm text-muted-foreground">
-                                            {t("Loading")}
-                                        </div>
-                                    )}
-                                    {!isLoadingDDNSCredentials &&
-                                        Boolean(ddnsCredentials?.length) && (
-                                            <MultiSelect
-                                                options={ddnsCredentialOptions}
-                                                value={effectiveSelectedDDNSCredentials.map(String)}
-                                                onValueChange={handleDDNSCredentialsChange}
-                                                placeholder={t("BestIP.SelectDDNSCredentials")}
-                                                maxCount={2}
-                                            />
-                                        )}
-                                    {!isLoadingDDNSCredentials && !ddnsCredentials?.length && (
-                                        <div className="grid gap-3 rounded-md bg-muted/40 p-3 text-sm sm:flex sm:items-center sm:justify-between">
-                                            <div className="grid gap-1">
-                                                <div className="font-medium text-foreground">
-                                                    {t("BestIP.DDNSCredentialsEmpty")}
-                                                </div>
-                                                <div className="text-muted-foreground">
-                                                    {t("BestIP.DDNSCredentialsEmptyHint")}
-                                                </div>
-                                            </div>
-                                            <Button
-                                                asChild
-                                                variant="outline"
-                                                size="sm"
-                                                className="w-full sm:w-auto"
-                                            >
-                                                <a href="/dashboard/ddns">
-                                                    {t("BestIP.CreateDDNSCredential")}
-                                                </a>
-                                            </Button>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_12rem]">
-                                <div className="grid gap-2">
-                                    <Label htmlFor="bestip-domains">
-                                        {t("BestIP.WritebackDomains")}
-                                    </Label>
-                                    <Input
-                                        id="bestip-domains"
-                                        value={effectiveOverrideDomains}
-                                        onChange={(event) => {
-                                            setOverrideDomainsTouched(true)
-                                            setOverrideDomains(event.target.value)
-                                        }}
-                                        placeholder={t("BestIP.WritebackDomainsPlaceholder")}
+                                {isLoadingDDNSCredentials && (
+                                    <div className="rounded-md border px-3 py-2 text-sm text-muted-foreground">
+                                        {t("Loading")}
+                                    </div>
+                                )}
+                                {!isLoadingDDNSCredentials && Boolean(ddnsCredentials?.length) && (
+                                    <MultiSelect
+                                        options={ddnsCredentialOptions}
+                                        value={effectiveSelectedDDNSCredentials.map(String)}
+                                        onValueChange={handleDDNSCredentialsChange}
+                                        placeholder={t("BestIP.SelectDDNSCredentials")}
+                                        maxCount={2}
                                     />
-                                </div>
-                                <NumberField
-                                    id="bestip-write-top-n"
-                                    label={t("BestIP.WriteTopN")}
-                                    value={writeTopN}
-                                    min={1}
-                                    max={maxBestIPCandidateCount}
-                                    onChange={(value) =>
-                                        setWriteTopN(clampBestIPCandidateCount(value))
-                                    }
+                                )}
+                                {!isLoadingDDNSCredentials && !ddnsCredentials?.length && (
+                                    <div className="grid gap-3 rounded-md bg-muted/40 p-3 text-sm sm:flex sm:items-center sm:justify-between">
+                                        <div className="grid gap-1">
+                                            <div className="font-medium text-foreground">
+                                                {t("BestIP.DDNSCredentialsEmpty")}
+                                            </div>
+                                            <div className="text-muted-foreground">
+                                                {t("BestIP.DDNSCredentialsEmptyHint")}
+                                            </div>
+                                        </div>
+                                        <Button
+                                            asChild
+                                            variant="outline"
+                                            size="sm"
+                                            className="w-full sm:w-auto"
+                                        >
+                                            <a href="/dashboard/ddns">
+                                                {t("BestIP.CreateDDNSCredential")}
+                                            </a>
+                                        </Button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_12rem]">
+                            <div className="grid gap-2">
+                                <Label htmlFor="bestip-domains">
+                                    {t("BestIP.WritebackDomains")}
+                                </Label>
+                                <Input
+                                    id="bestip-domains"
+                                    value={effectiveOverrideDomains}
+                                    onChange={(event) => {
+                                        setOverrideDomainsTouched(true)
+                                        setOverrideDomains(event.target.value)
+                                    }}
+                                    placeholder={t("BestIP.WritebackDomainsPlaceholder")}
                                 />
                             </div>
-                            <div className="flex justify-end">
-                                <Button
-                                    onClick={writeDNS}
-                                    disabled={
-                                        isWriting ||
-                                        effectiveSelectedDDNSCredentials.length === 0 ||
-                                        parseList(effectiveOverrideDomains).length === 0 ||
-                                        (selectedIPv4Records.length === 0 &&
-                                            selectedIPv6Records.length === 0)
-                                    }
-                                    className="w-full sm:w-auto"
-                                >
-                                    {isWriting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    {t("BestIP.WriteDNS")}
-                                </Button>
-                            </div>
-                        </CardContent>
-                    </Card>
+                            <NumberField
+                                id="bestip-write-top-n"
+                                label={t("BestIP.WriteTopN")}
+                                value={writeTopN}
+                                min={1}
+                                max={maxBestIPCandidateCount}
+                                onChange={(value) => setWriteTopN(clampBestIPCandidateCount(value))}
+                            />
+                        </div>
+                        <div className="flex justify-end">
+                            <Button
+                                onClick={writeDNS}
+                                disabled={
+                                    isWriting ||
+                                    effectiveSelectedDDNSCredentials.length === 0 ||
+                                    parseList(effectiveOverrideDomains).length === 0 ||
+                                    (selectedIPv4Records.length === 0 &&
+                                        selectedIPv6Records.length === 0)
+                                }
+                                className="w-full sm:w-auto"
+                            >
+                                {isWriting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                {t("BestIP.WriteDNS")}
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
 
-                    <Card className="rounded-md shadow-none">
-                        <CardHeader>
-                            <CardTitle className="text-lg">{t("BestIP.Automation")}</CardTitle>
-                        </CardHeader>
-                        <CardContent className="grid gap-4">
-                            <div className="grid gap-3">
-                                <div className="grid gap-2">
-                                    <Label htmlFor="bestip-automation-scheduler">
-                                        {t("BestIP.AutomationScheduler")}
-                                    </Label>
-                                    <Input
-                                        id="bestip-automation-scheduler"
-                                        value={automationScheduler}
-                                        onChange={(event) =>
-                                            setAutomationScheduler(event.target.value)
-                                        }
-                                        placeholder={defaultScheduler}
-                                    />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="bestip-notification-group">
-                                        {t("BestIP.NotificationGroup")}
-                                    </Label>
-                                    <Combobox
-                                        key={effectiveAutomationNotificationGroupID}
-                                        id="bestip-notification-group"
-                                        aria-label={t("BestIP.NotificationGroup")}
-                                        options={notificationGroupOptions}
-                                        defaultValue={String(
-                                            effectiveAutomationNotificationGroupID,
-                                        )}
-                                        placeholder={t("BestIP.NoNotificationGroup")}
-                                        onValueChange={(value) => {
-                                            setAutomationNotificationGroupTouched(true)
-                                            setAutomationNotificationGroupID(Number(value || 0))
-                                        }}
-                                    />
-                                </div>
+                <Card className="rounded-md shadow-none">
+                    <CardHeader>
+                        <CardTitle className="text-lg">{t("BestIP.Automation")}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="grid gap-4">
+                        <div className="grid gap-3">
+                            <div className="grid gap-2">
+                                <Label htmlFor="bestip-automation-scheduler">
+                                    {t("BestIP.AutomationScheduler")}
+                                </Label>
+                                <Input
+                                    id="bestip-automation-scheduler"
+                                    value={automationScheduler}
+                                    onChange={(event) => setAutomationScheduler(event.target.value)}
+                                    placeholder={defaultScheduler}
+                                />
                             </div>
-                            <div className="flex flex-wrap items-center gap-4">
-                                <label className="flex items-center gap-2 text-sm">
-                                    <Checkbox
-                                        checked={automationEnabled}
-                                        onCheckedChange={(checked) =>
-                                            setAutomationEnabled(checked === true)
-                                        }
-                                    />
-                                    {t("BestIP.EnableAutomation")}
-                                </label>
-                                <label className="flex items-center gap-2 text-sm">
-                                    <Checkbox
-                                        checked={automationAutoWriteDNS}
-                                        onCheckedChange={(checked) =>
-                                            setAutomationAutoWriteDNS(checked === true)
-                                        }
-                                    />
-                                    {t("BestIP.AutoWriteDNS")}
-                                </label>
-                                <label className="flex items-center gap-2 text-sm">
-                                    <Checkbox
-                                        checked={effectivePushSuccessful}
-                                        onCheckedChange={(checked) => {
-                                            setPushSuccessfulTouched(true)
-                                            setPushSuccessful(checked === true)
-                                        }}
-                                    />
-                                    {t("BestIP.PushSuccessful")}
-                                </label>
-                                <label className="flex items-center gap-2 text-sm">
-                                    <Checkbox
-                                        checked={effectivePushFailed}
-                                        onCheckedChange={(checked) => {
-                                            setPushFailedTouched(true)
-                                            setPushFailed(checked === true)
-                                        }}
-                                    />
-                                    {t("BestIP.PushFailed")}
-                                </label>
+                            <div className="grid gap-2">
+                                <Label htmlFor="bestip-notification-group">
+                                    {t("BestIP.NotificationGroup")}
+                                </Label>
+                                <Combobox
+                                    key={effectiveAutomationNotificationGroupID}
+                                    id="bestip-notification-group"
+                                    aria-label={t("BestIP.NotificationGroup")}
+                                    options={notificationGroupOptions}
+                                    defaultValue={String(effectiveAutomationNotificationGroupID)}
+                                    placeholder={t("BestIP.NoNotificationGroup")}
+                                    onValueChange={(value) => {
+                                        setAutomationNotificationGroupTouched(true)
+                                        setAutomationNotificationGroupID(Number(value || 0))
+                                    }}
+                                />
                             </div>
-                            <div className="flex flex-wrap gap-2">
-                                <Button onClick={saveAutomation} disabled={isSavingAutomation}>
-                                    {isSavingAutomation && (
-                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    )}
-                                    {t("BestIP.SaveAutomation")}
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    onClick={runAutomation}
-                                    disabled={isRunningAutomation}
-                                >
-                                    {isRunningAutomation && (
-                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    )}
-                                    {t("BestIP.RunAutomation")}
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    onClick={rollbackAutomation}
-                                    disabled={
-                                        isRollingBackAutomation ||
-                                        (!automation?.rollback_ipv4_records?.length &&
-                                            !automation?.rollback_ipv6_records?.length)
+                        </div>
+                        <div className="flex flex-wrap items-center gap-4">
+                            <label className="flex items-center gap-2 text-sm">
+                                <Checkbox
+                                    checked={automationEnabled}
+                                    onCheckedChange={(checked) =>
+                                        setAutomationEnabled(checked === true)
                                     }
-                                >
-                                    {isRollingBackAutomation && (
-                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                />
+                                {t("BestIP.EnableAutomation")}
+                            </label>
+                            <label className="flex items-center gap-2 text-sm">
+                                <Checkbox
+                                    checked={automationAutoWriteDNS}
+                                    onCheckedChange={(checked) =>
+                                        setAutomationAutoWriteDNS(checked === true)
+                                    }
+                                />
+                                {t("BestIP.AutoWriteDNS")}
+                            </label>
+                            <label className="flex items-center gap-2 text-sm">
+                                <Checkbox
+                                    checked={effectivePushSuccessful}
+                                    onCheckedChange={(checked) => {
+                                        setPushSuccessfulTouched(true)
+                                        setPushSuccessful(checked === true)
+                                    }}
+                                />
+                                {t("BestIP.PushSuccessful")}
+                            </label>
+                            <label className="flex items-center gap-2 text-sm">
+                                <Checkbox
+                                    checked={effectivePushFailed}
+                                    onCheckedChange={(checked) => {
+                                        setPushFailedTouched(true)
+                                        setPushFailed(checked === true)
+                                    }}
+                                />
+                                {t("BestIP.PushFailed")}
+                            </label>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            <Button onClick={saveAutomation} disabled={isSavingAutomation}>
+                                {isSavingAutomation && (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                )}
+                                {t("BestIP.SaveAutomation")}
+                            </Button>
+                            <Button
+                                variant="outline"
+                                onClick={runAutomation}
+                                disabled={isRunningAutomation}
+                            >
+                                {isRunningAutomation && (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                )}
+                                {t("BestIP.RunAutomation")}
+                            </Button>
+                            <Button
+                                variant="outline"
+                                onClick={rollbackAutomation}
+                                disabled={
+                                    isRollingBackAutomation ||
+                                    (!automation?.rollback_ipv4_records?.length &&
+                                        !automation?.rollback_ipv6_records?.length)
+                                }
+                            >
+                                {isRollingBackAutomation && (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                )}
+                                {t("BestIP.RollbackDNS")}
+                            </Button>
+                        </div>
+                        <div className="grid gap-2 rounded-md border p-3 text-sm">
+                            <div>
+                                <div className="text-muted-foreground">{t("LastExecution")}</div>
+                                <div>{automation?.last_run_at ?? "-"}</div>
+                            </div>
+                            <div>
+                                <div className="text-muted-foreground">
+                                    {t("BestIP.LastWriteRecords")}
+                                </div>
+                                <div className="font-mono text-xs">
+                                    {recordsText(
+                                        automationResult?.ipv4_records ??
+                                            automation?.last_ipv4_records,
                                     )}
-                                    {t("BestIP.RollbackDNS")}
-                                </Button>
-                            </div>
-                            <div className="grid gap-2 rounded-md border p-3 text-sm">
-                                <div>
-                                    <div className="text-muted-foreground">
-                                        {t("LastExecution")}
-                                    </div>
-                                    <div>{automation?.last_run_at ?? "-"}</div>
-                                </div>
-                                <div>
-                                    <div className="text-muted-foreground">
-                                        {t("BestIP.LastWriteRecords")}
-                                    </div>
-                                    <div className="font-mono text-xs">
-                                        {recordsText(
-                                            automationResult?.ipv4_records ??
-                                                automation?.last_ipv4_records,
-                                        )}
-                                    </div>
-                                </div>
-                                <div>
-                                    <div className="text-muted-foreground">
-                                        {t("BestIP.RollbackRecords")}
-                                    </div>
-                                    <div className="font-mono text-xs">
-                                        {recordsText(
-                                            automationResult?.rollback_ipv4_records ??
-                                                automation?.rollback_ipv4_records,
-                                        )}
-                                    </div>
                                 </div>
                             </div>
-                            {automation?.last_error && (
-                                <div className="rounded-md border border-destructive/40 p-3 text-sm text-destructive">
-                                    {automation.last_error}
+                            <div>
+                                <div className="text-muted-foreground">
+                                    {t("BestIP.RollbackRecords")}
                                 </div>
-                            )}
-                        </CardContent>
-                    </Card>
-                </div>
+                                <div className="font-mono text-xs">
+                                    {recordsText(
+                                        automationResult?.rollback_ipv4_records ??
+                                            automation?.rollback_ipv4_records,
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                        {automation?.last_error && (
+                            <div className="rounded-md border border-destructive/40 p-3 text-sm text-destructive">
+                                {automation.last_error}
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
             </div>
 
             <Card className="mt-4 rounded-md shadow-none">
