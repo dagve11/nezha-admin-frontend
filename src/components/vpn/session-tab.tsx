@@ -54,7 +54,7 @@ import {
     Trash2,
 } from "lucide-react"
 import type { ReactNode } from "react"
-import { useEffect, useRef, useState } from "react"
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 
 interface SessionTabProps {
@@ -84,7 +84,9 @@ const vpnSessionStates = [
     "unknown",
 ]
 
-export function SessionTab({
+const maxSessionLogLines = 1000
+
+export const SessionTab = memo(function SessionTab({
     sessions,
     policies,
     servers,
@@ -102,14 +104,21 @@ export function SessionTab({
     const [logSession, setLogSession] = useState<ModelAgentVPNSession | null>(null)
     const [controlSessionID, setControlSessionID] = useState<string | null>(null)
 
-    const filteredSessions = sessions.filter(
-        (session) =>
-            (filters.state === "all" || session.state === filters.state) &&
-            (filters.entry === "all" || String(session.entry_server_id) === filters.entry) &&
-            (filters.exit === "all" || String(session.exit_server_id) === filters.exit),
+    const filteredSessions = useMemo(
+        () =>
+            sessions.filter(
+                (session) =>
+                    (filters.state === "all" || session.state === filters.state) &&
+                    (filters.entry === "all" ||
+                        String(session.entry_server_id) === filters.entry) &&
+                    (filters.exit === "all" || String(session.exit_server_id) === filters.exit),
+            ),
+        [filters.entry, filters.exit, filters.state, sessions],
     )
-    const controlSession =
-        sessions.find((session) => session.session_id === controlSessionID) ?? null
+    const controlSession = useMemo(
+        () => sessions.find((session) => session.session_id === controlSessionID) ?? null,
+        [controlSessionID, sessions],
+    )
 
     return (
         <div className="space-y-4">
@@ -375,7 +384,7 @@ export function SessionTab({
             />
         </div>
     )
-}
+})
 
 function SessionControlDialog({
     session,
@@ -441,7 +450,11 @@ function SessionControlDialog({
     const tunName = session.tun_interface || session.tun_name || policy?.tun_name || "nezha-vpn"
     const systemProxyStatus =
         session.system_proxy_status ||
-        (session.system_proxy_applied === true ? "applied" : session.system_proxy_applied === false ? "disabled" : "unknown")
+        (session.system_proxy_applied === true
+            ? "applied"
+            : session.system_proxy_applied === false
+              ? "disabled"
+              : "unknown")
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -449,9 +462,7 @@ function SessionControlDialog({
                 <DialogHeader>
                     <div className="flex flex-wrap items-center gap-2">
                         <DialogTitle>{t("VPN.SessionControl")}</DialogTitle>
-                        {proxyCleared && (
-                            <Badge variant="secondary">{t("VPN.ProxyCleared")}</Badge>
-                        )}
+                        {proxyCleared && <Badge variant="secondary">{t("VPN.ProxyCleared")}</Badge>}
                     </div>
                     <DialogDescription className="break-all font-mono text-xs">
                         {session.session_id}
@@ -591,12 +602,43 @@ function SessionLogDialog({
     const [status, setStatus] = useState("")
     const retryTimerRef = useRef<number | undefined>(undefined)
     const socketRef = useRef<WebSocket | null>(null)
+    const pendingLogUpdateRef = useRef<((current: string[]) => string[]) | null>(null)
+    const logFlushTimerRef = useRef<number | undefined>(undefined)
+
+    const flushPendingLogUpdate = useCallback(() => {
+        const nextUpdate = pendingLogUpdateRef.current
+        pendingLogUpdateRef.current = null
+        if (!nextUpdate) return
+        setLogs((current) => nextUpdate(current))
+        setStatus("")
+    }, [])
+
+    const queueLogUpdate = useCallback(
+        (updater: (current: string[]) => string[]) => {
+            if (logFlushTimerRef.current === undefined && !pendingLogUpdateRef.current) {
+                setLogs((current) => updater(current))
+                setStatus("")
+                logFlushTimerRef.current = window.setTimeout(() => {
+                    logFlushTimerRef.current = undefined
+                    flushPendingLogUpdate()
+                }, 16)
+                return
+            }
+
+            const pending = pendingLogUpdateRef.current
+            pendingLogUpdateRef.current = pending ? (current) => updater(pending(current)) : updater
+        },
+        [flushPendingLogUpdate],
+    )
 
     useEffect(() => {
         if (!open || !session) return
 
         let closed = false
         let retryCount = 0
+        pendingLogUpdateRef.current = null
+        window.clearTimeout(logFlushTimerRef.current)
+        logFlushTimerRef.current = undefined
         setLogs([])
         setStatus(t("VPN.LogConnecting"))
 
@@ -630,11 +672,11 @@ function SessionLogDialog({
                     }
                     if (!frame.logs?.length) return
                     const nextLines = frame.logs.map((line) => String(line))
-                    setLogs(nextLines.slice(-1000))
-                    setStatus("")
+                    queueLogUpdate(() => nextLines.slice(-maxSessionLogLines))
                 } catch {
-                    setLogs((current) => [...current, String(event.data)].slice(-1000))
-                    setStatus("")
+                    queueLogUpdate((current) =>
+                        [...current, String(event.data)].slice(-maxSessionLogLines),
+                    )
                 }
             }
 
@@ -654,10 +696,13 @@ function SessionLogDialog({
         return () => {
             closed = true
             window.clearTimeout(retryTimerRef.current)
+            pendingLogUpdateRef.current = null
+            window.clearTimeout(logFlushTimerRef.current)
+            logFlushTimerRef.current = undefined
             socketRef.current?.close()
             socketRef.current = null
         }
-    }, [open, session, t])
+    }, [open, queueLogUpdate, session, t])
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -726,7 +771,10 @@ function SessionDetailDialog({
                         label={t("VPN.ExitServer")}
                         value={serverName(session.exit_server_id)}
                     />
-                    <DetailItem label={t("VPN.Mode")} value={sessionModeLabel(t, session, policy)} />
+                    <DetailItem
+                        label={t("VPN.Mode")}
+                        value={sessionModeLabel(t, session, policy)}
+                    />
                     <DetailItem
                         label={t("VPN.RuleMode")}
                         value={ruleModeLabel(t, session.rule_mode || policy?.rule_mode || "")}
@@ -744,9 +792,7 @@ function SessionDetailDialog({
                         value={
                             <div className="flex flex-wrap gap-1.5">
                                 <Badge
-                                    variant={
-                                        session.state === "running" ? "default" : "secondary"
-                                    }
+                                    variant={session.state === "running" ? "default" : "secondary"}
                                 >
                                     {session.state}
                                 </Badge>
@@ -856,15 +902,7 @@ function ControlStatusItem({
     )
 }
 
-function NativeField({
-    children,
-    id,
-    label,
-}: {
-    children: ReactNode
-    id: string
-    label: string
-}) {
+function NativeField({ children, id, label }: { children: ReactNode; id: string; label: string }) {
     return (
         <div className="space-y-2">
             <Label htmlFor={id}>{label}</Label>

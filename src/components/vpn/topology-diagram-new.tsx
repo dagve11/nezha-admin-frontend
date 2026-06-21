@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button"
 import { ModelAgentVPNSession, ServerIdentifierType } from "@/types"
 import { Minus, Plus, RotateCw, Server, Waypoints } from "lucide-react"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { memo, useEffect, useMemo, useRef, useState } from "react"
 
 interface TopologyDiagramProps {
     servers: ServerIdentifierType[]
@@ -23,7 +23,10 @@ interface ActiveConnection {
     entryNode: NodePosition
     exitNode: NodePosition
     isDirect: boolean
+    paths: string[]
 }
+
+const topologyCanvasSize = { width: 1200, height: 800 }
 
 // Deterministic pseudo-random number from a seed.
 function seededRandom(seed: number): number {
@@ -90,7 +93,12 @@ function generatePath(x1: number, y1: number, x2: number, y2: number): string {
     return `M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x2} ${y2}`
 }
 
-export function TopologyDiagramNew({ servers, sessions, serverName, t }: TopologyDiagramProps) {
+export const TopologyDiagramNew = memo(function TopologyDiagramNew({
+    servers,
+    sessions,
+    serverName,
+    t,
+}: TopologyDiagramProps) {
     const [view, setView] = useState({ scale: 1, x: 0, y: 0 })
     const [isDragging, setIsDragging] = useState(false)
     const viewportRef = useRef<HTMLDivElement | null>(null)
@@ -102,7 +110,7 @@ export function TopologyDiagramNew({ servers, sessions, serverName, t }: Topolog
         startY: number
     } | null>(null)
     const rafRef = useRef<number | null>(null)
-    const [canvasSize] = useState({ width: 1200, height: 800 })
+    const canvasSize = topologyCanvasSize
 
     const zoomBy = (delta: number) => {
         setView((current) => ({
@@ -118,13 +126,21 @@ export function TopologyDiagramNew({ servers, sessions, serverName, t }: Topolog
         [servers, canvasSize.width, canvasSize.height, serverName],
     )
 
-    const dashboardNode = {
-        x: canvasSize.width / 2,
-        y: canvasSize.height / 2,
-    }
+    const dashboardNode = useMemo(
+        () => ({
+            x: canvasSize.width / 2,
+            y: canvasSize.height / 2,
+        }),
+        [canvasSize.height, canvasSize.width],
+    )
 
     const onlineCount = useMemo(
         () => nodePositions.filter((n) => n.isOnline).length,
+        [nodePositions],
+    )
+
+    const nodeByID = useMemo(
+        () => new Map(nodePositions.map((node) => [node.id, node])),
         [nodePositions],
     )
 
@@ -132,20 +148,29 @@ export function TopologyDiagramNew({ servers, sessions, serverName, t }: Topolog
         return sessions
             .filter((session) => session.state === "running")
             .map((session) => {
-                const entryNode = nodePositions.find((n) => n.id === session.entry_server_id)
-                const exitNode = nodePositions.find((n) => n.id === session.exit_server_id)
+                const entryNode = nodeByID.get(session.entry_server_id)
+                const exitNode = nodeByID.get(session.exit_server_id)
 
                 if (!entryNode || !exitNode) return null
+
+                const isDirect = session.relay_mode === "direct"
+                const paths = isDirect
+                    ? [generatePath(entryNode.x, entryNode.y, exitNode.x, exitNode.y)]
+                    : [
+                          generatePath(entryNode.x, entryNode.y, dashboardNode.x, dashboardNode.y),
+                          generatePath(dashboardNode.x, dashboardNode.y, exitNode.x, exitNode.y),
+                      ]
 
                 return {
                     id: session.session_id,
                     entryNode,
                     exitNode,
-                    isDirect: session.relay_mode === "direct",
+                    isDirect,
+                    paths,
                 }
             })
             .filter((conn): conn is ActiveConnection => conn !== null)
-    }, [sessions, nodePositions])
+    }, [dashboardNode, nodeByID, sessions])
 
     useEffect(() => {
         const viewport = viewportRef.current
@@ -321,118 +346,105 @@ export function TopologyDiagramNew({ servers, sessions, serverName, t }: Topolog
                         transform: `translate(-50%, -50%) translate(${view.x}px, ${view.y}px) scale(${view.scale})`,
                     }}
                 >
-                    {/* SVG links */}
-                    <svg
-                        className="absolute inset-0 h-full w-full overflow-visible"
-                        fill="none"
-                        viewBox={`0 0 ${canvasSize.width} ${canvasSize.height}`}
-                    >
-                        {activeConnections.map((conn, index) => {
-                            const paths = conn.isDirect
-                                ? [
-                                      generatePath(
-                                          conn.entryNode.x,
-                                          conn.entryNode.y,
-                                          conn.exitNode.x,
-                                          conn.exitNode.y,
-                                      ),
-                                  ]
-                                : [
-                                      generatePath(
-                                          conn.entryNode.x,
-                                          conn.entryNode.y,
-                                          dashboardNode.x,
-                                          dashboardNode.y,
-                                      ),
-                                      generatePath(
-                                          dashboardNode.x,
-                                          dashboardNode.y,
-                                          conn.exitNode.x,
-                                          conn.exitNode.y,
-                                      ),
-                                  ]
-
-                            return (
-                                <g key={conn.id}>
-                                    {paths.map((path, pathIndex) => {
-                                        const pathID = `motion-path-${index}-${pathIndex}`
-                                        return (
-                                            <g key={pathID}>
-                                                {/* Static link base */}
-                                                <path
-                                                    d={path}
-                                                    stroke="rgb(63 63 70)"
-                                                    strokeWidth="1"
-                                                />
-
-                                                {/* Animated active link */}
-                                                <path
-                                                    d={path}
-                                                    stroke={
-                                                        conn.isDirect
-                                                            ? "rgb(96 165 250)"
-                                                            : "rgb(52 211 153)"
-                                                    }
-                                                    strokeWidth={conn.isDirect ? "2" : "1.5"}
-                                                    strokeLinecap="round"
-                                                    strokeDasharray="4 10"
-                                                    opacity="0.85"
-                                                >
-                                                    <animate
-                                                        attributeName="stroke-dashoffset"
-                                                        values="28;0"
-                                                        dur={conn.isDirect ? "1s" : "1.2s"}
-                                                        begin={`${index * 0.2 + pathIndex * 0.15}s`}
-                                                        repeatCount="indefinite"
-                                                    />
-                                                </path>
-
-                                                {/* Flow particle */}
-                                                <circle
-                                                    r={conn.isDirect ? "3" : "2.5"}
-                                                    fill={
-                                                        conn.isDirect
-                                                            ? "rgb(147 197 253)"
-                                                            : "rgb(110 231 183)"
-                                                    }
-                                                >
-                                                    <animateMotion
-                                                        dur={conn.isDirect ? "1.8s" : "2.4s"}
-                                                        begin={`${index * 0.3 + pathIndex * 0.4}s`}
-                                                        repeatCount="indefinite"
-                                                    >
-                                                        <mpath href={`#${pathID}`} />
-                                                    </animateMotion>
-                                                </circle>
-                                                <path id={pathID} d={path} opacity="0" />
-                                            </g>
-                                        )
-                                    })}
-                                </g>
-                            )
-                        })}
-                    </svg>
-
-                    {/* Relay hub node */}
-                    <HubNode x={dashboardNode.x} y={dashboardNode.y} label={t("VPN.FlowRelay")} />
-
-                    {/* Server nodes */}
-                    {nodePositions.map((node) => (
-                        <ServerNode
-                            key={node.id}
-                            x={node.x}
-                            y={node.y}
-                            name={node.name}
-                            isOnline={node.isOnline}
-                        />
-                    ))}
+                    <TopologyCanvasContent
+                        activeConnections={activeConnections}
+                        canvasHeight={canvasSize.height}
+                        canvasWidth={canvasSize.width}
+                        dashboardNode={dashboardNode}
+                        flowRelayLabel={t("VPN.FlowRelay")}
+                        nodePositions={nodePositions}
+                    />
                 </div>
             </div>
         </div>
     )
-}
+})
 
-function HubNode({ x, y, label }: { x: number; y: number; label: string }) {
+const TopologyCanvasContent = memo(function TopologyCanvasContent({
+    activeConnections,
+    canvasHeight,
+    canvasWidth,
+    dashboardNode,
+    flowRelayLabel,
+    nodePositions,
+}: {
+    activeConnections: ActiveConnection[]
+    canvasHeight: number
+    canvasWidth: number
+    dashboardNode: { x: number; y: number }
+    flowRelayLabel: string
+    nodePositions: NodePosition[]
+}) {
+    return (
+        <>
+            <svg
+                className="absolute inset-0 h-full w-full overflow-visible"
+                fill="none"
+                viewBox={`0 0 ${canvasWidth} ${canvasHeight}`}
+            >
+                {activeConnections.map((conn, index) => (
+                    <g key={conn.id}>
+                        {conn.paths.map((path, pathIndex) => {
+                            const pathID = `motion-path-${index}-${pathIndex}`
+                            return (
+                                <g key={pathID}>
+                                    <path d={path} stroke="rgb(63 63 70)" strokeWidth="1" />
+                                    <path
+                                        d={path}
+                                        stroke={
+                                            conn.isDirect ? "rgb(96 165 250)" : "rgb(52 211 153)"
+                                        }
+                                        strokeDasharray="4 10"
+                                        strokeLinecap="round"
+                                        strokeWidth={conn.isDirect ? "2" : "1.5"}
+                                        opacity="0.85"
+                                    >
+                                        <animate
+                                            attributeName="stroke-dashoffset"
+                                            values="28;0"
+                                            dur={conn.isDirect ? "1s" : "1.2s"}
+                                            begin={`${index * 0.2 + pathIndex * 0.15}s`}
+                                            repeatCount="indefinite"
+                                        />
+                                    </path>
+                                    <circle
+                                        r={conn.isDirect ? "3" : "2.5"}
+                                        fill={
+                                            conn.isDirect ? "rgb(147 197 253)" : "rgb(110 231 183)"
+                                        }
+                                    >
+                                        <animateMotion
+                                            dur={conn.isDirect ? "1.8s" : "2.4s"}
+                                            begin={`${index * 0.3 + pathIndex * 0.4}s`}
+                                            repeatCount="indefinite"
+                                        >
+                                            <mpath href={`#${pathID}`} />
+                                        </animateMotion>
+                                    </circle>
+                                    <path id={pathID} d={path} opacity="0" />
+                                </g>
+                            )
+                        })}
+                    </g>
+                ))}
+            </svg>
+
+            <HubNode x={dashboardNode.x} y={dashboardNode.y} label={flowRelayLabel} />
+
+            {nodePositions.map((node) => (
+                <ServerNode
+                    key={node.id}
+                    x={node.x}
+                    y={node.y}
+                    name={node.name}
+                    isOnline={node.isOnline}
+                />
+            ))}
+        </>
+    )
+})
+
+const HubNode = memo(function HubNode({ x, y, label }: { x: number; y: number; label: string }) {
     return (
         <div
             className="group absolute"
@@ -453,9 +465,9 @@ function HubNode({ x, y, label }: { x: number; y: number; label: string }) {
             </div>
         </div>
     )
-}
+})
 
-function ServerNode({
+const ServerNode = memo(function ServerNode({
     x,
     y,
     name,
@@ -502,7 +514,7 @@ function ServerNode({
             </div>
         </div>
     )
-}
+})
 
 function clampNumber(value: number, min: number, max: number): number {
     return Math.min(max, Math.max(min, value))

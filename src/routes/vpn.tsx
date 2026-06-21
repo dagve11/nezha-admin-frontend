@@ -309,53 +309,68 @@ export default function VPNPage() {
         }
     }
 
-    async function handleStopSession(sessionID: string) {
-        try {
-            await stopVPNSession(sessionID)
-            await mutateSessions()
-        } catch (error) {
-            toast(t("Error"), { description: errorMessage(error) })
-        }
-    }
+    const handleStopSession = useCallback(
+        async (sessionID: string) => {
+            try {
+                await stopVPNSession(sessionID)
+                await mutateSessions()
+            } catch (error) {
+                toast(t("Error"), { description: errorMessage(error) })
+            }
+        },
+        [mutateSessions, t],
+    )
 
-    async function handleDeleteSession(sessionID: string) {
-        try {
-            await deleteVPNSession(sessionID)
-            await mutateSessions()
-        } catch (error) {
-            toast(t("Error"), { description: errorMessage(error) })
-        }
-    }
+    const handleDeleteSession = useCallback(
+        async (sessionID: string) => {
+            try {
+                await deleteVPNSession(sessionID)
+                await mutateSessions()
+            } catch (error) {
+                toast(t("Error"), { description: errorMessage(error) })
+            }
+        },
+        [mutateSessions, t],
+    )
 
-    async function handleRestartSession(sessionID: string) {
-        try {
-            await restartVPNSession(sessionID)
-            await mutateSessions()
-        } catch (error) {
-            toast(t("Error"), { description: errorMessage(error) })
-        }
-    }
+    const handleRestartSession = useCallback(
+        async (sessionID: string) => {
+            try {
+                await restartVPNSession(sessionID)
+                await mutateSessions()
+            } catch (error) {
+                toast(t("Error"), { description: errorMessage(error) })
+            }
+        },
+        [mutateSessions, t],
+    )
 
-    async function handleRefreshSession(sessionID: string) {
-        try {
-            await refreshVPNSessionStatus(sessionID)
-            await mutateSessions()
-            window.setTimeout(() => {
-                void mutateSessions()
-            }, 900)
-        } catch (error) {
-            toast(t("Error"), { description: errorMessage(error) })
-        }
-    }
+    const handleRefreshSession = useCallback(
+        async (sessionID: string) => {
+            try {
+                await refreshVPNSessionStatus(sessionID)
+                await mutateSessions()
+                window.setTimeout(() => {
+                    void mutateSessions()
+                }, 900)
+            } catch (error) {
+                toast(t("Error"), { description: errorMessage(error) })
+            }
+        },
+        [mutateSessions, t],
+    )
 
-    async function handleControlSession(sessionID: string, form: ModelAgentVPNSessionControlForm) {
-        try {
-            await controlVPNSession(sessionID, form)
-            await mutateSessions()
-        } catch (error) {
-            toast(t("Error"), { description: errorMessage(error) })
-        }
-    }
+    const handleControlSession = useCallback(
+        async (sessionID: string, form: ModelAgentVPNSessionControlForm) => {
+            try {
+                await controlVPNSession(sessionID, form)
+                await mutateSessions()
+            } catch (error) {
+                toast(t("Error"), { description: errorMessage(error) })
+            }
+        },
+        [mutateSessions, t],
+    )
 
     function handleFormChange<K extends keyof ModelAgentVPNPolicyForm>(
         key: K,
@@ -368,9 +383,21 @@ export default function VPNPage() {
         }))
     }
 
-    function handleSessionFilterChange(key: string, value: string) {
+    const handleSessionFilterChange = useCallback((key: string, value: string) => {
         setSessionFilters((current) => ({ ...current, [key]: value }))
-    }
+    }, [])
+
+    const handleRefreshSessions = useCallback(() => {
+        void mutateSessions()
+    }, [mutateSessions])
+
+    const handleRequestStopSession = useCallback((sessionID: string) => {
+        setSessionAction({ sessionID, type: "stop" })
+    }, [])
+
+    const handleRequestDeleteSession = useCallback((sessionID: string) => {
+        setSessionAction({ sessionID, type: "delete" })
+    }, [])
 
     return (
         <div className="px-3">
@@ -481,12 +508,12 @@ export default function VPNPage() {
                         filters={sessionFilters}
                         serverName={serverName}
                         onFilterChange={handleSessionFilterChange}
-                        onRefresh={() => void mutateSessions()}
-                        onStop={(id) => setSessionAction({ sessionID: id, type: "stop" })}
-                        onStart={(id) => void handleRestartSession(id)}
-                        onDelete={(id) => setSessionAction({ sessionID: id, type: "delete" })}
-                        onRefreshStatus={(id) => void handleRefreshSession(id)}
-                        onControl={(id, form) => void handleControlSession(id, form)}
+                        onRefresh={handleRefreshSessions}
+                        onStop={handleRequestStopSession}
+                        onStart={handleRestartSession}
+                        onDelete={handleRequestDeleteSession}
+                        onRefreshStatus={handleRefreshSession}
+                        onControl={handleControlSession}
                     />
 
                     <AlertDialog
