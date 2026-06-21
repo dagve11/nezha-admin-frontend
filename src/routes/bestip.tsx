@@ -699,6 +699,8 @@ export default function BestIPPage() {
                 appendFissionLog(event)
             })
             setFissionResult(result)
+            await mutateAutomation()
+            await mutateAutomationHistories()
             const nextCandidateRows = candidateRowsFromResult(result)
             try {
                 await sendNotifyResult(nextCandidateRows, false)
