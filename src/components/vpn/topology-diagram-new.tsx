@@ -239,7 +239,7 @@ export const TopologyDiagramNew = memo(function TopologyDiagramNew({
     }
 
     return (
-        <div className="relative h-[600px] w-full overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950">
+        <div className="relative h-[600px] w-full overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 shadow-inner transition-shadow duration-300 ease-out">
             {/* Dotted grid background */}
             <div
                 className="pointer-events-none absolute inset-0 opacity-[0.35] [background-image:radial-gradient(rgba(255,255,255,0.18)_1px,transparent_1px)] [background-size:28px_28px]"
@@ -247,7 +247,7 @@ export const TopologyDiagramNew = memo(function TopologyDiagramNew({
             />
 
             {/* Summary panel */}
-            <div className="absolute left-4 top-4 z-20 rounded-lg border border-zinc-800 bg-zinc-900/80 backdrop-blur-sm">
+            <div className="absolute left-4 top-4 z-20 rounded-lg border border-zinc-800 bg-zinc-900/80 backdrop-blur-sm transition-[background-color,box-shadow,transform] duration-300 ease-out hover:-translate-y-0.5 hover:bg-zinc-900/90 hover:shadow-lg hover:shadow-black/20">
                 <div className="flex divide-x divide-zinc-800 p-2 text-center">
                     <div className="px-3.5 py-2">
                         <div className="text-base font-semibold tabular-nums text-zinc-100">
@@ -275,42 +275,42 @@ export const TopologyDiagramNew = memo(function TopologyDiagramNew({
             </div>
 
             {/* Zoom controls */}
-            <div className="absolute right-4 top-4 z-30 flex items-center gap-0.5 rounded-lg border border-zinc-800 bg-zinc-900/80 p-1 backdrop-blur-sm">
+            <div className="absolute right-4 top-4 z-30 flex items-center gap-0.5 rounded-lg border border-zinc-800 bg-zinc-900/80 p-1 backdrop-blur-sm transition-[background-color,box-shadow,transform] duration-300 ease-out hover:-translate-y-0.5 hover:bg-zinc-900/90 hover:shadow-lg hover:shadow-black/20">
                 <Button
                     aria-label={t("VPN.TopologyZoomOut")}
-                    className="h-8 w-8 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
+                    className="group h-8 w-8 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
                     size="icon"
                     variant="ghost"
                     onClick={() => zoomBy(-0.2)}
                 >
-                    <Minus className="h-4 w-4" />
+                    <Minus className="h-4 w-4 transition-transform duration-150 ease-out group-hover:scale-110" />
                 </Button>
                 <div className="w-12 text-center text-xs font-medium tabular-nums text-zinc-300">
                     {Math.round(view.scale * 100)}%
                 </div>
                 <Button
                     aria-label={t("VPN.TopologyZoomIn")}
-                    className="h-8 w-8 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
+                    className="group h-8 w-8 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
                     size="icon"
                     variant="ghost"
                     onClick={() => zoomBy(0.2)}
                 >
-                    <Plus className="h-4 w-4" />
+                    <Plus className="h-4 w-4 transition-transform duration-150 ease-out group-hover:scale-110" />
                 </Button>
                 <div className="mx-0.5 h-5 w-px bg-zinc-800" />
                 <Button
                     aria-label={t("VPN.TopologyResetView")}
-                    className="h-8 w-8 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
+                    className="group h-8 w-8 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
                     size="icon"
                     variant="ghost"
                     onClick={resetView}
                 >
-                    <RotateCw className="h-4 w-4" />
+                    <RotateCw className="h-4 w-4 transition-transform duration-300 ease-out group-hover:rotate-180" />
                 </Button>
             </div>
 
             {/* Legend */}
-            <div className="absolute bottom-4 left-4 z-20 flex items-center gap-4 rounded-lg border border-zinc-800 bg-zinc-900/80 px-3.5 py-2 text-[11px] text-zinc-400 backdrop-blur-sm">
+            <div className="absolute bottom-4 left-4 z-20 flex items-center gap-4 rounded-lg border border-zinc-800 bg-zinc-900/80 px-3.5 py-2 text-[11px] text-zinc-400 backdrop-blur-sm transition-[background-color,box-shadow,transform] duration-300 ease-out hover:-translate-y-0.5 hover:bg-zinc-900/90 hover:shadow-lg hover:shadow-black/20">
                 <span className="flex items-center gap-1.5">
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
                     {t("VPN.Online")}
@@ -338,7 +338,7 @@ export const TopologyDiagramNew = memo(function TopologyDiagramNew({
             >
                 <div
                     className={`absolute left-1/2 top-1/2 origin-center will-change-transform ${
-                        isDragging ? "" : "transition-transform duration-200 ease-out"
+                        isDragging ? "" : "transition-transform duration-300 ease-out"
                     }`}
                     style={{
                         width: `${canvasSize.width}px`,
@@ -455,7 +455,7 @@ const HubNode = memo(function HubNode({ x, y, label }: { x: number; y: number; l
                     {/* Outer pulse ring */}
                     <span className="absolute h-full w-full animate-ping rounded-full border border-emerald-500/30 [animation-duration:3s]" />
                     {/* Solid core */}
-                    <div className="relative flex h-16 w-16 items-center justify-center rounded-full border-2 border-emerald-300 bg-emerald-500 shadow-[0_0_28px_-2px_rgba(16,185,129,0.7)] transition-colors duration-200 group-hover:bg-emerald-400">
+                    <div className="relative flex h-16 w-16 items-center justify-center rounded-full border-2 border-emerald-300 bg-emerald-500 shadow-[0_0_28px_-2px_rgba(16,185,129,0.7)] transition-[background-color,box-shadow,transform] duration-300 ease-out group-hover:scale-105 group-hover:bg-emerald-400 group-hover:shadow-[0_0_34px_1px_rgba(16,185,129,0.8)]">
                         <Waypoints className="h-7 w-7 text-zinc-950" strokeWidth={2.25} />
                     </div>
                 </div>
@@ -485,7 +485,7 @@ const ServerNode = memo(function ServerNode({
         >
             <div className="relative flex flex-col items-center">
                 <div
-                    className={`relative flex h-14 w-14 items-center justify-center rounded-xl border transition-colors duration-200 ${
+                    className={`relative flex h-14 w-14 items-center justify-center rounded-xl border transition-[background-color,border-color,box-shadow,transform] duration-300 ease-out group-hover:-translate-y-0.5 group-hover:shadow-lg group-hover:shadow-black/25 ${
                         isOnline
                             ? "border-zinc-700 bg-zinc-900 group-hover:border-emerald-500/60"
                             : "border-zinc-800 bg-zinc-900/50 group-hover:border-zinc-700"
@@ -503,7 +503,7 @@ const ServerNode = memo(function ServerNode({
                     )}
                 </div>
                 <div
-                    className={`mt-2 whitespace-nowrap rounded-md border px-2 py-0.5 text-[11px] font-medium ${
+                    className={`mt-2 whitespace-nowrap rounded-md border px-2 py-0.5 text-[11px] font-medium transition-colors duration-200 ease-out ${
                         isOnline
                             ? "border-zinc-700 bg-zinc-900 text-zinc-200"
                             : "border-zinc-800 bg-zinc-900/60 text-zinc-500"

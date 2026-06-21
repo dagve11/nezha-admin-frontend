@@ -400,7 +400,7 @@ export default function VPNPage() {
     }, [])
 
     return (
-        <div className="px-3">
+        <div className="animate-in fade-in-0 slide-in-from-bottom-1 px-3 duration-300 ease-out">
             <div className="mt-6 mb-4">
                 <div className="space-y-2">
                     <h1 className="text-3xl font-bold tracking-tight">{t("VPN.Title")}</h1>

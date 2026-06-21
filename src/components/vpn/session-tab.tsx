@@ -182,10 +182,10 @@ export const SessionTab = memo(function SessionTab({
                         <div className="flex items-end">
                             <Button
                                 variant="outline"
-                                className="w-full gap-1.5 whitespace-nowrap"
+                                className="group w-full gap-1.5 whitespace-nowrap"
                                 onClick={onRefresh}
                             >
-                                <RotateCw className="h-4 w-4" />
+                                <RotateCw className="h-4 w-4 transition-transform duration-300 ease-out group-hover:rotate-180" />
                                 <span>{t("VPN.Refresh")}</span>
                             </Button>
                         </div>
@@ -239,7 +239,10 @@ export const SessionTab = memo(function SessionTab({
                                 ].includes(session.state)
 
                                 return (
-                                    <TableRow key={session.session_id}>
+                                    <TableRow
+                                        key={session.session_id}
+                                        className="transition-colors duration-200 ease-out hover:bg-muted/40"
+                                    >
                                         <TableCell className="max-w-[16rem] truncate font-mono text-xs">
                                             {session.session_id}
                                         </TableCell>
@@ -279,9 +282,10 @@ export const SessionTab = memo(function SessionTab({
                                                         <Button
                                                             size="icon"
                                                             variant="ghost"
+                                                            className="group"
                                                             aria-label={`${t("Actions")} ${session.session_id}`}
                                                         >
-                                                            <MoreHorizontal className="h-4 w-4" />
+                                                            <MoreHorizontal className="h-4 w-4 transition-transform duration-150 ease-out group-hover:scale-110" />
                                                         </Button>
                                                     </DropdownMenuTrigger>
                                                     <DropdownMenuContent
@@ -458,7 +462,7 @@ function SessionControlDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+            <DialogContent className="max-h-[85vh] overflow-y-auto duration-300 ease-out sm:max-w-lg">
                 <DialogHeader>
                     <div className="flex flex-wrap items-center gap-2">
                         <DialogTitle>{t("VPN.SessionControl")}</DialogTitle>
@@ -706,7 +710,7 @@ function SessionLogDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
+            <DialogContent className="max-h-[85vh] overflow-y-auto duration-300 ease-out sm:max-w-3xl">
                 <DialogHeader>
                     <DialogTitle>{t("VPN.SessionLog")}</DialogTitle>
                     <DialogDescription className="break-all font-mono text-xs">
@@ -717,7 +721,7 @@ function SessionLogDialog({
                     <div className="border-b px-3 py-2 text-xs text-muted-foreground">
                         {status || `${logs.length} lines`}
                     </div>
-                    <pre className="max-h-[60vh] overflow-auto whitespace-pre-wrap p-3 font-mono text-xs leading-relaxed">
+                    <pre className="max-h-[60vh] scroll-smooth overflow-auto whitespace-pre-wrap p-3 font-mono text-xs leading-relaxed">
                         {logs.length > 0 ? logs.join("\n") : t("VPN.LogIdle")}
                     </pre>
                 </div>
@@ -745,12 +749,13 @@ function SessionDetailDialog({
                 <Button
                     size="icon"
                     variant="ghost"
+                    className="group"
                     aria-label={`${t("VPN.Detail")} ${session.session_id}`}
                 >
-                    <Eye className="h-4 w-4" />
+                    <Eye className="h-4 w-4 transition-transform duration-150 ease-out group-hover:scale-110" />
                 </Button>
             </DialogTrigger>
-            <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+            <DialogContent className="max-h-[85vh] overflow-y-auto duration-300 ease-out sm:max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>{t("VPN.Detail")}</DialogTitle>
                     <DialogDescription className="break-all font-mono text-xs">
