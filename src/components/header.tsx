@@ -19,8 +19,8 @@ import { useAuth } from "@/hooks/useAuth"
 import { useMainStore } from "@/hooks/useMainStore"
 import { useMediaQuery } from "@/hooks/useMediaQuery"
 import useSetting from "@/hooks/useSetting"
+import { userHasFeature } from "@/lib/permissions"
 import { cn } from "@/lib/utils"
-import i18next from "i18next"
 import { LogOut, Settings, User2 } from "lucide-react"
 import { DateTime } from "luxon"
 import { useEffect, useRef, useState } from "react"
@@ -44,19 +44,6 @@ import { Skeleton } from "./ui/skeleton"
 import { IconButton } from "./xui/icon-button"
 import { NzNavigationMenuLink } from "./xui/navigation-menu"
 
-const pages = [
-    { href: "/dashboard", label: i18next.t("Server") },
-    { href: "/dashboard/service", label: i18next.t("Service") },
-    { href: "/dashboard/cron", label: i18next.t("Task") },
-    { href: "/dashboard/notification", label: i18next.t("Notification") },
-    { href: "/dashboard/ddns", label: i18next.t("DDNS") },
-    { href: "/dashboard/bestip", label: i18next.t("BestIP.Nav") },
-    { href: "/dashboard/nat", label: i18next.t("NATT") },
-    { href: "/dashboard/vpn", label: i18next.t("VPN.Nav") },
-    { href: "/dashboard/server-group", label: i18next.t("Group") },
-    { href: "/dashboard/transfer", label: i18next.t("Transfer.Title") },
-]
-
 export default function Header() {
     const { t } = useTranslation()
     const { logout } = useAuth()
@@ -78,6 +65,60 @@ export default function Header() {
     // @ts-expect-error CustomLogo is a global variable
     const customLogo = window.CustomLogo || "/apple-touch-icon.png"
     const siteName = settingData?.config?.site_name
+    const canServerGroup = userHasFeature(profile, "server_group")
+    const canNotification = userHasFeature(profile, "notification")
+    const navItems = [
+        { href: "/dashboard", label: t("Server"), active: location.pathname === "/dashboard" },
+        userHasFeature(profile, "service") && {
+            href: "/dashboard/service",
+            label: t("Service"),
+            active: location.pathname === "/dashboard/service",
+        },
+        userHasFeature(profile, "task") && {
+            href: "/dashboard/cron",
+            label: t("Task"),
+            active: location.pathname === "/dashboard/cron",
+        },
+        canNotification && {
+            href: "/dashboard/notification",
+            label: t("Notification"),
+            active:
+                location.pathname === "/dashboard/notification" ||
+                location.pathname === "/dashboard/alert-rule",
+        },
+        userHasFeature(profile, "ddns") && {
+            href: "/dashboard/ddns",
+            label: t("DDNS"),
+            active: location.pathname === "/dashboard/ddns",
+        },
+        userHasFeature(profile, "bestip") && {
+            href: "/dashboard/bestip",
+            label: t("BestIP.Nav"),
+            active: location.pathname === "/dashboard/bestip",
+        },
+        userHasFeature(profile, "nat") && {
+            href: "/dashboard/nat",
+            label: t("NATT"),
+            active: location.pathname === "/dashboard/nat",
+        },
+        userHasFeature(profile, "vpn") && {
+            href: "/dashboard/vpn",
+            label: t("VPN.Nav"),
+            active: location.pathname === "/dashboard/vpn",
+        },
+        (canServerGroup || canNotification) && {
+            href: canServerGroup ? "/dashboard/server-group" : "/dashboard/notification-group",
+            label: t("Group"),
+            active:
+                location.pathname === "/dashboard/server-group" ||
+                location.pathname === "/dashboard/notification-group",
+        },
+        userHasFeature(profile, "server_transfer") && {
+            href: "/dashboard/transfer",
+            label: t("Transfer.Title"),
+            active: location.pathname === "/dashboard/transfer",
+        },
+    ].filter(Boolean) as Array<{ href: string; label: string; active: boolean }>
 
     return isDesktop ? (
         <header className={cn("flex px-4 dark:bg-black/40 bg-muted border-b-[1px] overflow-visible", location.pathname === "/dashboard/login" ? "pt-4" : "pt-8")}>
@@ -199,102 +240,17 @@ export default function Header() {
                 <div className="flex mt-4 list-none">
                     {profile && (
                         <>
-                            <NavigationMenuItem>
-                                <NzNavigationMenuLink
-                                    asChild
-                                    active={location.pathname === "/dashboard"}
-                                    className={navigationMenuTriggerStyle()}
-                                >
-                                    <Link to="/dashboard">{t("Server")}</Link>
-                                </NzNavigationMenuLink>
-                            </NavigationMenuItem>
-                            <NavigationMenuItem>
-                                <NzNavigationMenuLink
-                                    asChild
-                                    active={location.pathname === "/dashboard/service"}
-                                    className={navigationMenuTriggerStyle()}
-                                >
-                                    <Link to="/dashboard/service">{t("Service")}</Link>
-                                </NzNavigationMenuLink>
-                            </NavigationMenuItem>
-                            <NavigationMenuItem>
-                                <NzNavigationMenuLink
-                                    asChild
-                                    active={location.pathname === "/dashboard/cron"}
-                                    className={navigationMenuTriggerStyle()}
-                                >
-                                    <Link to="/dashboard/cron">{t("Task")}</Link>
-                                </NzNavigationMenuLink>
-                            </NavigationMenuItem>
-                            <NavigationMenuItem>
-                                <NzNavigationMenuLink
-                                    asChild
-                                    active={
-                                        location.pathname === "/dashboard/notification" ||
-                                        location.pathname === "/dashboard/alert-rule"
-                                    }
-                                    className={navigationMenuTriggerStyle()}
-                                >
-                                    <Link to="/dashboard/notification">{t("Notification")}</Link>
-                                </NzNavigationMenuLink>
-                            </NavigationMenuItem>
-                            <NavigationMenuItem>
-                                <NzNavigationMenuLink
-                                    asChild
-                                    active={location.pathname === "/dashboard/ddns"}
-                                    className={navigationMenuTriggerStyle()}
-                                >
-                                    <Link to="/dashboard/ddns">{t("DDNS")}</Link>
-                                </NzNavigationMenuLink>
-                            </NavigationMenuItem>
-                            <NavigationMenuItem>
-                                <NzNavigationMenuLink
-                                    asChild
-                                    active={location.pathname === "/dashboard/bestip"}
-                                    className={navigationMenuTriggerStyle()}
-                                >
-                                    <Link to="/dashboard/bestip">{t("BestIP.Nav")}</Link>
-                                </NzNavigationMenuLink>
-                            </NavigationMenuItem>
-                            <NavigationMenuItem>
-                                <NzNavigationMenuLink
-                                    asChild
-                                    active={location.pathname === "/dashboard/nat"}
-                                    className={navigationMenuTriggerStyle()}
-                                >
-                                    <Link to="/dashboard/nat">{t("NATT")}</Link>
-                                </NzNavigationMenuLink>
-                            </NavigationMenuItem>
-                            <NavigationMenuItem>
-                                <NzNavigationMenuLink
-                                    asChild
-                                    active={location.pathname === "/dashboard/vpn"}
-                                    className={navigationMenuTriggerStyle()}
-                                >
-                                    <Link to="/dashboard/vpn">{t("VPN.Nav")}</Link>
-                                </NzNavigationMenuLink>
-                            </NavigationMenuItem>
-                            <NavigationMenuItem>
-                                <NzNavigationMenuLink
-                                    asChild
-                                    active={
-                                        location.pathname === "/dashboard/server-group" ||
-                                        location.pathname === "/dashboard/notification-group"
-                                    }
-                                    className={navigationMenuTriggerStyle()}
-                                >
-                                    <Link to="/dashboard/server-group">{t("Group")}</Link>
-                                </NzNavigationMenuLink>
-                            </NavigationMenuItem>
-                            <NavigationMenuItem>
-                                <NzNavigationMenuLink
-                                    asChild
-                                    active={location.pathname === "/dashboard/transfer"}
-                                    className={navigationMenuTriggerStyle()}
-                                >
-                                    <Link to="/dashboard/transfer">{t("Transfer.Title")}</Link>
-                                </NzNavigationMenuLink>
-                            </NavigationMenuItem>
+                            {navItems.map((item) => (
+                                <NavigationMenuItem key={item.href}>
+                                    <NzNavigationMenuLink
+                                        asChild
+                                        active={item.active}
+                                        className={navigationMenuTriggerStyle()}
+                                    >
+                                        <Link to={item.href}>{item.label}</Link>
+                                    </NzNavigationMenuLink>
+                                </NavigationMenuItem>
+                            ))}
                         </>
                     )}
                 </div>
@@ -316,10 +272,10 @@ export default function Header() {
                                 </DrawerDescription>
                             </DrawerHeader>
                             <div className="grid gap-1 px-4">
-                                {pages.slice(0).map((item, index) => (
+                                {navItems.map((item) => (
                                     <Link
-                                        key={index}
-                                        to={item.href ? item.href : "#"}
+                                        key={item.href}
+                                        to={item.href}
                                         className="py-1 text-sm"
                                         onClick={() => {
                                             setOpen(false)

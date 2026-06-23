@@ -94,7 +94,7 @@ export default function UserPage() {
                             mutate: mutate,
                         }}
                     >
-                        <></>
+                        <UserCard data={s} mutate={mutate} />
                     </ActionButtonGroup>
                 )
             },

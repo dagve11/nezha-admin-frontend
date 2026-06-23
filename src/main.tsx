@@ -15,6 +15,7 @@ import Root from "./routes/root"
 import ErrorPage from "./error-page"
 
 import ProtectedRoute from "./routes/protect"
+import FeatureRoute from "./routes/feature"
 import BestIPPage from "./routes/bestip"
 import CronPage from "./routes/cron"
 import LoginPage from "./routes/login"
@@ -76,75 +77,95 @@ const router = createBrowserRouter([
             {
                 path: "/dashboard/service",
                 element: (
-                    <ServerProvider withServer>
-                        <NotificationProvider withNotifierGroup>
-                            <ServicePage />
-                        </NotificationProvider>
-                    </ServerProvider>
+                    <FeatureRoute feature="service">
+                        <ServerProvider withServer>
+                            <NotificationProvider withNotifierGroup>
+                                <ServicePage />
+                            </NotificationProvider>
+                        </ServerProvider>
+                    </FeatureRoute>
                 ),
             },
             {
                 path: "/dashboard/cron",
                 element: (
-                    <ServerProvider withServer>
-                        <NotificationProvider withNotifierGroup>
-                            <CronPage />
-                        </NotificationProvider>
-                    </ServerProvider>
+                    <FeatureRoute feature="task">
+                        <ServerProvider withServer>
+                            <NotificationProvider withNotifierGroup>
+                                <CronPage />
+                            </NotificationProvider>
+                        </ServerProvider>
+                    </FeatureRoute>
                 ),
             },
             {
                 path: "/dashboard/alert-rule",
                 element: (
-                    <NotificationProvider withNotifierGroup>
-                        <AlertRulePage />
-                    </NotificationProvider>
+                    <FeatureRoute feature="notification">
+                        <NotificationProvider withNotifierGroup>
+                            <AlertRulePage />
+                        </NotificationProvider>
+                    </FeatureRoute>
                 ),
             },
             {
                 path: "/dashboard/ddns",
-                element: <DDNSPage />,
+                element: (
+                    <FeatureRoute feature="ddns">
+                        <DDNSPage />
+                    </FeatureRoute>
+                ),
             },
             {
                 path: "/dashboard/bestip",
                 element: (
-                    <ServerProvider withServer>
-                        <NotificationProvider withNotifierGroup>
-                            <BestIPPage />
-                        </NotificationProvider>
-                    </ServerProvider>
+                    <FeatureRoute feature="bestip">
+                        <ServerProvider withServer>
+                            <NotificationProvider withNotifierGroup>
+                                <BestIPPage />
+                            </NotificationProvider>
+                        </ServerProvider>
+                    </FeatureRoute>
                 ),
             },
             {
                 path: "/dashboard/nat",
                 element: (
-                    <ServerProvider withServer>
-                        <NATPage />
-                    </ServerProvider>
+                    <FeatureRoute feature="nat">
+                        <ServerProvider withServer>
+                            <NATPage />
+                        </ServerProvider>
+                    </FeatureRoute>
                 ),
             },
             {
                 path: "/dashboard/server-group",
                 element: (
-                    <ServerProvider withServer>
-                        <ServerGroupPage />
-                    </ServerProvider>
+                    <FeatureRoute feature="server_group">
+                        <ServerProvider withServer>
+                            <ServerGroupPage />
+                        </ServerProvider>
+                    </FeatureRoute>
                 ),
             },
             {
                 path: "/dashboard/notification-group",
                 element: (
-                    <NotificationProvider withNotifier>
-                        <NotificationGroupPage />
-                    </NotificationProvider>
+                    <FeatureRoute feature="notification">
+                        <NotificationProvider withNotifier>
+                            <NotificationGroupPage />
+                        </NotificationProvider>
+                    </FeatureRoute>
                 ),
             },
             {
                 path: "/dashboard/notification",
                 element: (
-                    <NotificationProvider withNotifierGroup>
-                        <NotificationPage />
-                    </NotificationProvider>
+                    <FeatureRoute feature="notification">
+                        <NotificationProvider withNotifierGroup>
+                            <NotificationPage />
+                        </NotificationProvider>
+                    </FeatureRoute>
                 ),
             },
             {
@@ -177,16 +198,22 @@ const router = createBrowserRouter([
             },
             {
                 path: "/dashboard/transfer",
-                element: <TransferPage />,
+                element: (
+                    <FeatureRoute feature="server_transfer">
+                        <TransferPage />
+                    </FeatureRoute>
+                ),
             },
             {
                 path: "/dashboard/vpn",
                 element: (
-                    <ServerProvider withServer>
-                        <NotificationProvider withNotifierGroup>
-                            <VPNPage />
-                        </NotificationProvider>
-                    </ServerProvider>
+                    <FeatureRoute feature="vpn">
+                        <ServerProvider withServer>
+                            <NotificationProvider withNotifierGroup>
+                                <VPNPage />
+                            </NotificationProvider>
+                        </ServerProvider>
+                    </FeatureRoute>
                 ),
             },
         ],

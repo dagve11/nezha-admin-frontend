@@ -1,4 +1,4 @@
-import { ModelProfile, ModelProfileForm, ModelUserForm } from "@/types"
+import { ModelProfile, ModelProfileForm, ModelUserForm, ModelUserUpdateForm } from "@/types"
 
 import { FetcherMethod, fetcher } from "./api"
 
@@ -12,6 +12,10 @@ export const login = async (username: string, password: string): Promise<void> =
 
 export const createUser = async (data: ModelUserForm): Promise<number> => {
     return fetcher<number>(FetcherMethod.POST, "/api/v1/user", data)
+}
+
+export const updateUser = async (id: number, data: ModelUserUpdateForm): Promise<void> => {
+    return fetcher<void>(FetcherMethod.PATCH, `/api/v1/user/${id}`, data)
 }
 
 export const deleteUser = async (id: number[]): Promise<void> => {

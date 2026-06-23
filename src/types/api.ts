@@ -532,6 +532,7 @@ export interface ModelProfile {
     login_ip: string
     oauth2_bind: Record<string, string>
     password: string
+    permissions: ModelUserPermissions
     reject_password: boolean
     role: number
     updated_at: string
@@ -831,6 +832,7 @@ export interface ModelUser {
     created_at: string
     id: number
     password: string
+    permissions: ModelUserPermissions
     reject_password: boolean
     role: number
     updated_at: string
@@ -839,8 +841,28 @@ export interface ModelUser {
 
 export interface ModelUserForm {
     password: string
+    permissions?: ModelUserPermissions
     role: number
     username: string
+}
+
+export interface ModelUserUpdateForm {
+    password?: string
+    permissions?: ModelUserPermissions
+    role: number
+    username: string
+}
+
+export interface ModelUserPermissions {
+    bestip: boolean
+    ddns: boolean
+    nat: boolean
+    notification: boolean
+    server_group: boolean
+    server_transfer: boolean
+    service: boolean
+    task: boolean
+    vpn: boolean
 }
 
 export interface ModelWAFApiMock {
