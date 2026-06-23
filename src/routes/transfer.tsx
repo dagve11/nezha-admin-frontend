@@ -233,14 +233,14 @@ export default function TransferPage() {
                                     <TableCell className="space-x-2">
                                         {isPending &&
                                             (isAdmin || row.from_user_id === callerID) && (
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    onClick={() => onCancel(row.id)}
-                                                >
-                                                    {t("Cancel")}
-                                                </Button>
-                                            )}
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => onCancel(row.id)}
+                                            >
+                                                {t("Cancel")}
+                                            </Button>
+                                        )}
                                         {isTerminalRevert && isAdmin && (
                                             <Button
                                                 size="sm"
