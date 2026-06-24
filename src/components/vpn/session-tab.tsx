@@ -39,6 +39,7 @@ import {
     ModelAgentVPNPolicy,
     ModelAgentVPNSession,
     ModelAgentVPNSessionControlForm,
+    ModelVPNDiagnostic,
     ServerIdentifierType,
 } from "@/types"
 import {
@@ -259,10 +260,15 @@ export const SessionTab = memo(function SessionTab({
                                                 </Badge>
                                                 {session.recovery_state &&
                                                     session.recovery_state !== "idle" && (
-                                                        <Badge variant="outline">
-                                                            {session.recovery_state}
-                                                        </Badge>
-                                                    )}
+                                                    <Badge variant="outline">
+                                                        {session.recovery_state}
+                                                    </Badge>
+                                                )}
+                                                {hasActionableDiagnostics(session) && (
+                                                    <Badge variant="destructive">
+                                                        {t("VPN.Diagnostics")}
+                                                    </Badge>
+                                                )}
                                             </div>
                                         </TableCell>
                                         <TableCell>
@@ -457,8 +463,8 @@ function SessionControlDialog({
         (session.system_proxy_applied === true
             ? "applied"
             : session.system_proxy_applied === false
-              ? "disabled"
-              : "unknown")
+                ? "disabled"
+                : "unknown")
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -604,6 +610,7 @@ function SessionLogDialog({
 }) {
     const [logs, setLogs] = useState<string[]>([])
     const [status, setStatus] = useState("")
+    const [streamSession, setStreamSession] = useState<ModelAgentVPNSession | null>(null)
     const retryTimerRef = useRef<number | undefined>(undefined)
     const socketRef = useRef<WebSocket | null>(null)
     const pendingLogUpdateRef = useRef<((current: string[]) => string[]) | null>(null)
@@ -644,6 +651,7 @@ function SessionLogDialog({
         window.clearTimeout(logFlushTimerRef.current)
         logFlushTimerRef.current = undefined
         setLogs([])
+        setStreamSession(session)
         setStatus(t("VPN.LogConnecting"))
 
         const connect = () => {
@@ -673,6 +681,9 @@ function SessionLogDialog({
                         frame.session.session_id !== session.session_id
                     ) {
                         return
+                    }
+                    if (frame.session) {
+                        setStreamSession(frame.session)
                     }
                     if (!frame.logs?.length) return
                     const nextLines = frame.logs.map((line) => String(line))
@@ -721,7 +732,7 @@ function SessionLogDialog({
                     <div className="border-b px-3 py-2 text-xs text-muted-foreground">
                         {status || `${logs.length} lines`}
                     </div>
-                    <VPNLogInsights logs={logs} session={session} t={t} />
+                    <VPNLogInsights logs={logs} session={streamSession ?? session} t={t} />
                     <pre className="max-h-[60vh] scroll-smooth overflow-auto whitespace-pre-wrap p-3 font-mono text-xs leading-relaxed">
                         {logs.length > 0 ? logs.join("\n") : t("VPN.LogIdle")}
                     </pre>
@@ -868,6 +879,13 @@ function SessionDetailDialog({
                         label={t("VPN.LastError")}
                         value={<VPNReadableError value={session.last_error} t={t} />}
                     />
+                    {session.diagnostics?.length ? (
+                        <DetailItem
+                            className="sm:col-span-2"
+                            label={t("VPN.Diagnostics")}
+                            value={<VPNSessionDiagnostics diagnostics={session.diagnostics} t={t} />}
+                        />
+                    ) : null}
                 </div>
             </DialogContent>
         </Dialog>
@@ -886,6 +904,15 @@ function VPNLogInsights({
     const insights = useMemo(() => {
         const seen = new Set<string>()
         const items: VPNReadableIssue[] = []
+        for (const diagnostic of session?.diagnostics ?? []) {
+            const issue = issueFromVPNDiagnostic(diagnostic)
+            if (!issue || seen.has(issue.titleKey)) continue
+            seen.add(issue.titleKey)
+            items.push(issue)
+            if (items.length >= 4) break
+        }
+        if (items.length > 0) return items
+
         const recentLogs = logs.slice(-120)
         for (const line of recentLogs.slice().reverse()) {
             const issue = explainVPNLogText(line)
@@ -896,7 +923,7 @@ function VPNLogInsights({
             if (items.length >= 4) break
         }
         return items.reverse()
-    }, [logs, session?.state])
+    }, [logs, session?.diagnostics, session?.state])
 
     if (insights.length === 0) return null
 
@@ -959,14 +986,14 @@ function VPNReadableIssueCard({
         issue.level === "critical"
             ? "border-red-200 bg-red-50 text-red-900 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200"
             : issue.level === "notice"
-              ? "border-zinc-200 bg-zinc-50 text-zinc-900 dark:border-zinc-800 dark:bg-zinc-900/30 dark:text-zinc-200"
-              : "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200"
+                ? "border-zinc-200 bg-zinc-50 text-zinc-900 dark:border-zinc-800 dark:bg-zinc-900/30 dark:text-zinc-200"
+                : "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200"
     const adviceClass =
         issue.level === "critical"
             ? "text-red-800 dark:text-red-300"
             : issue.level === "notice"
-              ? "text-zinc-700 dark:text-zinc-300"
-              : "text-amber-800 dark:text-amber-300"
+                ? "text-zinc-700 dark:text-zinc-300"
+                : "text-amber-800 dark:text-amber-300"
 
     return (
         <div className={`rounded-md border px-3 py-2 text-left ${toneClass}`}>
@@ -977,11 +1004,49 @@ function VPNReadableIssueCard({
     )
 }
 
+function VPNSessionDiagnostics({
+    diagnostics,
+    t,
+}: {
+    diagnostics: ModelVPNDiagnostic[]
+    t: (key: string) => string
+}) {
+    return (
+        <div className="space-y-2">
+            {diagnostics.map((diagnostic) => {
+                const issue = issueFromVPNDiagnostic(diagnostic)
+                if (!issue) return null
+                return (
+                    <div key={`${diagnostic.code}-${diagnostic.source ?? ""}`} className="space-y-2">
+                        <VPNReadableIssueCard issue={issue} t={t} />
+                        {diagnostic.message && (
+                            <div className="break-words rounded-md border bg-background/70 px-3 py-2 font-mono text-xs text-muted-foreground">
+                                {diagnostic.message}
+                            </div>
+                        )}
+                    </div>
+                )
+            })}
+        </div>
+    )
+}
+
 interface VPNReadableIssue {
     titleKey: string
     detailKey: string
     adviceKey: string
     level: "critical" | "warning" | "notice"
+}
+
+function issueFromVPNDiagnostic(diagnostic: ModelVPNDiagnostic): VPNReadableIssue | null {
+    if (!diagnostic.code) return null
+    const severity =
+        diagnostic.severity === "critical"
+            ? "critical"
+            : diagnostic.severity === "notice"
+                ? "notice"
+                : "warning"
+    return vpnIssue(diagnostic.code, severity)
 }
 
 function explainVPNLogText(value?: string): VPNReadableIssue | null {
@@ -1107,6 +1172,15 @@ function explainVPNLogText(value?: string): VPNReadableIssue | null {
     }
 
     return null
+}
+
+function hasActionableDiagnostics(session: ModelAgentVPNSession): boolean {
+    return Boolean(
+        session.diagnostics?.some(
+            (diagnostic) =>
+                diagnostic.severity === "critical" || diagnostic.severity === "warning",
+        ),
+    )
 }
 
 function vpnIssue(key: string, level: VPNReadableIssue["level"] = "warning"): VPNReadableIssue {

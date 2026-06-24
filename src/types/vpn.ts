@@ -138,6 +138,14 @@ export interface ModelAgentVPNSession {
     started_at?: string
     expires_at?: string
     stopped_at?: string
+    diagnostics?: ModelVPNDiagnostic[]
+}
+
+export interface ModelVPNDiagnostic {
+    code: string
+    severity: "critical" | "warning" | "notice" | string
+    source?: string
+    message?: string
 }
 
 export interface ModelAgentVPNSessionControlForm {

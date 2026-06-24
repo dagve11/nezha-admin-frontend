@@ -391,9 +391,25 @@
         "ActionStatusSession": "Refresh status",
         "ActionControlSession": "Control session",
         "AuditPending": "Pending",
+        "Diagnostics": "Diagnostics",
         "LogInsights": "Log diagnosis",
         "RawLog": "Raw log",
         "LogIssue": {
+            "RecoveryActive": {
+                "Title": "Self recovery is in progress",
+                "Detail": "The session detected a runtime fault and scheduled or started an automatic restart.",
+                "Advice": "Wait for the next recovery attempt. If it repeats, check the latest actionable diagnostic below."
+            },
+            "RecoveryExhausted": {
+                "Title": "Self recovery was exhausted",
+                "Detail": "The session retried automatically but still could not return to a healthy running state.",
+                "Advice": "Check the latest error, confirm both agents are online, then restart the session manually after fixing the cause."
+            },
+            "RuntimeInactive": {
+                "Title": "Session is marked running but runtime is inactive",
+                "Detail": "Dashboard still has a running session record, but the agent reports that the local runtime is inactive or unavailable.",
+                "Advice": "Refresh status first. If it remains inactive, stop the stale session and start it again."
+            },
             "WSSHandshakeClosed": {
                 "Title": "WSS connected, but the encrypted handshake was closed",
                 "Detail": "Network and WebSocket upgrade succeeded; the connection closed during the project handshake.",

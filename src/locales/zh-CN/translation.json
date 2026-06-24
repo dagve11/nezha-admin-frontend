@@ -391,9 +391,25 @@
         "ActionStatusSession": "刷新状态",
         "ActionControlSession": "控制会话",
         "AuditPending": "待记录",
+        "Diagnostics": "诊断",
         "LogInsights": "日志诊断",
         "RawLog": "原始日志",
         "LogIssue": {
+            "RecoveryActive": {
+                "Title": "正在自动恢复",
+                "Detail": "会话检测到运行时异常，已经安排或开始自动重启。",
+                "Advice": "先等待下一次恢复尝试；如果反复出现，再看下面最新的可处理诊断。"
+            },
+            "RecoveryExhausted": {
+                "Title": "自动恢复次数已耗尽",
+                "Detail": "会话已经自动重试，但仍无法恢复到健康运行状态。",
+                "Advice": "查看最新错误，确认入口和出口 agent 在线，处理原因后手动重启会话。"
+            },
+            "RuntimeInactive": {
+                "Title": "会话显示运行中，但本地运行时未运行",
+                "Detail": "Dashboard 仍有 running 会话记录，但 agent 报告本地运行时 inactive 或 unavailable。",
+                "Advice": "先刷新状态；如果仍然 inactive，停止这个残留会话后重新启动。"
+            },
             "WSSHandshakeClosed": {
                 "Title": "WSS 已连接，但加密握手被关闭",
                 "Detail": "网络和 WebSocket Upgrade 已经通过，连接是在项目内握手阶段被关闭。",
