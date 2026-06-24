@@ -45,6 +45,22 @@ export enum FetcherMethod {
 
 let lastestRefreshTokenAt = 0
 
+function clearCookies() {
+    document.cookie.split(";").forEach((cookie) => {
+        document.cookie = cookie
+            .replace(/^ +/, "")
+            .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/")
+    })
+}
+
+function redirectToLogin() {
+    if (typeof window === "undefined") return
+    clearCookies()
+    if (!window.location.pathname.startsWith("/dashboard/login")) {
+        window.location.replace("/dashboard/login")
+    }
+}
+
 export async function fetcher<T>(method: FetcherMethod, path: string, data?: any): Promise<T> {
     let response
     if (method === FetcherMethod.GET || method === FetcherMethod.DELETE) {
@@ -58,11 +74,18 @@ export async function fetcher<T>(method: FetcherMethod, path: string, data?: any
             body: data ? JSON.stringify(data) : null,
         })
     }
+    if (response.status === 401 || response.status === 403) {
+        redirectToLogin()
+        throw new Error("ApiErrorUnauthorized")
+    }
     if (!response.ok) {
         throw new Error(response.statusText)
     }
     const responseData: CommonResponse<T> = await response.json()
     if (!responseData.success) {
+        if (responseData.error === "ApiErrorUnauthorized") {
+            redirectToLogin()
+        }
         throw new Error(responseData.error)
     }
 

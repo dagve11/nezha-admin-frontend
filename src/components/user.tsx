@@ -121,7 +121,10 @@ export const UserCard: React.FC<UserCardProps> = ({ data, mutate }) => {
                 await updateUser(data.id, {
                     username: values.username,
                     role: values.role,
-                    password: values.password || undefined,
+                    password:
+                        form.formState.dirtyFields.password && values.password
+                            ? values.password
+                            : undefined,
                     permissions,
                 })
             } else {
@@ -180,6 +183,8 @@ export const UserCard: React.FC<UserCardProps> = ({ data, mutate }) => {
                                             <FormControl>
                                                 <Input
                                                     {...field}
+                                                    type="password"
+                                                    autoComplete="new-password"
                                                     placeholder={data ? t("LeaveEmptyNoChange") : ""}
                                                 />
                                             </FormControl>
