@@ -7,6 +7,7 @@
     },
     "Username": "Username",
     "Password": "Password",
+    "ConfirmPassword": "Confirm password",
     "InvalidUsernameOrPassword": "Invalid Username Or Password",
     "NetworkError": "Network Error",
     "LoginFirst": "Please Log in first",
@@ -14,6 +15,8 @@
     "Results": {
         "UsernameMin": "Username must be at least {{number}} characters.",
         "PasswordRequired": "Password cannot be empty.",
+        "PasswordMin": "Password must be at least {{number}} characters.",
+        "PasswordMismatch": "Passwords do not match.",
         "ErrorFetchingResource": "Error Fetching Resource : {{error}}",
         "SelectAtLeastOneServer": "Please select at least one server.",
         "UnExpectedError": "Unexpected error, Please see the console for details.",
@@ -26,6 +29,12 @@
         "UnknownIdentifier": "Unknown identifier"
     },
     "Login": "Log in",
+    "Register": "Register",
+    "CreateAccount": "Create account",
+    "NoAccount": "No account yet?",
+    "AlreadyHaveAccount": "Already have an account?",
+    "RegisterDescription": "Create a member account, then sign in and add your own servers.",
+    "RegisterSuccess": "Registration succeeded. Please sign in.",
     "Server": "Server",
     "Service": "Service",
     "Task": "Task",
@@ -381,7 +390,121 @@
         "ActionRestartSession": "Restart session",
         "ActionStatusSession": "Refresh status",
         "ActionControlSession": "Control session",
-        "AuditPending": "Pending"
+        "AuditPending": "Pending",
+        "LogInsights": "Log diagnosis",
+        "RawLog": "Raw log",
+        "LogIssue": {
+            "WSSHandshakeClosed": {
+                "Title": "WSS connected, but the encrypted handshake was closed",
+                "Detail": "Network and WebSocket upgrade succeeded; the connection closed during the project handshake.",
+                "Advice": "Check time sync on both entry and exit first, then verify the entry path is not rewritten by Clash/TUN or another proxy."
+            },
+            "WSSRouteNotFound": {
+                "Title": "WSS route did not reach the direct endpoint",
+                "Detail": "The domain and TLS are reachable, but the WebSocket path returned 404 or failed the handshake.",
+                "Advice": "Check the domain, Nginx/Cloudflare route, and whether the WebSocket path forwards to the exit agent direct port."
+            },
+            "ClockNotSynced": {
+                "Title": "System time is not synchronized",
+                "Detail": "The encrypted handshake carries a timestamp and is rejected when entry and exit clocks drift too far apart.",
+                "Advice": "Enable Windows Time/NTP, sync against an external time source, then restart the session."
+            },
+            "HeartbeatTimeout": {
+                "Title": "Link heartbeat timed out",
+                "Detail": "The session was established, but the internal heartbeat between entry and exit stopped responding.",
+                "Advice": "Check network jitter, Cloudflare/relay idle timeout, machine sleep, and whether the exit process was cleaned up."
+            },
+            "ConnectTimeout": {
+                "Title": "Target port timed out",
+                "Detail": "The entry node could not connect to the exit address or destination site before timeout.",
+                "Advice": "Check firewall rules, security groups, blocking, and whether the direct host and port are correct."
+            },
+            "DestinationTimeout": {
+                "Title": "Destination site timed out",
+                "Detail": "The session is still usable, but a specific site or IP did not respond before timeout.",
+                "Advice": "If other sites work, this is usually not a session failure. Check the destination, rule match, and exit reachability."
+            },
+            "RouteUnavailable": {
+                "Title": "No usable route",
+                "Detail": "The system cannot find a network path to the destination address.",
+                "Advice": "Check default gateway, virtual adapters, IPv6 settings, and Clash/TUN routing state."
+            },
+            "TLSConnectionReset": {
+                "Title": "TLS connection was reset",
+                "Detail": "The proxy tunnel or TCP connection was established, but the connection reset during TLS handshake.",
+                "Advice": "Check whether the destination is blocked, whether SNI/TLS fingerprinting is involved, and whether the exit can reach the domain directly."
+            },
+            "RemoteClosed": {
+                "Title": "Remote side closed the connection",
+                "Detail": "An existing connection was closed by the peer or an intermediate network path.",
+                "Advice": "If the session is still running and other sites work, this is usually harmless; investigate link stability if it happens often."
+            },
+            "DNSFailed": {
+                "Title": "DNS resolution failed",
+                "Detail": "The domain returned no usable result, or DNS returned NXDOMAIN.",
+                "Advice": "Check DNS servers, rule-set DNS settings, and whether the domain exists."
+            },
+            "SocksRejected": {
+                "Title": "Exit proxy rejected the connection",
+                "Detail": "Traffic reached the exit SOCKS proxy, but the request was rejected.",
+                "Advice": "Check whether exit sing-box is still running, port 19090 is listening, and the exit session was not cleaned up."
+            },
+            "PortInUse": {
+                "Title": "Local port is already in use",
+                "Detail": "The proxy or relay listen port is occupied by another process.",
+                "Advice": "Stop the stale process, or change the local listen port in the policy and retry."
+            },
+            "LocalServiceRefused": {
+                "Title": "Local service is not listening",
+                "Detail": "A local port was reached, but no process accepted the request.",
+                "Advice": "Check whether agent/sing-box started successfully. Stop and restart the session if needed."
+            },
+            "MissingDefaultInterface": {
+                "Title": "Default network interface is missing",
+                "Detail": "The system did not detect a default outbound adapter, so TUN or route checks cannot continue.",
+                "Advice": "Check network adapters, default route, and virtual adapter state."
+            },
+            "SingBoxConfigDeprecated": {
+                "Title": "sing-box configuration is incompatible",
+                "Detail": "The generated config contains legacy fields that newer sing-box versions may warn about or reject.",
+                "Advice": "Update the policy generation logic or use a matching sing-box core version."
+            },
+            "CoreConfigIncompatible": {
+                "Title": "sing-box rejected the generated configuration",
+                "Detail": "The core failed to start, usually because a config field was removed in the current sing-box version.",
+                "Advice": "Update the config generator or use a sing-box core version compatible with this config."
+            },
+            "CertificateProblem": {
+                "Title": "Certificate verification failed",
+                "Detail": "The TLS certificate, chain, or fingerprint does not match the policy settings.",
+                "Advice": "Check the domain certificate, TLS SNI, certificate verification toggle, and SHA256 pin."
+            },
+            "DirectSessionMismatch": {
+                "Title": "Direct session mismatch",
+                "Detail": "The entry reached the exit, but the exit could not find a matching pending session or token.",
+                "Advice": "Stop stale sessions and restart. Confirm entry, exit, and policy were not modified mid-start."
+            },
+            "SystemProxyCleanup": {
+                "Title": "System proxy cleanup or restore failed",
+                "Detail": "Windows system proxy registry cleanup, restore, or override detection failed.",
+                "Advice": "Check system proxy settings, close third-party proxy tools, then restart the session."
+            },
+            "CleanupRetry": {
+                "Title": "Cleanup needs a retry",
+                "Detail": "Some process or state file could not be cleaned up during session stop, so state was kept for later recovery.",
+                "Advice": "If system proxy is restored and no stale ports are listening, this is usually harmless; otherwise restart the agent or stop the stale process."
+            },
+            "AgentOffline": {
+                "Title": "Agent is offline",
+                "Detail": "Dashboard could not dispatch the control command to the entry or exit agent.",
+                "Advice": "Confirm the agent service is online and connected to Dashboard."
+            },
+            "DirectOutboundUsed": {
+                "Title": "This connection used the direct outbound",
+                "Detail": "Rules selected direct for this connection instead of vpn-exit.",
+                "Advice": "If this target should be proxied, check rule mode, domain rules, and rule-set matching."
+            }
+        }
     },
     "NATT": "NAT Traversal",
     "Group": "Group",

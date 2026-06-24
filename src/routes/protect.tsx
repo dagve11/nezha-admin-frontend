@@ -4,7 +4,9 @@ import { Navigate } from "react-router-dom"
 export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     const { profile } = useAuth()
 
-    if (!profile && window.location.pathname !== "/dashboard/login") {
+    const publicPaths = ["/dashboard/login", "/dashboard/register"]
+
+    if (!profile && !publicPaths.includes(window.location.pathname)) {
         return (
             <>
                 <Navigate to="/dashboard/login" />

@@ -19,6 +19,7 @@ import FeatureRoute from "./routes/feature"
 import BestIPPage from "./routes/bestip"
 import CronPage from "./routes/cron"
 import LoginPage from "./routes/login"
+import RegisterPage from "./routes/register"
 import ServerPage from "./routes/server"
 import ServicePage from "./routes/service"
 import { TerminalPage } from "./components/terminal"
@@ -65,6 +66,10 @@ const router = createBrowserRouter([
             {
                 path: "/dashboard/login",
                 element: <LoginPage />,
+            },
+            {
+                path: "/dashboard/register",
+                element: <RegisterPage />,
             },
             {
                 path: "/dashboard",

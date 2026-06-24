@@ -721,6 +721,7 @@ function SessionLogDialog({
                     <div className="border-b px-3 py-2 text-xs text-muted-foreground">
                         {status || `${logs.length} lines`}
                     </div>
+                    <VPNLogInsights logs={logs} session={session} t={t} />
                     <pre className="max-h-[60vh] scroll-smooth overflow-auto whitespace-pre-wrap p-3 font-mono text-xs leading-relaxed">
                         {logs.length > 0 ? logs.join("\n") : t("VPN.LogIdle")}
                     </pre>
@@ -829,7 +830,7 @@ function SessionDetailDialog({
                     />
                     <DetailItem
                         label={t("VPN.RecoveryLastError")}
-                        value={session.recovery_last_error || "-"}
+                        value={<VPNReadableError value={session.recovery_last_error} t={t} />}
                     />
                     <DetailItem
                         label={t("VPN.Traffic")}
@@ -865,12 +866,256 @@ function SessionDetailDialog({
                     <DetailItem
                         className="sm:col-span-2"
                         label={t("VPN.LastError")}
-                        value={session.last_error || "-"}
+                        value={<VPNReadableError value={session.last_error} t={t} />}
                     />
                 </div>
             </DialogContent>
         </Dialog>
     )
+}
+
+function VPNLogInsights({
+    logs,
+    session,
+    t,
+}: {
+    logs: string[]
+    session: ModelAgentVPNSession | null
+    t: (key: string) => string
+}) {
+    const insights = useMemo(() => {
+        const seen = new Set<string>()
+        const items: VPNReadableIssue[] = []
+        const recentLogs = logs.slice(-120)
+        for (const line of recentLogs.slice().reverse()) {
+            const issue = explainVPNLogText(line)
+            if (!issue || seen.has(issue.titleKey)) continue
+            if (session?.state === "running" && issue.level === "notice") continue
+            seen.add(issue.titleKey)
+            items.push(issue)
+            if (items.length >= 4) break
+        }
+        return items.reverse()
+    }, [logs, session?.state])
+
+    if (insights.length === 0) return null
+
+    return (
+        <div className="border-b bg-background/70 px-3 py-3">
+            <div className="mb-2 text-xs font-medium text-muted-foreground">
+                {t("VPN.LogInsights")}
+            </div>
+            <div className="space-y-2">
+                {insights.map((issue) => (
+                    <VPNReadableIssueCard key={issue.titleKey} issue={issue} t={t} />
+                ))}
+            </div>
+        </div>
+    )
+}
+
+function VPNReadableError({
+    value,
+    t,
+}: {
+    value?: string
+    t: (key: string) => string
+}) {
+    const raw = value?.trim()
+    if (!raw) return <>-</>
+
+    const issue = explainVPNLogText(raw)
+    if (!issue) {
+        return (
+            <div className="space-y-2">
+                <div className="break-words font-mono text-xs text-muted-foreground">{raw}</div>
+            </div>
+        )
+    }
+
+    return (
+        <div className="space-y-2">
+            <VPNReadableIssueCard issue={issue} t={t} />
+            <details className="rounded-md border bg-background/70 px-3 py-2">
+                <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
+                    {t("VPN.RawLog")}
+                </summary>
+                <div className="mt-2 break-words font-mono text-xs text-muted-foreground">
+                    {raw}
+                </div>
+            </details>
+        </div>
+    )
+}
+
+function VPNReadableIssueCard({
+    issue,
+    t,
+}: {
+    issue: VPNReadableIssue
+    t: (key: string) => string
+}) {
+    const toneClass =
+        issue.level === "critical"
+            ? "border-red-200 bg-red-50 text-red-900 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200"
+            : issue.level === "notice"
+              ? "border-zinc-200 bg-zinc-50 text-zinc-900 dark:border-zinc-800 dark:bg-zinc-900/30 dark:text-zinc-200"
+              : "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200"
+    const adviceClass =
+        issue.level === "critical"
+            ? "text-red-800 dark:text-red-300"
+            : issue.level === "notice"
+              ? "text-zinc-700 dark:text-zinc-300"
+              : "text-amber-800 dark:text-amber-300"
+
+    return (
+        <div className={`rounded-md border px-3 py-2 text-left ${toneClass}`}>
+            <div className="text-sm font-semibold">{t(issue.titleKey)}</div>
+            <div className="mt-1 text-xs leading-relaxed">{t(issue.detailKey)}</div>
+            <div className={`mt-1 text-xs leading-relaxed ${adviceClass}`}>{t(issue.adviceKey)}</div>
+        </div>
+    )
+}
+
+interface VPNReadableIssue {
+    titleKey: string
+    detailKey: string
+    adviceKey: string
+    level: "critical" | "warning" | "notice"
+}
+
+function explainVPNLogText(value?: string): VPNReadableIssue | null {
+    const text = value?.toLowerCase() ?? ""
+    if (!text.trim()) return null
+
+    if (
+        text.includes("fatal") &&
+        (text.includes("decode config") ||
+            text.includes("legacy inbound fields") ||
+            text.includes("removed in sing-box"))
+    ) {
+        return vpnIssue("CoreConfigIncompatible", "critical")
+    }
+    if (
+        text.includes("direct websocket dial failed") &&
+        (text.includes("404") || text.includes("not found") || text.includes("bad handshake"))
+    ) {
+        return vpnIssue("WSSRouteNotFound")
+    }
+    if (
+        text.includes("websocket: close 1006") ||
+        text.includes("unexpected eof") ||
+        text.includes("websocket bad handshake")
+    ) {
+        return vpnIssue("WSSHandshakeClosed")
+    }
+    if (text.includes("handshake timestamp expired") || text.includes("local cmos clock")) {
+        return vpnIssue("ClockNotSynced")
+    }
+    if (text.includes("heartbeat_timeout") || text.includes("heartbeat timeout")) {
+        return vpnIssue("HeartbeatTimeout")
+    }
+    if (
+        text.includes("connection: open connection to") &&
+        (text.includes("i/o timeout") ||
+            text.includes("context deadline exceeded") ||
+            text.includes("did not properly respond"))
+    ) {
+        return vpnIssue("DestinationTimeout", "notice")
+    }
+    if (
+        text.includes("i/o timeout") ||
+        text.includes("did not properly respond") ||
+        text.includes("context deadline exceeded")
+    ) {
+        return vpnIssue("ConnectTimeout")
+    }
+    if (text.includes("network is unreachable") || text.includes("no route to host")) {
+        return vpnIssue("RouteUnavailable")
+    }
+    if (
+        text.includes("failed to receive handshake") ||
+        text.includes("connection was reset") ||
+        text.includes("connection reset") ||
+        text.includes("recv failure")
+    ) {
+        return vpnIssue("TLSConnectionReset")
+    }
+    if (
+        text.includes("connection upload closed") ||
+        text.includes("connection download closed") ||
+        text.includes("forcibly closed by the remote host")
+    ) {
+        return vpnIssue("RemoteClosed", "notice")
+    }
+    if (
+        text.includes("lookup ") &&
+        (text.includes("nxdomain") || text.includes("empty result") || text.includes("no such host"))
+    ) {
+        return vpnIssue("DNSFailed", "notice")
+    }
+    if (text.includes("socks5: request rejected")) {
+        return vpnIssue("SocksRejected")
+    }
+    if (text.includes("address already in use") || text.includes("bind:")) {
+        return vpnIssue("PortInUse")
+    }
+    if (text.includes("actively refused") || text.includes("connection refused")) {
+        return vpnIssue("LocalServiceRefused")
+    }
+    if (text.includes("missing default interface")) {
+        return vpnIssue("MissingDefaultInterface")
+    }
+    if (text.includes("legacy inbound fields") || text.includes("legacy domain strategy")) {
+        return vpnIssue("SingBoxConfigDeprecated", "notice")
+    }
+    if (
+        text.includes("certificate") ||
+        text.includes("unknown authority") ||
+        text.includes("fingerprint mismatch") ||
+        text.includes("direct_cert_sha256 is required")
+    ) {
+        return vpnIssue("CertificateProblem")
+    }
+    if (
+        text.includes("unknown vpn direct session") ||
+        text.includes("invalid vpn direct session token") ||
+        text.includes("unknown or invalid vpn direct session")
+    ) {
+        return vpnIssue("DirectSessionMismatch")
+    }
+    if (
+        text.includes("system proxy") ||
+        text.includes("proxyserver") ||
+        text.includes("proxyoverride") ||
+        text.includes("reg delete")
+    ) {
+        return vpnIssue("SystemProxyCleanup")
+    }
+    if (
+        text.includes("state=kept-for-restore-retry") ||
+        text.includes("sidecar_pid") && text.includes("kill=failed") ||
+        text.includes("access is denied")
+    ) {
+        return vpnIssue("CleanupRetry", "notice")
+    }
+    if (text.includes("agent is offline") || text.includes("server ") && text.includes(" is offline")) {
+        return vpnIssue("AgentOffline")
+    }
+    if (text.includes("using outbound/direct[direct]")) {
+        return vpnIssue("DirectOutboundUsed", "notice")
+    }
+
+    return null
+}
+
+function vpnIssue(key: string, level: VPNReadableIssue["level"] = "warning"): VPNReadableIssue {
+    return {
+        titleKey: `VPN.LogIssue.${key}.Title`,
+        detailKey: `VPN.LogIssue.${key}.Detail`,
+        adviceKey: `VPN.LogIssue.${key}.Advice`,
+        level,
+    }
 }
 
 function DetailItem({

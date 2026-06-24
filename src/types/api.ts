@@ -546,6 +546,11 @@ export interface ModelProfileForm {
     reject_password?: boolean
 }
 
+export interface ModelRegisterForm {
+    password: string
+    username: string
+}
+
 export interface ModelRule {
     /** 覆盖范围 RuleCoverAll/IgnoreAll */
     cover: number

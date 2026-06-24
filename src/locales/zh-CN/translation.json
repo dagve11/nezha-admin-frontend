@@ -7,6 +7,7 @@
     },
     "Username": "用户名",
     "Password": "密码",
+    "ConfirmPassword": "确认密码",
     "InvalidUsernameOrPassword": "用户名或密码错误",
     "NetworkError": "网络错误",
     "LoginFirst": "请先登录",
@@ -14,6 +15,8 @@
     "Results": {
         "UsernameMin": "用户名必须至少有 {{number}} 个字符。",
         "PasswordRequired": "密码不能为空。",
+        "PasswordMin": "密码必须至少有 {{number}} 个字符。",
+        "PasswordMismatch": "两次输入的密码不一致。",
         "ErrorFetchingResource": "获取资源时出错：{{error}}",
         "SelectAtLeastOneServer": "请至少选择一台服务器。",
         "UnExpectedError": "意外错误，请查看控制台了解详细信息。",
@@ -26,6 +29,12 @@
         "UnknownIdentifier": "未知标识符"
     },
     "Login": "登录",
+    "Register": "注册",
+    "CreateAccount": "创建账号",
+    "NoAccount": "还没有账号？",
+    "AlreadyHaveAccount": "已有账号？",
+    "RegisterDescription": "创建普通用户账号后即可登录并接入自己的服务器。",
+    "RegisterSuccess": "注册成功，请登录。",
     "Server": "服务器",
     "Service": "服务",
     "Task": "任务",
@@ -381,7 +390,121 @@
         "ActionRestartSession": "重启会话",
         "ActionStatusSession": "刷新状态",
         "ActionControlSession": "控制会话",
-        "AuditPending": "待记录"
+        "AuditPending": "待记录",
+        "LogInsights": "日志诊断",
+        "RawLog": "原始日志",
+        "LogIssue": {
+            "WSSHandshakeClosed": {
+                "Title": "WSS 已连接，但加密握手被关闭",
+                "Detail": "网络和 WebSocket Upgrade 已经通过，连接是在项目内握手阶段被关闭。",
+                "Advice": "优先检查入口和出口时间是否同步，再确认入口没有被 Clash/TUN 或中间代理改写链路。"
+            },
+            "WSSRouteNotFound": {
+                "Title": "WSS 路由没有接到直连入口",
+                "Detail": "域名和 TLS 可达，但 WebSocket 路径返回 404 或握手失败。",
+                "Advice": "检查域名、Nginx/Cloudflare 路由、WebSocket 路径是否转发到出口 agent 的直连端口。"
+            },
+            "ClockNotSynced": {
+                "Title": "系统时间不同步",
+                "Detail": "加密握手带时间戳，入口和出口时间偏差过大会被拒绝。",
+                "Advice": "启动 Windows Time/NTP，同步到外部时间源后重新启动会话。"
+            },
+            "HeartbeatTimeout": {
+                "Title": "链路心跳超时",
+                "Detail": "会话已经建立，但入口和出口之间的内部心跳长时间没有回应。",
+                "Advice": "检查网络抖动、Cloudflare/中转链路空闲超时、机器休眠和出口进程是否被清理。"
+            },
+            "ConnectTimeout": {
+                "Title": "目标端口连接超时",
+                "Detail": "入口无法在超时时间内连接到出口地址或目标网站。",
+                "Advice": "检查防火墙、安全组、被墙情况，以及直连地址和端口是否正确。"
+            },
+            "DestinationTimeout": {
+                "Title": "目标网站访问超时",
+                "Detail": "会话仍可用，但某个具体网站或 IP 没有在超时时间内响应。",
+                "Advice": "如果其它网站正常，这通常不是会话故障；可检查目标站点、规则匹配和出口网络可达性。"
+            },
+            "RouteUnavailable": {
+                "Title": "本机没有可用路由",
+                "Detail": "系统找不到到目标地址的网络路径。",
+                "Advice": "检查默认网关、虚拟网卡、IPv6 设置和 Clash/TUN 路由状态。"
+            },
+            "TLSConnectionReset": {
+                "Title": "TLS 连接被重置",
+                "Detail": "代理隧道或 TCP 已建立，但 TLS 握手阶段连接被重置。",
+                "Advice": "检查目标站点是否被阻断、SNI/TLS 指纹是否被拦截，以及出口是否能直接访问该域名。"
+            },
+            "RemoteClosed": {
+                "Title": "远端主动关闭连接",
+                "Detail": "已有连接被对端或中间链路关闭，常见于浏览器取消请求、目标站断开或网络抖动。",
+                "Advice": "如果会话仍在运行且其它网站正常，通常可忽略；频繁出现时再检查链路稳定性。"
+            },
+            "DNSFailed": {
+                "Title": "DNS 解析失败",
+                "Detail": "域名没有解析结果，或解析服务返回 NXDOMAIN。",
+                "Advice": "检查 DNS 服务器、规则集 DNS 配置和域名是否真实存在。"
+            },
+            "SocksRejected": {
+                "Title": "出口代理拒绝连接",
+                "Detail": "入口已把流量交给出口 SOCKS，但出口代理拒绝了该请求。",
+                "Advice": "检查出口 sing-box 是否仍在运行、19090 端口是否监听，以及出口侧会话是否被清理。"
+            },
+            "PortInUse": {
+                "Title": "本地端口被占用",
+                "Detail": "代理或中转监听端口已被其它进程占用。",
+                "Advice": "结束残留进程，或更换策略里的本地监听端口后重试。"
+            },
+            "LocalServiceRefused": {
+                "Title": "本地服务未监听",
+                "Detail": "连接到了本机端口，但没有进程接收请求。",
+                "Advice": "检查 agent/sing-box 是否启动成功，必要时停止会话后重新启动。"
+            },
+            "MissingDefaultInterface": {
+                "Title": "缺少默认网络接口",
+                "Detail": "系统没有识别到默认出口网卡，TUN 或路由检测无法继续。",
+                "Advice": "检查网络适配器、默认路由和虚拟网卡状态。"
+            },
+            "SingBoxConfigDeprecated": {
+                "Title": "sing-box 配置语法不兼容",
+                "Detail": "当前配置包含旧版字段，新版 sing-box 可能警告或拒绝启动。",
+                "Advice": "更新策略生成逻辑或使用匹配版本的 sing-box 核心。"
+            },
+            "CoreConfigIncompatible": {
+                "Title": "sing-box 配置已被当前版本拒绝",
+                "Detail": "核心启动失败，通常是配置字段在当前 sing-box 版本中已移除。",
+                "Advice": "更新配置生成逻辑，或换用与该配置兼容的 sing-box 版本。"
+            },
+            "CertificateProblem": {
+                "Title": "证书校验失败",
+                "Detail": "TLS 证书、证书链或证书指纹与策略配置不匹配。",
+                "Advice": "检查域名证书、TLS SNI、证书校验开关和 SHA256 固定值。"
+            },
+            "DirectSessionMismatch": {
+                "Title": "直连会话不匹配",
+                "Detail": "入口到达了出口，但出口没有找到匹配的待连接会话或 token。",
+                "Advice": "停止残留会话后重新启动，确认入口、出口和策略没有被同时修改。"
+            },
+            "SystemProxyCleanup": {
+                "Title": "系统代理清理或恢复异常",
+                "Detail": "Windows 系统代理注册表项清理、恢复或覆盖检测失败。",
+                "Advice": "检查系统代理设置，关闭第三方代理工具后重新启动会话。"
+            },
+            "CleanupRetry": {
+                "Title": "清理动作需要重试",
+                "Detail": "会话停止时部分进程或状态文件暂时无法清理，系统已保留状态等待后续恢复。",
+                "Advice": "如果系统代理已恢复且没有残留端口监听，通常不影响使用；否则重启 agent 或手动结束残留进程。"
+            },
+            "AgentOffline": {
+                "Title": "Agent 离线",
+                "Detail": "Dashboard 无法向对应入口或出口 agent 下发控制命令。",
+                "Advice": "确认 agent 服务在线，并且能连接 Dashboard。"
+            },
+            "DirectOutboundUsed": {
+                "Title": "该连接走了直连出口",
+                "Detail": "规则把这条连接分到了 direct，而不是 vpn-exit。",
+                "Advice": "如果目标本应走代理，检查规则模式、域名规则和规则集是否命中。"
+            }
+        }
     },
     "NATT": "内网穿透",
     "Group": "分组",
