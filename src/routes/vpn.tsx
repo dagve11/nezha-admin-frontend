@@ -47,15 +47,16 @@ import {
     validatePolicyFormClient,
 } from "@/components/vpn/utils"
 import { useNotification } from "@/hooks/useNotfication"
-import { useServer } from "@/hooks/useServer"
 import useSetting from "@/hooks/useSetting"
 import {
     ModelAgentVPNDebugResult,
     ModelAgentVPNPolicy,
     ModelAgentVPNPolicyForm,
+    ModelAgentVPNServer,
     ModelAgentVPNPolicyStatusCheck,
     ModelAgentVPNSession,
     ModelAgentVPNSessionControlForm,
+    ServerIdentifierType,
 } from "@/types"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
@@ -117,9 +118,30 @@ const newInitialForm = (): ModelAgentVPNPolicyForm => ({
     auto_restart_backoff_seconds: [...initialForm.auto_restart_backoff_seconds],
 })
 
+function vpnServerToIdentifier(server: ModelAgentVPNServer): ServerIdentifierType {
+    return {
+        id: server.id,
+        name: server.name,
+        owner: server.owner,
+        owned: server.owned,
+        shared: server.shared,
+        online: server.online,
+        host: {
+            vpn_enabled: server.vpn_enabled,
+            vpn_allow_system_proxy: server.vpn_allow_system_proxy,
+            vpn_allow_tun: server.vpn_allow_tun,
+            vpn_core_version: server.vpn_core_version,
+            vpn_last_error: server.vpn_last_error,
+            vpn_direct_enabled: server.vpn_direct_enabled,
+            vpn_direct_listen_port: server.vpn_direct_listen_port,
+            vpn_direct_transports: server.vpn_direct_transports,
+            vpn_direct_crypto_version: server.vpn_direct_crypto_version,
+        },
+    }
+}
+
 export default function VPNPage() {
     const { t } = useTranslation()
-    const { servers = [] } = useServer()
     const { notifierGroup = [] } = useNotification()
     const { data: settingData } = useSetting()
     const [form, setForm] = useState<ModelAgentVPNPolicyForm>(() => newInitialForm())
@@ -147,6 +169,22 @@ export default function VPNPage() {
             setActiveTab("overview")
         }
     }, [activeTab, vpnDebugEnabled])
+
+    const { data: vpnServers = [], error: vpnServersError } = useSWR<ModelAgentVPNServer[]>(
+        "/api/v1/vpn/server",
+        swrFetcher,
+    )
+    const servers = useMemo(() => vpnServers.map(vpnServerToIdentifier), [vpnServers])
+
+    useEffect(() => {
+        if (vpnServersError) {
+            toast(t("Error"), {
+                description: t("Results.ErrorFetchingResource", {
+                    error: errorMessage(vpnServersError),
+                }),
+            })
+        }
+    }, [t, vpnServersError])
 
     const serverNameByID = useMemo(
         () => new Map(servers.map((server) => [server.id, server.name])),

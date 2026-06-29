@@ -113,6 +113,35 @@ vi.mock("sonner", () => ({
 vi.mock("swr", () => ({
     default: (key: string) => {
         const dataByKey: Record<string, unknown> = {
+            "/api/v1/vpn/server": [
+                {
+                    id: 1,
+                    name: "entry-cn",
+                    owned: true,
+                    shared: false,
+                    online: true,
+                    vpn_enabled: true,
+                    vpn_allow_system_proxy: true,
+                    vpn_allow_tun: true,
+                    vpn_core_version: "1.12.0",
+                    vpn_last_error: "",
+                    vpn_direct_enabled: false,
+                },
+                {
+                    id: 2,
+                    name: "exit-jp",
+                    owned: false,
+                    shared: true,
+                    online: false,
+                    vpn_enabled: true,
+                    vpn_allow_system_proxy: true,
+                    vpn_allow_tun: false,
+                    vpn_core_version: "",
+                    vpn_last_error: "Core not installed",
+                    vpn_direct_enabled: false,
+                    owner: { id: 2, username: "owner" },
+                },
+            ],
             "/api/v1/vpn/policy": [
                 {
                     id: 7,

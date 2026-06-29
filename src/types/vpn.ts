@@ -93,6 +93,27 @@ export interface ModelAgentVPNPolicyForm {
     core_sha256: string
 }
 
+export interface ModelAgentVPNServer {
+    id: number
+    name: string
+    owner?: {
+        id: number
+        username?: string
+    }
+    owned: boolean
+    shared: boolean
+    online: boolean
+    vpn_enabled: boolean
+    vpn_allow_system_proxy: boolean
+    vpn_allow_tun: boolean
+    vpn_core_version?: string
+    vpn_last_error?: string
+    vpn_direct_enabled: boolean
+    vpn_direct_listen_port?: number
+    vpn_direct_transports?: string[]
+    vpn_direct_crypto_version?: string
+}
+
 export interface ModelAgentVPNSession {
     id: number
     policy_id: number

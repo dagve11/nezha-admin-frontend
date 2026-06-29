@@ -8,11 +8,21 @@ export interface ServerIdentifierHostType {
     vpn_allow_tun?: boolean
     vpn_core_version?: string
     vpn_last_error?: string
+    vpn_direct_enabled?: boolean
+    vpn_direct_listen_port?: number
+    vpn_direct_transports?: string[]
+    vpn_direct_crypto_version?: string
 }
 
 export interface ServerIdentifierType {
     id: number
     name: string
+    owner?: {
+        id: number
+        username?: string
+    }
+    owned?: boolean
+    shared?: boolean
     host?: ServerIdentifierHostType
     last_active?: string
     online?: boolean
