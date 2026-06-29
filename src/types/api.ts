@@ -603,6 +603,8 @@ export interface ModelServer {
     geoip: ModelGeoIP
     /** 对游客隐藏 */
     hide_for_guest: boolean
+    /** 允许其他用户在代理隧道中选择 */
+    vpn_shared?: boolean
     host: ModelHost
     id: number
     last_active: string
@@ -639,6 +641,8 @@ export interface ModelServerForm {
     enable_ddns?: boolean
     /** 对游客隐藏 */
     hide_for_guest?: boolean
+    /** 允许其他用户在代理隧道中选择 */
+    vpn_shared?: boolean
     name: string
     /** 管理员可见备注 */
     note?: string

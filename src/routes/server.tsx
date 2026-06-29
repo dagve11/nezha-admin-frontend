@@ -154,6 +154,11 @@ export default function ServerPage() {
             accessorFn: (row) => row.hide_for_guest ?? false,
         },
         {
+            header: t("VPNShared"),
+            accessorKey: "vpnShared",
+            accessorFn: (row) => row.vpn_shared ?? false,
+        },
+        {
             id: "note",
             header: t("Note"),
             cell: ({ row }) => {
